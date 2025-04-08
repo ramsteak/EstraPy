@@ -1,0 +1,107 @@
+from typing import NamedTuple
+
+from . import __version__
+from .commands import commands
+from .commands._context import Directives, Context
+from .commands._handler import CommandHandler
+from .commands._parser import InputFileParsingException
+
+VERSION = tuple(int(i) for i in __version__.split("."))
+
+
+def parse_version(input: str) -> tuple[int, ...]:
+    # At most the version line will be 25 characters long. This is in order to
+    # reduce the amount of unnecessary string splitting.
+    firstline = input[:25].splitlines()[0]
+    if not firstline.startswith("#"):
+        raise InputFileParsingException(
+            "The first line of the input file must declare the version."
+        )
+
+    versionstr = (
+        firstline.removeprefix("#")
+        .strip()
+        .removeprefix("version")
+        .removeprefix(":")
+        .strip()
+    )
+
+    return tuple(int(d) for d in versionstr.split("."))
+
+
+def parse_directives(input: str) -> Directives:
+    lines = input.splitlines()
+    # Directives are prefixed by %, and follow the version. Only empty lines can
+    # be between directives or version, and all directives must be at the top of
+    # the file.
+    directives: list[str] = []
+    for line in lines[1:]:
+        # Skip empty lines
+        if not line.strip():
+            continue
+        # Stop directive parsing after the first command line
+        if not line.startswith("%"):
+            break
+
+        directives.append(line.removeprefix("%").strip())
+
+    return Directives(
+        "clear" in directives,
+        "noplot" in directives,
+    )
+
+
+def parse_commands(
+    input: str, context: Context
+) -> list[tuple[CommandHandler, NamedTuple]]:
+    # Check file version
+    if context.options.version[:3] != VERSION[:3]:
+        # TODO: is not valueerror
+        raise ValueError(
+            f"Estrapy version ({VERSION}) does not match file version {context.options.version}"
+        )
+
+    lines = input.splitlines()
+
+    parsedcommands: list[tuple[CommandHandler, NamedTuple]] = []
+
+    lineid = 0
+    while lineid + 1 < len(lines):
+        lineid += 1
+        line = lines[lineid]
+        if not line.strip():
+            continue
+        if line.startswith("#"):
+            continue
+        if line.startswith("%"):
+            continue
+
+        if line.startswith(" "):
+            raise InputFileParsingException("Command cannot start with spaces.")
+
+        cmd = line.split(maxsplit=1)[0]
+
+        if cmd not in commands:
+            raise InputFileParsingException(f"Unrecognized command: {cmd}")
+
+        command = commands[cmd]
+
+        # Check if successive lines start with spaces and are non empty, and add
+        # them to the current command line.
+        step = 1
+        while (
+            (lineid + step < len(lines))
+            and (lines[lineid + step].startswith(" "))
+            and lines[lineid + step].strip()
+        ):
+            step += 1
+
+        tokens = command.tokenize([(i, lines[i]) for i in range(lineid, lineid + step)])
+        # Removes the first token, corresponding to the command name.
+        commandargs = command.parse(tokens[1:], context)
+
+        parsedcommands.append((command, commandargs))
+
+        lineid += step
+
+    return parsedcommands

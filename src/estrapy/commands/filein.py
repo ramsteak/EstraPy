@@ -1,0 +1,492 @@
+from __future__ import annotations
+
+import pandas as pd
+import numpy as np
+
+from io import StringIO
+from logging import getLogger
+from pathlib import Path
+from typing import NamedTuple, Sequence
+
+from .exceptions import FileParsingException, ArgumentException
+from ._context import AxisType, Context, Data, MetaData, SignalType
+from ._handler import CommandHandler, Token, CommandResult
+from ._parser import CommandParser, InputFileParsingException
+
+
+def attempt_number(s: str) -> str | int | float:
+    if s.isdigit():
+        return int(s)
+    try:
+        return float(s)
+    except ValueError:
+        return s
+
+
+def _read_file_m1(
+    file: Path, args: Args_FileIn
+) -> tuple[CommandResult, pd.DataFrame, dict[str, str | int | float]]:
+    # Expect the datafile to start with a "#"
+    filecontent = file.read_text()
+    if filecontent[0] != "#":
+        raise FileParsingException
+
+    lines = filecontent.splitlines()
+    # Gets the index of the first line that does not start with #
+    id_firstdataline = (
+        i for i, line in enumerate(lines) if not line.lstrip().startswith("#")
+    ).__next__()
+
+    metadatalines = [line.split() for line in lines[: id_firstdataline - 1]]
+    headers = lines[id_firstdataline - 1].split()[1:]
+
+    try:
+        data = pd.read_csv(
+            StringIO("\n".join(lines[id_firstdataline:])), sep=r"\s+", header=None
+        )
+    except pd.errors.ParserError:
+        raise FileParsingException
+
+    datalen, headlen = len(data.columns), len(headers)
+
+    if datalen < headlen:
+        headers = headers[:datalen]
+        warn = f"Header and data length mismatch: {headlen} {datalen}. Header was cut to match."
+    elif datalen > headlen:
+        headers.extend(f"col{i+1}" for i in range(headlen, datalen))
+        warn = f"Header and data length mismatch: {headlen} {datalen}. Header was extended to match."
+    else:
+        warn = None
+
+    data.columns = headers
+
+    # --- Parse metadata -------------------------------------------------------
+    metavars: dict[str, str | int | float] = {}
+    # Add file name metadata. The split is done at every underscore.
+    metavars.update(
+        {f".f{n+1}": attempt_number(e) for n, e in enumerate(file.name.split("_"))}
+    )
+
+    # Add file header metadata. The split is done at every space.
+    metavars.update(
+        {
+            f".h{ln+1}.{pn+1}": attempt_number(item)
+            for ln, line in enumerate(metadatalines)
+            for pn, item in enumerate(line)
+        }
+    )
+
+    # If a line starts with #U then what follows is a varname and a value
+    for line in metadatalines:
+        if not line:
+            continue
+        if line[0] == "#U" and len(line) >= 3:
+            vname, vval = line[1], attempt_number(line[2])
+            metavars[f"${vname}"] = vval
+
+    # Add all the given variable names
+    for vname, vval in args.vars.items():
+        metavars[f"${vname}"] = vval
+
+    return CommandResult(None, warning=warn), data, metavars
+
+
+_file_read_methods = [_read_file_m1]
+
+
+def _get_column_index(_columns: Sequence[str], column: str | int) -> int:
+    if isinstance(column, int):
+        return column
+    if column.isdigit():
+        return int(column) - 1
+    if column in _columns:
+        return _columns.index(column)
+    raise IndexError(f"Column {column} not found.")
+
+
+def _get_column_range(
+    _columns: Sequence[str], cola: str | int, colb: str | int | None = None
+) -> list[int]:
+    if colb is None:
+        return [_get_column_index(_columns, cola)]
+    return [
+        *range(_get_column_index(_columns, cola), _get_column_index(_columns, colb) + 1)
+    ]
+
+
+def _parse_column_range(_columns: Sequence[str], range: str) -> list[int]:
+    return [
+        col
+        for interval in range.split(",")
+        for col in _get_column_range(_columns, *interval.split(".."))
+    ]
+
+
+def read_file(file: Path, args: Args_FileIn) -> Data:
+    """Reads the given file and extracts data and metadata.
+    Attempts all methods before failing."""
+    log = getLogger("filein")
+
+    log.info(f"Reading file: {file}")
+
+    for method in _file_read_methods:
+        res, filedat, mdat = method(file, args)
+        if res.success:
+            break
+
+    if res.warning is not None:
+        log.warning(f"{file}: {res.warning}")
+
+    name = file.name.removesuffix(file.suffix)
+    signaltype = args.signaltype[0] if args.signaltype is not None else None
+    refsigtype = args.refsigtype[0] if args.refsigtype is not None else None
+    metadata = MetaData(args.axis, signaltype, refsigtype, name, mdat, [], None, None)
+
+    headercolumns = list(filedat.columns)
+    dat = pd.DataFrame(
+        {
+            colname: filedat.iloc[:, _parse_column_range(headercolumns, colrange)].sum(
+                axis=1
+            )
+            for colname, colrange in args.columns.items()
+        }
+    )
+
+    xaxiscol = _get_column_index(headercolumns, args.xaxiscol)
+    match args.axis:
+        case AxisType.INDEX:
+            ...
+        case AxisType.ENERGY:
+            dat.loc[:, "E"] = filedat.iloc[:, xaxiscol]
+        case AxisType.KVECTOR:
+            dat.loc[:, "k"] = filedat.iloc[:, xaxiscol]
+        case AxisType.DISTANCE:
+            dat.loc[:, "R"] = filedat.iloc[:, xaxiscol]
+        case AxisType.QVECTOR:
+            dat.loc[:, "q"] = filedat.iloc[:, xaxiscol]
+
+    if args.signaltype is not None:
+        stype, scols = args.signaltype
+        match stype:
+            case SignalType.INTENSITY:
+                dat.loc[:, "x"] = dat.loc[:, scols[0]]
+            case SignalType.TRANSMITTANCE:
+                dat.loc[:, "x"] = np.log10(dat.loc[:, scols[0]] / dat.loc[:, scols[1]])
+            case SignalType.FLUORESCENCE:
+                dat.loc[:, "x"] = dat.loc[:, scols[0]] / dat.loc[:, scols[1]]
+
+    if args.refsigtype is not None:
+        ...
+
+    return Data(dat, metadata)
+
+
+class Args_FileIn(NamedTuple):
+    filepos: str
+
+    axis: AxisType
+    xaxiscol: str
+    shift: float
+
+    columns: dict[str, str]
+
+    signaltype: tuple[SignalType, tuple[str, ...]]
+    refsigtype: tuple[SignalType, tuple[str, ...]] | None
+
+    vars: dict[str, str | int | float]
+
+
+class BatchIn(CommandHandler):
+    @staticmethod
+    def parse(tokens: list[Token], context: Context) -> None:
+        if "batcharguments" not in context.options.other:
+            context.options.other["batcharguments"] = list[list[Token]]()
+        context.options.other["batcharguments"].append(tokens)
+
+    @staticmethod
+    def execute(args: None, context: Context) -> CommandResult:
+        return CommandResult(True)
+
+    @staticmethod
+    def undo(args: NamedTuple, context: Context) -> CommandResult:
+        # TODO:
+        raise NotImplementedError
+
+
+class FileIn(CommandHandler):
+    @staticmethod
+    def parse(tokens: list[Token], context: Context) -> Args_FileIn:
+        parser = CommandParser("filein", description="Imports the data from files.")
+        parser.add_argument(
+            "datafile", help="The file to import. Can be a glob pattern."
+        )
+        parser.add_argument(
+            "--batch", "-b", action="store_true", help="Uses the batch arguments"
+        )
+
+        parser.add_argument("--xaxiscolumn", "-x", help="Column containing the x-axis.")
+
+        groupx = parser.add_mutually_exclusive_group()
+        groupx.add_argument(
+            "--index",
+            nargs="?",
+            type=str,
+            default=None,
+            const=True,
+            help="Sets the x axis to a numeric index.",
+        )
+        groupx.add_argument(
+            "--energy",
+            "-E",
+            nargs="?",
+            type=str,
+            default=None,
+            const=True,
+            help="Reads the x-axis column as energy.",
+        )
+        groupx.add_argument(
+            "--kvector",
+            "-k",
+            nargs="?",
+            type=str,
+            default=None,
+            const=True,
+            help="Reads the x-axis column as k-vector.",
+        )
+        groupx.add_argument(
+            "--rdistance",
+            "-R",
+            nargs="?",
+            type=str,
+            default=None,
+            const=True,
+            help="Reads the x-axis column as radial distance.",
+        )
+        groupx.add_argument(
+            "--qvector",
+            "-q",
+            nargs="?",
+            type=str,
+            default=None,
+            const=True,
+            help="Reads the x-axis column as q-vector.",
+        )
+
+        parser.add_argument(
+            "--shift",
+            type=float,
+            default=0,
+            help="Shifts the data by the specified amount.",
+        )
+
+        parser.add_argument(
+            "--intensities",
+            "-I",
+            nargs="+",
+            help="Imports raw intensities, in order: I0, I1, I2, If. If not specified, determines columns from data import commands. To skip one, use '-'",
+        )
+
+        groupd = parser.add_mutually_exclusive_group()
+        groupd.add_argument(
+            "--transmission",
+            "-t",
+            nargs="*",
+            help="Reads transmission data, and calculates as log(#1/#2).",
+        )
+        groupd.add_argument(
+            "--fluorescence",
+            "-f",
+            nargs="*",
+            help="Reads fluorescence data, and calculates as #1/#2.",
+        )
+        groupd.add_argument("--intensity", "-i", help="Reads signal, as is.")
+
+        groupr = parser.add_mutually_exclusive_group()
+        groupr.add_argument(
+            "--reftransmittance",
+            "-T",
+            nargs="*",
+            help="Reads transmission reference data, and calculates as log(#1/#2).",
+        )
+        groupr.add_argument(
+            "--refabsorption", "-A", help="Reads reference signal, as is."
+        )
+
+        parser.add_argument("--var", action="append", nargs=2)
+
+        # Preparse the current arguments. If batch is used, reparse the arguments
+        # parsing the batch arguments first, to update the namespace.
+        args = parser.parse(tokens)
+        if args.batch:
+            if "batcharguments" not in context.options.other:
+                raise ArgumentException("No batch arguments specified.")
+            namespace = None
+            for batcharg in context.options.other["batcharguments"]:
+                batcharg: list[Token]
+                namespace = parser.parse([Token("", -1, -1), *batcharg], namespace)
+            args = parser.parse(tokens, namespace)
+
+        # --- Detect the input x axis type -------------------------------------
+
+        match args.xaxiscolumn, args.index, args.energy, args.kvector, args.rdistance, args.qvector:
+            case [None, None, None, None, None, None]:
+                raise InputFileParsingException("No x axis specified.")
+            case [col, None, None, None, None, None]:
+                xaxiscol, xaxis = col, AxisType.INDEX
+            case [None, col, None, None, None, None]:
+                xaxiscol, xaxis = col, AxisType.INDEX
+            case [col, True, None, None, None, None]:
+                xaxiscol, xaxis = col, AxisType.INDEX
+            case [None, None, col, None, None, None]:
+                xaxiscol, xaxis = col, AxisType.ENERGY
+            case [col, None, True, None, None, None]:
+                xaxiscol, xaxis = col, AxisType.ENERGY
+            case [None, None, None, col, None, None]:
+                xaxiscol, xaxis = col, AxisType.KVECTOR
+            case [col, None, None, True, None, None]:
+                xaxiscol, xaxis = col, AxisType.KVECTOR
+            case [None, None, None, None, col, None]:
+                xaxiscol, xaxis = col, AxisType.DISTANCE
+            case [col, None, None, None, True, None]:
+                xaxiscol, xaxis = col, AxisType.DISTANCE
+            case [None, None, None, None, None, col]:
+                xaxiscol, xaxis = col, AxisType.QVECTOR
+            case [col, None, None, None, None, True]:
+                xaxiscol, xaxis = col, AxisType.QVECTOR
+            case _:
+                raise InputFileParsingException("Invalid x axis type combination.")
+
+        # --- Intensities, transmission, absorption, fluorescence are only valid
+        # if the x axis is ENERGY. If else, use intensity ----------------------
+
+        cols: dict[str, str] = {}
+
+        match xaxis, args.transmission, args.fluorescence, args.intensities, args.intensity:
+            case [AxisType.ENERGY, None, None, None, None]:
+                raise InputFileParsingException("No y axis specified.")
+            case [AxisType.ENERGY, [str(cI0), str(cI1)], None, None, None]:
+                ytype = SignalType.TRANSMITTANCE, ("I0", "I1")
+                cols["I0"] = cI0
+                cols["I1"] = cI1
+            case [AxisType.ENERGY, None, [str(cIf), str(cI0)], None, None]:
+                ytype = SignalType.FLUORESCENCE, ("If", "I0")
+                cols["I0"] = cI0
+                cols["If"] = cIf
+            case [AxisType.ENERGY, None, None, [str(cI)], None]:
+                ytype = SignalType.INTENSITY, ("I",)
+                cols["I"] = cI
+            case [AxisType.ENERGY, None, None, _, None]:
+                raise InputFileParsingException(
+                    "No y signal mode specified. Specify either transmission, fluorescence or intensity."
+                )
+            case [AxisType.ENERGY, [], None, [str(cI0), str(cI1)], None]:
+                ytype = SignalType.TRANSMITTANCE, ("I0", "I1")
+                cols["I0"] = cI0
+                cols["I1"] = cI1
+            case [AxisType.ENERGY, None, [], [str(cI0), str(cI1)], None]:
+                raise InputFileParsingException(
+                    "Fluorescence intensity (If) is not specified."
+                )
+            case [AxisType.ENERGY, [], None, [str(cI0), str(cI1), str(cI2)], None]:
+                ytype = SignalType.TRANSMITTANCE, ("I0", "I1")
+                cols["I0"] = cI0
+                cols["I1"] = cI1
+                cols["I2"] = cI2
+            case [AxisType.ENERGY, None, [], [str(cI0), str(cI1), str(cI2)], None]:
+                raise InputFileParsingException(
+                    "Fluorescence intensity (If) is not specified."
+                )
+            case [
+                AxisType.ENERGY,
+                [],
+                None,
+                [str(cI0), str(cI1), str(cI2), str(cIf)],
+                None,
+            ]:
+                ytype = SignalType.TRANSMITTANCE, ("I0", "I1")
+                cols["I0"] = cI0
+                cols["I1"] = cI1
+                cols["I2"] = cI2
+                cols["If"] = cIf
+            case [
+                AxisType.ENERGY,
+                None,
+                [],
+                [str(cI0), str(cI1), str(cI2), str(cIf)],
+                None,
+            ]:
+                ytype = SignalType.FLUORESCENCE, ("If", "I0")
+                cols["I0"] = cI0
+                cols["I1"] = cI1
+                cols["I2"] = cI2
+                cols["If"] = cIf
+            case [AxisType.ENERGY, None, None, None, str(cI)]:
+                ytype = SignalType.INTENSITY, (cI,)
+                cols["I"] = cI
+            case [AxisType.ENERGY, _, _, _, _]:
+                raise InputFileParsingException("Too many signal specifications.")
+            case _:
+                raise InputFileParsingException(
+                    "Only energy x-axis supports this type of data input."
+                )
+
+        match xaxis, args.reftransmittance, args.refabsorption:
+            case [AxisType.ENERGY, None, None]:
+                rtype = None
+            case [AxisType.ENERGY, [], None]:
+                if "I1" not in cols:
+                    raise InputFileParsingException("No I1 column specified.")
+                if "I2" not in cols:
+                    raise InputFileParsingException("No I2 column specified.")
+                rtype = SignalType.TRANSMITTANCE, ("I1", "I2")
+            case [AxisType.ENERGY, [str(rI1), str(rI2)], None]:
+                cols["rI1"] = rI1
+                cols["rI2"] = rI2
+                rtype = SignalType.TRANSMITTANCE, ("rI1", "rI2")
+            case [AxisType.ENERGY, None, []]:
+                raise InputFileParsingException("No reference signal mode specified.")
+            case [AxisType.ENERGY, None, str(rI)]:
+                cols["Ir"] = rI
+                rtype = SignalType.INTENSITY, ("Ir",)
+            case [AxisType.ENERGY, _, _]:
+                raise InputFileParsingException(
+                    "Too many reference signal specifications."
+                )
+            case _:
+                raise InputFileParsingException(
+                    "Only energy x-axis supports this type of data input."
+                )
+
+        vars = {
+            str(k): attempt_number(v) if str(v).isdecimal() else str(v)
+            for k, v in args.var
+        }
+
+        return Args_FileIn(
+            args.datafile,
+            xaxis,
+            xaxiscol,
+            args.shift,
+            cols,
+            ytype,
+            rtype,
+            vars,
+        )
+
+    @staticmethod
+    def execute(args: Args_FileIn, context: Context) -> CommandResult:
+        files = [*context.paths.workdir.glob(args.filepos)]
+
+        if not files:
+            raise FileNotFoundError(
+                f"The specified file does not exist: {args.filepos}"
+            )
+
+        for file in files:
+            data = read_file(file, args)
+            context.data.add_data(data)
+
+        return CommandResult(True)
+
+    @staticmethod
+    def undo(args: Args_FileIn, context: Context) -> CommandResult: ...
