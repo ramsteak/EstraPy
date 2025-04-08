@@ -1,0 +1,8 @@
+# version: 1.0.0
+% clearlog
+
+batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
+
+filein data/* -b -f -T
+  --var batch 1
+
