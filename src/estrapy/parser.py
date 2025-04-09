@@ -102,6 +102,7 @@ def parse_commands(
 
         parsedcommands.append((command, commandargs))
 
-        lineid += step
+        # -1 is due to the +1 at the beginning of the loop
+        lineid += step - 1
 
     return parsedcommands
