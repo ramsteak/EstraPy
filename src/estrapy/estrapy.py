@@ -13,6 +13,10 @@ from .commands._context import Paths, Context, Options
 from .parser import parse_version, parse_directives, parse_commands
 
 
+logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
+
+
 def main():
     parser = ArgumentParser(
         "estrapy", description="Analyze XAS data files from an instruction file."
