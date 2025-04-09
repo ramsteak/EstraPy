@@ -11,16 +11,8 @@ from typing import NamedTuple, Sequence
 from .exceptions import FileParsingException, ArgumentException
 from ._context import AxisType, Context, Data, MetaData, SignalType
 from ._handler import CommandHandler, Token, CommandResult
+from ._misc import attempt_number
 from ._parser import CommandParser, InputFileParsingException
-
-
-def attempt_number(s: str) -> str | int | float:
-    if s.isdigit():
-        return int(s)
-    try:
-        return float(s)
-    except ValueError:
-        return s
 
 
 def _read_file_m1(
@@ -127,7 +119,7 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     Attempts all methods before failing."""
     log = getLogger("filein")
 
-    log.info(f"Reading file: {file}")
+    log.debug(f"Reading file: {file}")
 
     for method in _file_read_methods:
         res, filedat, mdat = method(file, args)
@@ -140,7 +132,7 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     name = file.name.removesuffix(file.suffix)
     signaltype = args.signaltype[0] if args.signaltype is not None else None
     refsigtype = args.refsigtype[0] if args.refsigtype is not None else None
-    metadata = MetaData(args.axis, signaltype, refsigtype, name, mdat, [], None, None)
+    metadata = MetaData(args.axis, signaltype, refsigtype, name, file, mdat)
 
     headercolumns = list(filedat.columns)
     dat = pd.DataFrame(
@@ -176,7 +168,16 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
                 dat.loc[:, "x"] = dat.loc[:, scols[0]] / dat.loc[:, scols[1]]
 
     if args.refsigtype is not None:
-        ...
+        rtype, rcols = args.refsigtype
+        match rtype:
+            case SignalType.INTENSITY:
+                dat.loc[:, "ref"] = dat.loc[:, rcols[0]]
+            case SignalType.TRANSMITTANCE:
+                dat.loc[:, "ref"] = np.log10(
+                    dat.loc[:, rcols[0]] / dat.loc[:, rcols[1]]
+                )
+            case SignalType.FLUORESCENCE:
+                dat.loc[:, "ref"] = dat.loc[:, rcols[0]] / dat.loc[:, rcols[1]]
 
     return Data(dat, metadata)
 
@@ -475,6 +476,7 @@ class FileIn(CommandHandler):
 
     @staticmethod
     def execute(args: Args_FileIn, context: Context) -> CommandResult:
+        log = getLogger("filein")
         files = [*context.paths.workdir.glob(args.filepos)]
 
         if not files:
@@ -485,8 +487,11 @@ class FileIn(CommandHandler):
         for file in files:
             data = read_file(file, args)
             context.data.add_data(data)
+            log.info(f"Imported {file}")
 
         return CommandResult(True)
 
     @staticmethod
-    def undo(args: Args_FileIn, context: Context) -> CommandResult: ...
+    def undo(args: Args_FileIn, context: Context) -> CommandResult:
+        # TODO:
+        raise NotImplementedError

@@ -3,6 +3,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Any, NamedTuple
 from enum import Enum
+from dataclasses import dataclass, field
 
 
 class Options(NamedTuple):
@@ -39,20 +40,22 @@ class SignalType(Enum):
     INTENSITY = "i"
 
 
-class MetaData(NamedTuple):
+@dataclass(slots=True)
+class MetaData:
     axis: AxisType
     signaltype: SignalType | None
     refsigtype: SignalType | None
     name: str
+    path: Path
     vars: dict[str, str | int | float]
-    history: list
-    refE0: float | None
-    E0: float | None
+    run: dict[str, Any] = field(default_factory=dict)
+    refE0: float | None = None
+    E0: float | None = None
 
 
 class Data:
     def __init__(self, dataframe: pd.DataFrame, metadata: MetaData) -> None:
-        self.data = dataframe
+        self.df = dataframe
         self.metadata = metadata
 
 
@@ -62,6 +65,9 @@ class DataStore:
 
     def add_data(self, data: Data) -> None:
         self.data.append(data)
+
+    def __iter__(self):
+        return self.data.__iter__()
 
 
 class Directives(NamedTuple):

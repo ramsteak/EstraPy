@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import numpy as np
+import numpy.typing as npt
+
+from enum import Enum
+from typing import NamedTuple, Any
+from statsmodels.nonparametric.smoothers_lowess import lowess
+from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootResults
+from scipy.interpolate import interp1d
+from logging import getLogger
+
+from matplotlib import pyplot as plt
+
+from ._context import Context
+from ._handler import CommandHandler, Token, CommandResult
+from ._misc import parse_numberunit, NumberUnit
+from ._parser import CommandParser
+
+
+class Args_PreEdge(NamedTuple):
+    lowerbound: NumberUnit
+    upperbound: NumberUnit
+    degree: int
+
+
+class PreEdge(CommandHandler):
+    @staticmethod
+    def parse(tokens: list[Token], context: Context) -> Args_PreEdge:
+        # The first two arguments must be the lower and upper bound, and are
+        # removed from the token list before parsing
+        token_a, token_b, *tokens = tokens
+        range = token_a.value, token_b.value
+
+        parser = CommandParser(
+            "preedge", description="Removes the background preedge contribution."
+        )
+        # parser.add_argument("range", nargs=2, help="The polynomial fit range.")
+
+        groupd = parser.add_mutually_exclusive_group()
+        groupd.add_argument(
+            "--constant",
+            "-C",
+            dest="degree",
+            action="store_const",
+            const=0,
+            help="Models the preedge as a constant polynomial.",
+        )
+        groupd.add_argument(
+            "--linear",
+            "-l",
+            dest="degree",
+            action="store_const",
+            const=1,
+            help="Models the preedge as a linear polynomial.",
+        )
+        groupd.add_argument(
+            "--quadratic",
+            "-q",
+            dest="degree",
+            action="store_const",
+            const=2,
+            help="Models the preedge as a quadratic polynomial.",
+        )
+        groupd.add_argument(
+            "--cubic",
+            "-c",
+            dest="degree",
+            action="store_const",
+            const=3,
+            help="Models the preedge as a cubic polynomial.",
+        )
+        groupd.add_argument(
+            "--polynomial",
+            "-p",
+            dest="degree",
+            type=int,
+            help="Models the preedge as a polynomial trend, and removes it from the data.",
+        )
+
+        args = parser.parse(tokens)
+
+        match range:
+            case ["..", str(B)]:
+                a = NumberUnit(-np.inf, 0, "eV")
+
+                _b = parse_numberunit(B)
+                if _b.unit not in ("eV", None):
+                    raise ValueError(f"Invalid upper bound specifier: {B}.")
+                b = NumberUnit(_b.value, _b.sign, "eV")
+            case [str(A), str(B)]:
+                _a = parse_numberunit(A)
+                if _a.unit not in ("eV", None):
+                    raise ValueError(f"Invalid lower bound specifier: {A}.")
+                a = NumberUnit(_a.value, _a.sign, "eV")
+
+                _b = parse_numberunit(B)
+                if _b.unit not in ("eV", None):
+                    raise ValueError(f"Invalid upper bound specifier: {B}.")
+                b = NumberUnit(_b.value, _b.sign, "eV")
+            case [A, B]:
+                raise ValueError(f"Invalid range specifier: {A} {B}")
+
+        return Args_PreEdge(a, b, args.degree)
+
+    @staticmethod
+    def execute(args: Args_PreEdge, context: Context) -> CommandResult:
+        log = getLogger("preedge")
+        for data in context.data:
+            if "preedge" in data.metadata.run:
+                raise RuntimeError(
+                    f"Preedge was already calculated for {data.metadata.name}"
+                )
+
+            match args.lowerbound:
+                case NumberUnit(value, 0, "eV"):
+                    lb = value
+                    idx_l = data.df.E >= lb
+                case NumberUnit(value, 1 | -1, "eV"):
+                    if data.metadata.E0 is None:
+                        raise RuntimeError(
+                            "Cannot specify relative energy value if E0 is not set."
+                        )
+                    lb = data.metadata.E0 + value
+                    idx_l = data.df.E > lb
+                case _:
+                    raise RuntimeError("Invalid state exception: #645651")
+
+            match args.upperbound:
+                case NumberUnit(value, 0, "eV"):
+                    ub = value
+                    idx_u = data.df.E <= ub
+                case NumberUnit(value, 1 | -1, "eV"):
+                    if data.metadata.E0 is None:
+                        raise RuntimeError(
+                            "Cannot specify relative energy value if E0 is not set."
+                        )
+                    ub = data.metadata.E0 + value
+                    idx_u = data.df.E <= ub
+                case _:
+                    raise RuntimeError("Invalid state exception: #645651")
+
+            log.debug(
+                f"Fitting preedge of order {args.degree} in the region {lb:0.3f}{args.lowerbound.unit} ~ {ub:0.3f}{args.upperbound.unit}"
+            )
+
+            idx = idx_l & idx_u
+            x, y = data.df.E[idx], data.df.x[idx]
+            poly = np.poly1d(np.polyfit(x, y, args.degree))
+
+            data.metadata.run["preedge"] = poly, "eV"
+
+            data.df["preedge"] = poly(data.df.E)
+            data.df.x = data.df.x - data.df.preedge
+
+        return CommandResult(True)
+
+    @staticmethod
+    def undo(args: NamedTuple, context: Context) -> CommandResult:
+        # TODO:
+        raise NotImplementedError

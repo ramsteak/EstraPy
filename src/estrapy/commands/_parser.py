@@ -2,8 +2,7 @@ import argparse
 
 from typing import NamedTuple
 
-
-class InputFileParsingException(Exception): ...
+from .exceptions import InputFileParsingException
 
 
 class Token(NamedTuple):
@@ -32,7 +31,7 @@ class CommandParser(argparse.ArgumentParser):
 
         try:
             namespace = self.parse_args(args, _namespace)
-        except argparse.ArgumentError as E:
+        except argparse.ArgumentError:
             raise InputFileParsingException
 
         return namespace  # type: ignore
