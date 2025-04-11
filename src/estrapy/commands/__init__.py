@@ -4,6 +4,7 @@ from .fourier import Fourier
 from .preedge import PreEdge
 from .postedge import PostEdge
 from .phase import Phase
+from .plot import Plot
 
 from ._handler import CommandHandler
 
@@ -16,4 +17,5 @@ commands: dict[str, CommandHandler] = {
     "postedge": PostEdge(),
     "fourier": Fourier(),
     "phase": Phase(),
+    "plot": Plot(),
 }

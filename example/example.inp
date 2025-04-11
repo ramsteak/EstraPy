@@ -12,7 +12,16 @@ edge c2.s5.d2.i2.Z
 preedge .. -50 -l
 postedge 3k .. -cde
 
-fourier 3k 16k 6A 0.04A -w2 -k2
+fourier 3k 12k 6A 0.02A -w2 -k2
   -a hann
 
 phase correct
+
+plot x(E)
+  --xlabel "Energy (eV)"
+  --ylabel "$\mu(E)$"
+
+
+plot x(k)
+  --xlabel "Wavevector (k)"
+  --ylabel "$\mu(k)$"
