@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
-import numpy.typing as npt
 
 from enum import Enum
-from typing import NamedTuple, Any
-from statsmodels.nonparametric.smoothers_lowess import lowess
-from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootResults
-from scipy.interpolate import interp1d
+from typing import NamedTuple
 from logging import getLogger
 
-from matplotlib import pyplot as plt
 
 from ._context import Context
+from ._format import sup, exp
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_numberunit_range, NumberUnit
 from ._parser import CommandParser
@@ -116,9 +112,9 @@ class PostEdge(CommandHandler):
     def execute(args: Args_PostEdge, context: Context) -> CommandResult:
         log = getLogger("postedge")
         for data in context.data:
-            if "postedge" in data.metadata.run:
+            if "postedge" in data.meta.run:
                 raise RuntimeError(
-                    f"Postedge was already calculated for {data.metadata.name}"
+                    f"Postedge was already calculated for {data.meta.name}"
                 )
 
             match args.lowerbound:
@@ -126,52 +122,51 @@ class PostEdge(CommandHandler):
                     lb = value
                     idx_l = data.df.E >= lb
                 case NumberUnit(value, 1 | -1, "eV"):
-                    if data.metadata.E0 is None:
+                    if data.meta.E0 is None:
                         raise RuntimeError(
                             "Cannot specify relative energy value if E0 is not set."
                         )
-                    lb = data.metadata.E0 + value
+                    lb = data.meta.E0 + value
                     idx_l = data.df.E >= lb
                 case NumberUnit(value, 0, "k"):
                     lb = value
                     idx_l = data.df.k >= lb
                 case _:
                     raise RuntimeError("Invalid state exception: #645651")
+                
             match args.upperbound:
                 case NumberUnit(value, 0, "eV"):
                     ub = value
                     idx_u = data.df.E <= ub
                 case NumberUnit(value, 1 | -1, "eV"):
-                    if data.metadata.E0 is None:
+                    if data.meta.E0 is None:
                         raise RuntimeError(
                             "Cannot specify relative energy value if E0 is not set."
                         )
-                    ub = data.metadata.E0 + value
+                    ub = data.meta.E0 + value
                     idx_u = data.df.E <= ub
                 case NumberUnit(value, 0, "k"):
                     ub = value
-                    idx_l = data.df.k <= ub
+                    idx_u = data.df.k <= ub
                 case _:
                     raise RuntimeError("Invalid state exception: #645651")
 
-            log.debug(
-                f"Fitting postedge of order {args.degree} in the region {lb:0.3f}{args.lowerbound.unit} ~ {ub:0.3f}{args.upperbound.unit}"
-            )
+            log.debug(f"{data.meta.name}: Fitting postedge of order {args.degree} in the region {lb:0.3f}{args.lowerbound.unit} ~ {ub:0.3f}{args.upperbound.unit}")
 
             idx = idx_l & idx_u
             match args.fitaxis:
                 case "eV":
-                    X = data.df.E
+                    X = data.df.rE
                 case "k":
                     X = data.df.k
 
             x, y = X[idx], data.df.x[idx]
             poly = np.poly1d(np.polyfit(x, y, args.degree))
 
-            data.metadata.run["postedge"] = (poly, args.fitaxis, args.action)
+            data.meta.run["postedge"] = (poly, args.fitaxis, args.action)
 
             data.df["postedge"] = poly(X)
-
+            log.debug(f"{data.meta.name}: postedge = {" ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(poly.coef))}")
             match args.action:
                 case RemovalOperation.SUBTRACT:
                     data.df.x = data.df.x - data.df.postedge
