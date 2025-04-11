@@ -6,8 +6,13 @@ batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
 filein data/* -b -f -T
   --var batch 1
 
-align c5.s5.d2.c1.i2.Z -E 24350 -d 3
-edge c5.s5.d2.c1.i2.Z
+align c2.s5.d2.i2.Z -E 24350 -d 3
+edge c2.s5.d2.i2.Z
 
-preedge .. -50eV -l
-postedge 3k .. -c -d
+preedge .. -50 -l
+postedge 3k .. -cde
+
+fourier 3k 16k 6A 0.04A -w2 -k2
+  -a hann
+
+phase correct
