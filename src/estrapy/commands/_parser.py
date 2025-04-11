@@ -1,7 +1,6 @@
 import argparse
 
 from typing import NamedTuple
-
 from .exceptions import InputFileParsingException
 
 

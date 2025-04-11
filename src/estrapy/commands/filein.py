@@ -11,7 +11,7 @@ from typing import NamedTuple, Sequence
 from .exceptions import FileParsingException, ArgumentException
 from ._context import AxisType, Context, Data, MetaData, SignalType
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import attempt_number
+from ._misc import attempt_parse_number
 from ._parser import CommandParser, InputFileParsingException
 
 
@@ -56,13 +56,13 @@ def _read_file_m1(
     metavars: dict[str, str | int | float] = {}
     # Add file name metadata. The split is done at every underscore.
     metavars.update(
-        {f".f{n+1}": attempt_number(e) for n, e in enumerate(file.name.split("_"))}
+        {f".f{n+1}": attempt_parse_number(e) for n, e in enumerate(file.name.split("_"))}
     )
 
     # Add file header metadata. The split is done at every space.
     metavars.update(
         {
-            f".h{ln+1}.{pn+1}": attempt_number(item)
+            f".h{ln+1}.{pn+1}": attempt_parse_number(item)
             for ln, line in enumerate(metadatalines)
             for pn, item in enumerate(line)
         }
@@ -73,7 +73,7 @@ def _read_file_m1(
         if not line:
             continue
         if line[0] == "#U" and len(line) >= 3:
-            vname, vval = line[1], attempt_number(line[2])
+            vname, vval = line[1], attempt_parse_number(line[2])
             metavars[f"${vname}"] = vval
 
     # Add all the given variable names
@@ -459,7 +459,7 @@ class FileIn(CommandHandler):
                 )
 
         vars = {
-            str(k): attempt_number(v) if str(v).isdecimal() else str(v)
+            str(k): attempt_parse_number(v) if str(v).isdecimal() else str(v)
             for k, v in args.var
         }
 

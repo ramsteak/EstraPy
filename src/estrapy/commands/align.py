@@ -10,8 +10,6 @@ from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootRes
 from scipy.interpolate import interp1d
 from logging import getLogger
 
-from matplotlib import pyplot as plt
-
 from ._context import Context
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_edgeenergy, parse_numberunit, E_to_sk, NumberUnit
@@ -281,9 +279,9 @@ class Align(CommandHandler):
     def execute(args: Args_Align, context: Context) -> CommandResult:
         log = getLogger("align")
         for data in context.data:
-            if data.metadata.refE0 is not None:
+            if data.meta.refE0 is not None:
                 raise RuntimeError(
-                    f"Reference preedge was already calculated for {data.metadata.name}."
+                    f"Reference preedge was already calculated for {data.meta.name}."
                 )
 
             y = data.df.ref.to_numpy()
@@ -295,14 +293,14 @@ class Align(CommandHandler):
             shift = rE0 - args.E0
 
             log.info(
-                f"{data.metadata.name}: Found reference E0 value at {rE0:.3f}eV (shift by {-shift:+.3f}eV)"
+                f"{data.meta.name}: Found reference E0 value at {rE0:.3f}eV (shift by {-shift:+.3f}eV)"
             )
 
-            data.metadata.refE0 = args.E0
+            data.meta.refE0 = args.E0
             data.df.E = data.df.E - shift
 
-            if data.metadata.E0 is not None:
-                data.metadata.E0 = data.metadata.E0 - shift
+            if data.meta.E0 is not None:
+                data.meta.E0 = data.meta.E0 - shift
 
         return CommandResult(True)
 
@@ -365,29 +363,30 @@ class Edge(CommandHandler):
     def execute(args: Args_Edge, context: Context) -> CommandResult:
         log = getLogger("edge")
         for data in context.data:
-            if data.metadata.E0 is not None:
+            if data.meta.E0 is not None:
                 raise RuntimeError(
-                    f"Reference preedge was already calculated for {data.metadata.name}."
+                    f"Reference preedge was already calculated for {data.meta.name}."
                 )
 
             y = data.df.x.to_numpy()
             x = data.df.E.to_numpy()
-            E0s = E0s if args.E0s is not None else data.metadata.refE0
+            E0s = E0s if args.E0s is not None else data.meta.refE0
             if E0s is None:
                 raise RuntimeError("E0 search interval was not provided.")
             E0 = find_E0_with_method(
                 args.method, (E0s - args.dE0, E0s + args.dE0), y, x
             )
 
-            if data.metadata.refE0:
-                relativeE0 = E0 - data.metadata.refE0
+            if data.meta.refE0:
+                relativeE0 = E0 - data.meta.refE0
                 log.info(
-                    f"{data.metadata.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV)"
+                    f"{data.meta.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV)"
                 )
             else:
-                log.info(f"{data.metadata.name}: Found E0 value at {E0:.3f}eV")
+                log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
 
-            data.metadata.E0 = E0
+            data.meta.E0 = E0
+            data.df["rE"] = data.df.E - E0
             data.df["k"] = E_to_sk(data.df.E.to_numpy(), E0)
 
         return CommandResult(True)
