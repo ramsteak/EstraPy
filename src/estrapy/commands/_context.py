@@ -55,8 +55,12 @@ class MetaData:
 
 class Data:
     def __init__(self, dataframe: pd.DataFrame, metadata: MetaData) -> None:
+        # df holds the real-space data
         self.df = dataframe
-        self.metadata = metadata
+        # fd holds the Fourier-space data
+        self.fd = pd.DataFrame()
+        # meta holds the metadata
+        self.meta = metadata
 
 
 class DataStore:
