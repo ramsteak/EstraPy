@@ -121,7 +121,12 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     Attempts all methods before failing."""
     log = getLogger("filein")
 
-    log.debug(f"Reading file: {file}")
+    if args.directory is not None:
+        _log_fname = file.relative_to(args.directory)
+    else:
+        _log_fname = file
+
+    log.debug(f"Reading file: {_log_fname}")
 
     for method in _file_read_methods:
         res, filedat, mdat = method(file, args)
@@ -129,7 +134,7 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
             break
 
     if res.warning is not None:
-        log.warning(f"{file}: {res.warning}")
+        log.warning(f"{_log_fname}: {res.warning}")
 
     name = file.name.removesuffix(file.suffix)
     signaltype = args.signaltype[0] if args.signaltype is not None else None
@@ -508,7 +513,7 @@ class FileIn(CommandHandler):
 
             data.meta.vars[".i"] = i+1
             data.meta.vars[".n"] = len(context.data.data)
-            log.info(f"Imported {file}")
+            log.info(f"Imported {data.meta.name}")
 
         return CommandResult(True)
 
