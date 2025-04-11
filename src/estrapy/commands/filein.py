@@ -56,8 +56,9 @@ def _read_file_m1(
     metavars: dict[str, str | int | float] = {}
     # Add file name metadata. The split is done at every underscore.
     metavars.update(
-        {f".f{n+1}": attempt_parse_number(e) for n, e in enumerate(file.name.split("_"))}
+        {f".f{n+1}": attempt_parse_number(e) for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))}
     )
+    metavars[".fe"] = file.suffix
 
     # Add file header metadata. The split is done at every space.
     metavars.update(
@@ -484,9 +485,12 @@ class FileIn(CommandHandler):
                 f"The specified file does not exist: {args.filepos}"
             )
 
-        for file in files:
+        for i,file in enumerate(files):
             data = read_file(file, args)
             context.data.add_data(data)
+
+            data.meta.vars[".i"] = i+1
+            data.meta.vars[".n"] = len(context.data.data)
             log.info(f"Imported {file}")
 
         return CommandResult(True)
