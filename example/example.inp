@@ -2,9 +2,12 @@
 % clearlog
 
 batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
+  --dir C:/Users/Marco/Desktop/Dottore/progetti/202411_Barcellona/data/insitu
 
-filein data/* -b -f -T
+filein 4-R1_AE_Pd_S1b/1*/*.xy -b -f -T
   --var batch 1
+
+plot r(E)
 
 align c2.s5.d2.i2.Z -E 24350 -d 3
 edge c2.s5.d2.i2.Z
@@ -15,8 +18,6 @@ postedge 3k .. -cde
 fourier 3k 12k 6A 0.02A -w2 -k2
   -a hann
 
-phase correct
-
 plot x(E)
   --xlabel "Energy (eV)"
   --ylabel "$\mu(E)$"
@@ -24,4 +25,8 @@ plot x(E)
 
 plot x(k)
   --xlabel "Wavevector (k)"
+  --ylabel "$\mu(k)$"
+
+plot f(R)
+  --xlabel "Distance (A)"
   --ylabel "$\mu(k)$"
