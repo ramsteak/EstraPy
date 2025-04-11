@@ -58,6 +58,7 @@ def _read_file_m1(
     metavars.update(
         {f".f{n+1}": attempt_parse_number(e) for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))}
     )
+    metavars[".fe"] = file.suffix
 
     # Add file header metadata. The split is done at every space.
     metavars.update(
