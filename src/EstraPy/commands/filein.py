@@ -485,9 +485,12 @@ class FileIn(CommandHandler):
                 f"The specified file does not exist: {args.filepos}"
             )
 
-        for file in files:
+        for i,file in enumerate(files):
             data = read_file(file, args)
             context.data.add_data(data)
+
+            data.meta.vars[".i"] = i+1
+            data.meta.vars[".n"] = len(context.data.data)
             log.info(f"Imported {file}")
 
         return CommandResult(True)
