@@ -42,6 +42,7 @@ def extract_phase(x:npt.NDArray[np.floating], y:npt.NDArray[np.complexfloating])
 
 class PhaseAction(Enum):
     CORRECT = "corr"
+    ALIGN = "align"
 
 class Args_Phase(NamedTuple):
     action:PhaseAction
@@ -56,6 +57,7 @@ class Phase(CommandHandler):
         subparsers = parser.add_subparsers(dest='action')
 
         correct = subparsers.add_parser('correct')
+        align = subparsers.add_parser('align')
 
         args = parser.parse(tokens)
 
@@ -71,13 +73,18 @@ class Phase(CommandHandler):
     def execute(args: Args_Phase, context: Context) -> CommandResult:
         log = getLogger("phase")
 
-        for data in context.data:            
-            if "f" not in data.fd:
-                raise RuntimeError("Fourier transform was not calculated. Cannot correct phase.")
+        match args.action:
+            case PhaseAction.CORRECT:
+                for data in context.data:            
+                    if "f" not in data.fd:
+                        raise RuntimeError("Fourier transform was not calculated. Cannot correct phase.")
 
-            s,p = extract_phase(data.fd.R.to_numpy(),data.fd.f.to_numpy())
-            data.fd.f = s
-            data.meta.run["phase"] = p
+                    s,p = extract_phase(data.fd.R.to_numpy(),data.fd.f.to_numpy())
+                    data.fd.f = s
+                    data.meta.run["phase"] = p
+
+            case PhaseAction.ALIGN:
+                raise NotImplementedError()
             
         return CommandResult(True)
 
