@@ -61,7 +61,6 @@ class Args_Edge(NamedTuple):
     wplot: bool
     rplot: bool
 
-
 def find_E0_with_method(
     method: list[tuple[Operation, int | None]],
     _bounds: tuple[float, float],
@@ -163,7 +162,10 @@ def find_E0_with_method(
 
             case [Operation.ZERO, "poly" | "interp"]:
                 p = data
-                res: RootResults = root_scalar(p, bracket=bounds)  # type: ignore
+                try:
+                    res: RootResults = root_scalar(p, bracket=bounds)  # type: ignore
+                except ValueError:
+                    res: RootResults = root_scalar(p, x0 = bounds[1]/2)  # type: ignore
                 return res.root + _bounds[0]
 
             case [Operation.HALFHEIGHT, "data"]:
