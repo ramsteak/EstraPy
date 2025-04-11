@@ -56,6 +56,11 @@ class Plot(CommandHandler):
                 _limits = (None,None,None,None)
                 _accept_xunits = ("eV", None)
                 _accept_yunits = (None, )
+            case "r(E)":
+                plottype = XYPlot("E", "ref")
+                _limits = (None,None,None,None)
+                _accept_xunits = ("eV", None)
+                _accept_yunits = (None, )
             case "x(rE)":
                 plottype = XYPlot("rE", "x")
                 _limits = (0,None,None,None)
@@ -104,7 +109,7 @@ class Plot(CommandHandler):
                         plt.plot(data.df[x], data.df[y])
                 elif x in ["R"]:
                     for data in context.data:
-                        plt.plot(data.fd[x], data.fd[y])
+                        plt.plot(data.fd[x], np.abs(data.fd[y]))
                 else:
                     raise RuntimeError(f"Invalid plot type: {y}({x})")
                 
