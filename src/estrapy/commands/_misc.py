@@ -81,6 +81,8 @@ def parse_edgeenergy(val: str) -> float:
     elif (m := ELEMENT_EDGE.match(val)) is not None:
         element, edge, value, mult, _ = m.groups()
         shift = float(value) * SI_multiplier(mult) if value is not None else 0
+
+        from xraydb import xray_edge
         energy = xray_edge(element, edge, True)
         return energy + shift  # type: ignore
     else:
