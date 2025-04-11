@@ -2,8 +2,7 @@ import re
 import numpy as np
 import numpy.typing as npt
 
-from typing import overload, NamedTuple
-from xraydb import xray_edge
+from typing import overload, NamedTuple, Iterable
 
 
 def attempt_number(s: str) -> str | int | float:
