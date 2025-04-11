@@ -150,8 +150,10 @@ class Fourier(CommandHandler):
 
             _min_dR = 2*np.diff(x).mean()
 
+            log.debug(f"{data.meta.name}: Performing fourier transform")
+
             if _min_dR > args.interval:
-                log.warning(f"The required frequency ({1/args.interval:0.2f}) is smaller than the Nyquist frequency ({1/_min_dR:0.2f}). The minimum interval is {_min_dR:0.2f}")
+                log.warning(f"The required frequency ({1/args.interval:0.1f}) is smaller than the average Nyquist frequency ({1/_min_dR:0.1f}). The minimum interval is {_min_dR:0.2e}")
 
             f = fourier(x,y,R)
 
