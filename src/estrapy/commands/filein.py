@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import pandas as pd
 import numpy as np
 
@@ -18,7 +19,7 @@ from ._parser import CommandParser, InputFileParsingException
 def _read_file_m1(
     file: Path, args: Args_FileIn
 ) -> tuple[CommandResult, pd.DataFrame, dict[str, str | int | float]]:
-    # Expect the datafile to start with a "#"
+    # Expect the data file to start with a "#"
     filecontent = file.read_text()
     if filecontent[0] != "#":
         raise FileParsingException
@@ -185,6 +186,7 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
 
 class Args_FileIn(NamedTuple):
     filepos: str
+    directory: str|None
 
     axis: AxisType
     xaxiscol: str
@@ -220,7 +222,10 @@ class FileIn(CommandHandler):
     def parse(tokens: list[Token], context: Context) -> Args_FileIn:
         parser = CommandParser("filein", description="Imports the data from files.")
         parser.add_argument(
-            "datafile", help="The file to import. Can be a glob pattern."
+            "filepos", help="The file to import. Can be a glob pattern."
+        )
+        parser.add_argument(
+            "--dir", help="The directory to import the files from, instead of the current workdir."
         )
         parser.add_argument(
             "--batch", "-b", action="store_true", help="Uses the batch arguments"
@@ -465,7 +470,8 @@ class FileIn(CommandHandler):
         }
 
         return Args_FileIn(
-            args.datafile,
+            args.filepos,
+            args.dir,
             xaxis,
             xaxiscol,
             args.shift,
@@ -478,7 +484,18 @@ class FileIn(CommandHandler):
     @staticmethod
     def execute(args: Args_FileIn, context: Context) -> CommandResult:
         log = getLogger("filein")
-        files = [*context.paths.workdir.glob(args.filepos)]
+
+        # Check if the path is relative or absolute.
+        relativeto = Path(args.directory) if args.directory is not None else context.paths.workdir
+        if os.path.isabs(args.filepos):
+            _p = Path(args.filepos)
+            if _p.parent.name == "**":
+                files = [*_p.parent.parent.rglob(_p.name)]
+            else:
+                files = [*_p.parent.glob(_p.name)]
+        else:
+            files = [*relativeto.glob(args.filepos)]
+        
 
         if not files:
             raise FileNotFoundError(
