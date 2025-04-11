@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from ._context import Context
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit, NumberUnit
+from ._misc import parse_numberunit_range, NumberUnit
 from ._parser import CommandParser
 
 
@@ -35,7 +35,7 @@ class PreEdge(CommandHandler):
         parser = CommandParser(
             "preedge", description="Removes the background preedge contribution."
         )
-        # parser.add_argument("range", nargs=2, help="The polynomial fit range.")
+        parser.add_argument("range", nargs=2, help="The polynomial fit range.")
 
         groupd = parser.add_mutually_exclusive_group()
         groupd.add_argument(
@@ -80,26 +80,7 @@ class PreEdge(CommandHandler):
 
         args = parser.parse(tokens)
 
-        match range:
-            case ["..", str(B)]:
-                a = NumberUnit(-np.inf, 0, "eV")
-
-                _b = parse_numberunit(B)
-                if _b.unit not in ("eV", None):
-                    raise ValueError(f"Invalid upper bound specifier: {B}.")
-                b = NumberUnit(_b.value, _b.sign, "eV")
-            case [str(A), str(B)]:
-                _a = parse_numberunit(A)
-                if _a.unit not in ("eV", None):
-                    raise ValueError(f"Invalid lower bound specifier: {A}.")
-                a = NumberUnit(_a.value, _a.sign, "eV")
-
-                _b = parse_numberunit(B)
-                if _b.unit not in ("eV", None):
-                    raise ValueError(f"Invalid upper bound specifier: {B}.")
-                b = NumberUnit(_b.value, _b.sign, "eV")
-            case [A, B]:
-                raise ValueError(f"Invalid range specifier: {A} {B}")
+        a,b = parse_numberunit_range(args.range, ("eV", None), "eV")
 
         return Args_PreEdge(a, b, args.degree)
 

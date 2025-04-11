@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 
 from ._context import Context
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit, NumberUnit
+from ._misc import parse_numberunit_range, NumberUnit
 from ._parser import CommandParser
 
 
@@ -34,15 +34,10 @@ class Args_PostEdge(NamedTuple):
 class PostEdge(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_PostEdge:
-        # The first two arguments must be the lower and upper bound, and are
-        # removed from the token list before parsing
-        token_a, token_b, *tokens = tokens
-        range = token_a.value, token_b.value
-
         parser = CommandParser(
             "postedge", description="Removes the background postedge contribution."
         )
-        # parser.add_argument("range", nargs=2, help="The polynomial fit range.")
+        parser.add_argument("range", nargs=2, help="The polynomial fit range.")
 
         groupd = parser.add_mutually_exclusive_group()
         groupd.add_argument(
@@ -105,37 +100,7 @@ class PostEdge(CommandHandler):
 
         fitaxis = args.fitaxis if args.fitaxis is not None else "eV"
 
-        match range:
-            case [str(A), ".."]:
-                b = NumberUnit(np.inf, 0, "eV")
-
-                _a = parse_numberunit(A)
-                if _a.unit in ("eV", "k"):
-                    a = _a
-                elif _a.unit is None:
-                    a = NumberUnit(_a.value, _a.sign, fitaxis)
-                else:
-                    raise ValueError(f"Invalid lower bound specifier: {A}.")
-
-            case [str(A), str(B)]:
-                _a = parse_numberunit(A)
-                if _a.unit in ("eV", "k"):
-                    a = _a
-                elif _a.unit is None:
-                    a = NumberUnit(_a.value, _a.sign, fitaxis)
-                else:
-                    raise ValueError(f"Invalid lower bound specifier: {A}.")
-
-                _b = parse_numberunit(B)
-                if _b.unit in ("eV", "k"):
-                    b = _b
-                elif _b.unit is None:
-                    b = NumberUnit(_b.value, _b.sign, fitaxis)
-                else:
-                    raise ValueError(f"Invalid upper bound specifier: {B}.")
-
-            case [A, B]:
-                raise ValueError(f"Invalid range specifier: {A} {B}")
+        a,b = parse_numberunit_range(args.range, ("eV", "k", None), fitaxis)
 
         match args.method:
             case "div":

@@ -4,8 +4,7 @@ import numpy.typing as npt
 
 from typing import overload, NamedTuple, Iterable
 
-
-def attempt_number(s: str) -> str | int | float:
+def attempt_parse_number(s: str) -> str | int | float:
     if s.isdigit():
         return int(s)
     try:
@@ -48,7 +47,7 @@ def SI_multiplier(prefix: str | None) -> int:
 class NumberUnit(NamedTuple):
     value: float
     sign: int
-    unit: str
+    unit: str | None
 
 
 def parse_numberunit(val: str) -> NumberUnit:
@@ -69,6 +68,30 @@ def parse_numberunit(val: str) -> NumberUnit:
         raise ValueError(f'Invalid sign: "{_sign}"')
 
     return NumberUnit(value, sign, unit)
+
+def parse_numberunit_range(bounds:tuple[str,str], acceptable_units:Iterable[str|None], default_unit:str|None=None) -> tuple[NumberUnit,NumberUnit]:
+    _lower, _upper = bounds
+    
+    if _lower == "..":
+        lower = NumberUnit(-np.inf, 0, default_unit)
+    else:
+        lower = parse_numberunit(_lower)
+        if lower.unit not in acceptable_units:
+            raise ValueError(f"Invalid lower bound specifier: \"{_lower}\"")
+        if lower.unit is None:
+            lower = NumberUnit(lower.value, lower.sign, default_unit)
+
+    if _upper == "..":
+        upper = NumberUnit(np.inf, 0, default_unit)
+    else:
+        upper = parse_numberunit(_upper)
+        if upper.unit not in acceptable_units:
+            raise ValueError(f"Invalid upper bound specifier: \"{_upper}\"")
+        if upper.unit is None:
+            upper = NumberUnit(upper.value, upper.sign, default_unit)
+    
+    return lower, upper
+
 
 
 def parse_edgeenergy(val: str) -> float:
