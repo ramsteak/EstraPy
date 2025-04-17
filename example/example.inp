@@ -1,32 +1,49 @@
 # version: 1.0.0
-% clearlog
+% clear
+
+# batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
+#   --dir C:/Users/Marco/Desktop/Dottore/progetti/202411_Barcellona/data/insitu
 
 batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
-  --dir C:/Users/Marco/Desktop/Dottore/progetti/202411_Barcellona/data/insitu
 
-filein 4-R1_AE_Pd_S1b/1*/*.xy -b -f -T
-  --var batch 1
+filein data/Pd_01_0001.xy -b -f -T
 
-plot r(E)
+align c2.s5.d2.i2.Z -E 24350 -d 2
+edge c2.s5.d2.i2.Z -E 24354 -d 2
 
-align c2.s5.d2.i2.Z -E 24350 -d 3
-edge c2.s5.d2.i2.Z
+plot x(E)
+  --title "PdO Pd_01_0001: raw data"
+  --xlabel "$Energy\ [eV]$"
+  --ylabel "$Intensity$"
 
 preedge .. -50 -l
 postedge 3k .. -cde
 
-fourier 3k 12k 6A 0.02A -w2 -k2
-  -a hann
+plot E:+(*(x,postedge),preedge) E:preedge E:+(postedge,preedge)
+  --title "PdO Pd_01_0001: background"
+  --xlabel "$Energy\ [eV]$"
+  --ylabel "$Intensity$"
 
-plot x(E)
-  --xlabel "Energy (eV)"
-  --ylabel "$\mu(E)$"
+background fourier 1.1A -k1
 
+plot k2.x(k)
+  --title "PdO Pd_01_0001: normalized intensity"
+  --xlim 0 ..
+  --xlabel "$Wavevector\ [k]$"
+  --ylabel "$k^2 \cdot \chi(k)\ [A^{-2}]$"
 
-plot x(k)
-  --xlabel "Wavevector (k)"
-  --ylabel "$\mu(k)$"
+fourier 3k 12k 6A 0.02A -a hann -k2 -w1
 
-plot f(R)
-  --xlabel "Distance (A)"
-  --ylabel "$\mu(k)$"
+plot a.f(R)
+  --colorby .n
+  --color tab10
+  --title "PdO Pd_01_0001: fourier transform"
+  --xlabel "$Distance\ [A]$"
+  --ylabel "$FT\{k^1 \cdot \chi(k)\} [A^{-1}]\}$"
+
+# plot *(k1.x,win)(k)
+#   --norm
+#   --title "PdO Pd_01_0001: normalized intensity"
+#   --xlim 0 ..
+#   --xlabel "$Wavevector\ [k]$"
+#   --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"

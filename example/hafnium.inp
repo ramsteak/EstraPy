@@ -1,0 +1,45 @@
+# version: 1.0.0
+% clear
+
+batchin -E Energy_enc -I I0 I1 I2
+
+filein Hf/Hf40_50K_Hf_L3_0000.xdi -b -T -t
+
+edge S -E 9561
+
+plot x(E)
+  --title "Hf L3 Edge"
+  --xlabel "$Energy\ [eV]$"
+  --ylabel "$Intensity$"
+
+preedge .. -40 -l
+postedge 3k .. -cdk
+
+plot E:+(*(x,postedge),preedge) E:preedge E:+(postedge,preedge)
+  --title "Hf L3: raw data"
+  --xlabel "$Energy\ [eV]$"
+  --ylabel "$Intensity$"
+
+background fourier 1.1A -k1
+
+plot k1.x(k) bkg(k)
+  --title "Hf: normalized intensity"
+  --xlim 0 ..
+  --xlabel "$Wavevector\ [k]$"
+  --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"
+
+fourier 3k 16k 6A 0.02A -a hann -k1 -w3
+
+plot a.f(R)
+  --colorby .n
+  --color tab10
+  --title "Hf: fourier transform"
+  --xlabel "$Distance\ [A]$"
+  --ylabel "$FT\{k^1 \cdot \chi(k)\} [A^{-1}]\}$"
+
+plot *(k1.x,win)(k) win(k)
+  --norm
+  --title "Hf: normalized intensity"
+  --xlim 0 ..
+  --xlabel "$Wavevector\ [k]$"
+  --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"
