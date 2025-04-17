@@ -3,6 +3,8 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
+from matplotlib import pyplot as plt
+
 from enum import Enum
 from typing import NamedTuple, Any
 from statsmodels.nonparametric.smoothers_lowess import lowess
@@ -61,6 +63,7 @@ class Args_Edge(NamedTuple):
     wplot: bool
     rplot: bool
 
+
 def find_E0_with_method(
     method: list[tuple[Operation, int | None]],
     _bounds: tuple[float, float],
@@ -72,6 +75,12 @@ def find_E0_with_method(
 
     for action, arg in method:
         dtype, data = h[-1]
+        # match dtype:
+        #     case "data":
+        #         plt.plot(data[1], data[0])
+        #     case "interp"|"poly":
+        #         plt.plot(np.linspace(0,bounds[1], 100), data(np.linspace(0,bounds[1], 100)))
+
         match action, dtype:
             case [Operation.CUT, "data"]:
                 arg = arg or 0
@@ -130,7 +139,7 @@ def find_E0_with_method(
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                h.append(("interp", interp1d(x, y, arg)))  # type: ignore
+                h.append(("interp", interp1d(x, y, arg, fill_value=np.nan)))  # type: ignore
 
             case [Operation.MAXIMUM, "data"]:
                 y, x = data  # type: ignore
@@ -165,14 +174,24 @@ def find_E0_with_method(
                 try:
                     res: RootResults = root_scalar(p, bracket=bounds)  # type: ignore
                 except ValueError:
-                    res: RootResults = root_scalar(p, x0 = bounds[1]/2)  # type: ignore
+                    # Let's try again with the bounded one, but ensuring
+                    # that the bracket has different values and includes the
+                    # middle value.
+                    _b0, _b1 = bounds
+                    for i in range(10):
+                        if p(_b0) * p(_b1) <= 0: break
+                        _b0, _b1 = (_b1-_b0)*0.1, _b1 - (_b1-_b0)*0.1
+                    else:
+                        raise ValueError("Cannot find root interval.")
+                    res: RootResults = root_scalar(p, bracket=(_b0, _b1))  # type: ignore
+
                 return res.root + _bounds[0]
 
             case [Operation.HALFHEIGHT, "data"]:
                 ...
             case [Operation.AVERAGEINT, "data"]:
                 ...
-
+    
     raise ValueError("Method must terminate with a final method.")
 
 
@@ -288,9 +307,23 @@ class Align(CommandHandler):
 
             y = data.df.ref.to_numpy()
             x = data.df.E.to_numpy()
-            rE0 = find_E0_with_method(
-                args.method, (args.E0 - args.dE0, args.E0 + args.dE0), y, x
-            )
+            try:
+                rE0 = find_E0_with_method(
+                    args.method, (args.E0 - args.dE0, args.E0 + args.dE0), y, x
+                )
+            except ValueError:
+                log.error(f"{data.meta.name}: Cannot find reference E0 value with the specified method.")
+                continue
+                
+            # Check where the value falls. If it is outside the range, error
+            _l, _u = args.E0 - args.dE0, args.E0 + args.dE0
+            if (rE0 <= _l) or (rE0 >= _u):
+                log.error(f"{data.meta.name}: E0 value found outside the specified range ({rE0:.3f}eV).")
+                continue
+            elif (rE0 <= _l + 0.05*args.dE0) or (rE0 >= _u - 0.05*args.dE0):
+                log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({rE0:.3f}eV)")
+            # If it is in the ±5% of the borders of the range, warning
+                
 
             shift = rE0 - args.E0
 
@@ -372,12 +405,15 @@ class Edge(CommandHandler):
 
             y = data.df.x.to_numpy()
             x = data.df.E.to_numpy()
-            E0s = E0s if args.E0s is not None else data.meta.refE0
+            E0s = args.E0s if args.E0s is not None else data.meta.refE0
             if E0s is None:
                 raise RuntimeError("E0 search interval was not provided.")
-            E0 = find_E0_with_method(
-                args.method, (E0s - args.dE0, E0s + args.dE0), y, x
-            )
+
+            try:
+                E0 = find_E0_with_method(args.method, (E0s - args.dE0, E0s + args.dE0), y, x)
+            except ValueError:
+                log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
+                continue
 
             if data.meta.refE0:
                 relativeE0 = E0 - data.meta.refE0
@@ -388,7 +424,7 @@ class Edge(CommandHandler):
                 log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
 
             data.meta.E0 = E0
-            data.df["rE"] = data.df.E - E0
+            data.df["e"] = data.df.E - E0
             data.df["k"] = E_to_sk(data.df.E.to_numpy(), E0)
 
         return CommandResult(True)

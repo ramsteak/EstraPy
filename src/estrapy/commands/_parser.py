@@ -1,7 +1,7 @@
 import argparse
 
 from typing import NamedTuple
-from .exceptions import InputFileParsingException
+from ._exceptions import InputFileParsingException
 
 
 class Token(NamedTuple):

@@ -156,7 +156,7 @@ class PostEdge(CommandHandler):
             idx = idx_l & idx_u
             match args.fitaxis:
                 case "eV":
-                    X = data.df.rE
+                    X = data.df.e
                 case "k":
                     X = data.df.k
 

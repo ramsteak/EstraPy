@@ -50,7 +50,7 @@ class NumberUnit(NamedTuple):
     unit: str | None
 
 
-def parse_numberunit(val: str) -> NumberUnit:
+def parse_numberunit(val: str, acceptable_units: Iterable[str|None]|None = None, default_unit:str|None=None) -> NumberUnit:
     m = NUMBER_UNIT.match(val)
     if m is None:
         raise ValueError(f'Could not parse "{val}" as energy.')
@@ -66,32 +66,44 @@ def parse_numberunit(val: str) -> NumberUnit:
         sign = 0
     else:
         raise ValueError(f'Invalid sign: "{_sign}"')
+    
+    if acceptable_units is not None:
+        if unit not in acceptable_units:
+            _acc = ", ".join(f"{str(u)}" for u in acceptable_units)
+            raise ValueError(f'Invalid unit specifier: "{unit}" (accepted units: {_acc})')
+        if unit is None:
+            unit = default_unit
 
     return NumberUnit(value, sign, unit)
 
-def parse_numberunit_range(bounds:tuple[str,str], acceptable_units:Iterable[str|None], default_unit:str|None=None) -> tuple[NumberUnit,NumberUnit]:
+def parse_numberunit_range(
+    bounds: tuple[str, str],
+    acceptable_units: Iterable[str | None] | None = None,
+    default_unit: str | None = None,
+) -> tuple[NumberUnit, NumberUnit]:
     _lower, _upper = bounds
-    
+
     if _lower == "..":
         lower = NumberUnit(-np.inf, 0, default_unit)
     else:
         lower = parse_numberunit(_lower)
-        if lower.unit not in acceptable_units:
-            raise ValueError(f"Invalid lower bound specifier: \"{_lower}\"")
-        if lower.unit is None:
-            lower = NumberUnit(lower.value, lower.sign, default_unit)
+        if acceptable_units is not None:
+            if lower.unit not in acceptable_units:
+                raise ValueError(f'Invalid lower bound specifier: "{_lower}"')
+            if lower.unit is None:
+                lower = NumberUnit(lower.value, lower.sign, default_unit)
 
     if _upper == "..":
         upper = NumberUnit(np.inf, 0, default_unit)
     else:
         upper = parse_numberunit(_upper)
-        if upper.unit not in acceptable_units:
-            raise ValueError(f"Invalid upper bound specifier: \"{_upper}\"")
-        if upper.unit is None:
-            upper = NumberUnit(upper.value, upper.sign, default_unit)
-    
-    return lower, upper
+        if acceptable_units is not None:
+            if upper.unit not in acceptable_units:
+                raise ValueError(f'Invalid upper bound specifier: "{_upper}"')
+            if upper.unit is None:
+                upper = NumberUnit(upper.value, upper.sign, default_unit)
 
+    return lower, upper
 
 
 def parse_edgeenergy(val: str) -> float:
@@ -105,6 +117,7 @@ def parse_edgeenergy(val: str) -> float:
         shift = float(value) * SI_multiplier(mult) if value is not None else 0
 
         from xraydb import xray_edge
+
         energy = xray_edge(element, edge, True)
         return energy + shift  # type: ignore
     else:

@@ -13,7 +13,10 @@ from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
 from ._parser import CommandParser
 
-def extract_phase(x:npt.NDArray[np.floating], y:npt.NDArray[np.complexfloating]) -> tuple[npt.NDArray[np.complexfloating], np.poly1d]:
+
+def extract_phase(
+    x: npt.NDArray[np.floating], y: npt.NDArray[np.complexfloating]
+) -> tuple[npt.NDArray[np.complexfloating], np.poly1d]:
     """Extracts the linear behavior of the phase.
     Returns:
       - the corrected complex signal
@@ -21,9 +24,9 @@ def extract_phase(x:npt.NDArray[np.floating], y:npt.NDArray[np.complexfloating])
     """
     # Numpy unwrap the phase and linear fit to remove most of the windings
     p0 = np.unwrap(np.angle(y))
-    p_p0 = np.poly1d(np.polyfit(x,p0, 1))
+    p_p0 = np.poly1d(np.polyfit(x, p0, 1))
     linear_phase = p_p0(x)
-    y1 = y * (np.cos(linear_phase) - 1.0j*np.sin(linear_phase))
+    y1 = y * (np.cos(linear_phase) - 1.0j * np.sin(linear_phase))
 
     # Phase and phase derivative evaluation for better unwrapping
 
@@ -34,19 +37,21 @@ def extract_phase(x:npt.NDArray[np.floating], y:npt.NDArray[np.complexfloating])
     # y2 = y1 * s.conj()
 
     # Rotate the phase so that the center of mass is real
-    c = (_t:=y1.mean()) / np.abs(_t)
-    
+    c = (_t := y1.mean()) / np.abs(_t)
+
     y3 = y1 * c.conj()
 
     return y3, p_p0 - np.angle(c)
+
 
 class PhaseAction(Enum):
     CORRECT = "corr"
     ALIGN = "align"
 
+
 class Args_Phase(NamedTuple):
-    action:PhaseAction
-    
+    action: PhaseAction
+
 
 class Phase(CommandHandler):
     @staticmethod
@@ -54,10 +59,10 @@ class Phase(CommandHandler):
         parser = CommandParser(
             "phase", description="Alters the phase of the fourier transform."
         )
-        subparsers = parser.add_subparsers(dest='action')
+        subparsers = parser.add_subparsers(dest="action")
 
-        correct = subparsers.add_parser('correct')
-        align = subparsers.add_parser('align')
+        correct = subparsers.add_parser("correct")
+        align = subparsers.add_parser("align")
 
         args = parser.parse(tokens)
 
@@ -75,17 +80,19 @@ class Phase(CommandHandler):
 
         match args.action:
             case PhaseAction.CORRECT:
-                for data in context.data:            
+                for data in context.data:
                     if "f" not in data.fd:
-                        raise RuntimeError("Fourier transform was not calculated. Cannot correct phase.")
+                        raise RuntimeError(
+                            "Fourier transform was not calculated. Cannot correct phase."
+                        )
 
-                    s,p = extract_phase(data.fd.R.to_numpy(),data.fd.f.to_numpy())
+                    s, p = extract_phase(data.fd.R.to_numpy(), data.fd.f.to_numpy())
                     data.fd.f = s
                     data.meta.run["phase"] = p
 
             case PhaseAction.ALIGN:
                 raise NotImplementedError()
-            
+
         return CommandResult(True)
 
     @staticmethod

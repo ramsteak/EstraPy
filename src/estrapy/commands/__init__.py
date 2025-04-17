@@ -1,10 +1,12 @@
-from .align import Align, Edge
+from .edge import Align, Edge
 from .filein import FileIn, BatchIn
 from .fourier import Fourier
 from .preedge import PreEdge
 from .postedge import PostEdge
 from .phase import Phase
 from .plot import Plot
+from .background import Background
+from .othercmds import Cut, Smooth
 
 from ._handler import CommandHandler
 
@@ -18,4 +20,7 @@ commands: dict[str, CommandHandler] = {
     "fourier": Fourier(),
     "phase": Phase(),
     "plot": Plot(),
+    "background": Background(),
+    "cut": Cut(),
+    "smooth": Smooth(),
 }

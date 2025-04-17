@@ -112,7 +112,7 @@ class PreEdge(CommandHandler):
             log.debug(f"{data.meta.name}: Fitting preedge of order {args.degree} in the region {lb:0.3f}{args.lowerbound.unit} ~ {ub:0.3f}{args.upperbound.unit}")
 
             idx = idx_l & idx_u
-            X = data.df.rE
+            X = data.df.e
             x, y = X[idx], data.df.x[idx]
             poly = np.poly1d(np.polyfit(x, y, args.degree))
 

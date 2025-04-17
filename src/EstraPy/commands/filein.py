@@ -9,7 +9,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import NamedTuple, Sequence
 
-from .exceptions import FileParsingException, ArgumentException
+from ._exceptions import FileParsingException, ArgumentException
 from ._context import AxisType, Context, Data, MetaData, SignalType
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import attempt_parse_number
@@ -57,8 +57,13 @@ def _read_file_m1(
     metavars: dict[str, str | int | float] = {}
     # Add file name metadata. The split is done at every underscore.
     metavars.update(
-        {f".f{n+1}": attempt_parse_number(e) for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))}
+        {
+            f".f{n+1}": attempt_parse_number(e)
+            for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))
+        }
     )
+    metavars[".f"] = file.name
+    metavars[".fn"] = file.name.removesuffix(file.suffix)
     metavars[".fe"] = file.suffix
 
     # Add file header metadata. The split is done at every space.
@@ -191,7 +196,7 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
 
 class Args_FileIn(NamedTuple):
     filepos: str
-    directory: str|None
+    directory: str | None
 
     axis: AxisType
     xaxiscol: str
@@ -230,7 +235,8 @@ class FileIn(CommandHandler):
             "filepos", help="The file to import. Can be a glob pattern."
         )
         parser.add_argument(
-            "--dir", help="The directory to import the files from, instead of the current workdir."
+            "--dir",
+            help="The directory to import the files from, instead of the current workdir.",
         )
         parser.add_argument(
             "--batch", "-b", action="store_true", help="Uses the batch arguments"
@@ -469,10 +475,13 @@ class FileIn(CommandHandler):
                     "Only energy x-axis supports this type of data input."
                 )
 
-        vars = {
-            str(k): attempt_parse_number(v) if str(v).isdecimal() else str(v)
-            for k, v in args.var
-        }
+        if args.var is not None:
+            vars = {
+                str(k): attempt_parse_number(v) if str(v).isdecimal() else str(v)
+                for k, v in args.var
+            }
+        else:
+            vars = {}
 
         return Args_FileIn(
             args.filepos,
@@ -491,28 +500,34 @@ class FileIn(CommandHandler):
         log = getLogger("filein")
 
         # Check if the path is relative or absolute.
-        relativeto = Path(args.directory) if args.directory is not None else context.paths.workdir
+        relativeto = (
+            Path(args.directory)
+            if args.directory is not None
+            else context.paths.workdir
+        )
         if os.path.isabs(args.filepos):
             _p = Path(args.filepos)
-            if _p.parent.name == "**":
-                files = [*_p.parent.parent.rglob(_p.name)]
-            else:
-                files = [*_p.parent.glob(_p.name)]
+            _d = Path((_p.drive) + "/")
+            _r = _p.relative_to(_d)
+            files = [*_d.glob(_r.name)]
+            # if _p.parent.name == "**":
+            #     files = [*_p.parent.parent.rglob(_p.name)]
+            # else:
+            #     files = [*_p.parent.glob(_p.name)]
         else:
             files = [*relativeto.glob(args.filepos)]
-        
 
         if not files:
             raise FileNotFoundError(
                 f"The specified file does not exist: {args.filepos}"
             )
 
-        for i,file in enumerate(files):
+        for i, file in enumerate(files):
             data = read_file(file, args)
             context.data.add_data(data)
 
-            data.meta.vars[".i"] = i+1
             data.meta.vars[".n"] = len(context.data.data)
+            data.meta.vars[".i"] = i
             log.info(f"Imported {data.meta.name}")
 
         return CommandResult(True)
