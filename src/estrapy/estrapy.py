@@ -129,7 +129,7 @@ def main():
     }
 
     fmt = logging.Formatter("[%(levelname)s] <%(name)s> %(message)s")
-    flh = logging.FileHandler(logfile, encoding="utf-8")
+    flh = logging.FileHandler(logfile, encoding="utf-8", mode="w" if directives.clear else "a")
     flh.setLevel(logging.DEBUG)
     flh.setFormatter(fmt)
     rootlogger.addHandler(flh)
@@ -139,11 +139,11 @@ def main():
             "%(log_color)s[%(levelname)s] <%(name)s> %(message)s", log_colors=log_colors
         )
         sth = colorlog.StreamHandler(sys.stdout)
-        sth.setLevel(logging.DEBUG if options.verbose else logging.WARNING)
+        sth.setLevel(logging.DEBUG if options.verbose else logging.INFO)
         sth.setFormatter(cfm)
     else:
         sth = logging.StreamHandler(sys.stdout)
-        sth.setLevel(logging.DEBUG if options.verbose else logging.WARNING)
+        sth.setLevel(logging.DEBUG if options.verbose else logging.INFO)
         sth.setFormatter(fmt)
     rootlogger.addHandler(sth)
 
