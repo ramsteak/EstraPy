@@ -34,6 +34,7 @@ class Operation(Enum):
     ZERO = "Z"
     HALFHEIGHT = "H"
     AVERAGEINT = "A"
+    SET = "S"
 
 
 FINAL_METHODS = [
@@ -42,6 +43,7 @@ FINAL_METHODS = [
     Operation.ZERO,
     Operation.HALFHEIGHT,
     Operation.AVERAGEINT,
+    Operation.SET,
 ]
 
 
@@ -191,6 +193,8 @@ def find_E0_with_method(
                 ...
             case [Operation.AVERAGEINT, "data"]:
                 ...
+            case [Operation.SET, _]:
+                return 0 + _bounds[0]
     
     raise ValueError("Method must terminate with a final method.")
 
@@ -224,6 +228,8 @@ def _parse_method_to_op(method: str) -> tuple[Operation, int | None]:
             return (Operation.HALFHEIGHT, a)
         case "A":
             return (Operation.AVERAGEINT, a)
+        case "S":
+            return (Operation.SET, a)
         case _:
             raise ValueError(f'Invalid method specification: "{method}"')
 
