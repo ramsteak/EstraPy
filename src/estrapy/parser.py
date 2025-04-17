@@ -81,6 +81,9 @@ def parse_commands(
 
         cmd = line.split(maxsplit=1)[0]
 
+        if cmd == "exit":
+            return parsedcommands
+        
         if cmd not in commands:
             raise InputFileParsingException(f"Unrecognized command: {cmd}")
 
