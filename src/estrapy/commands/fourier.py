@@ -37,8 +37,13 @@ class Args_Fourier(NamedTuple):
     wwidth: float
     method: Method
 
-def get_window(_r:npt.NDArray[np.floating], apodizer:Apodizer, parameter: float|None=None) -> npt.NDArray[np.floating]:
-    r = np.clip(np.abs(_r), 0, 1)
+def get_window(_r:npt.NDArray[np.floating], apodizer:Apodizer, parameter: float|None=None, symm:bool=True) -> npt.NDArray[np.floating]:
+    r0 = np.clip(_r, 0, None)
+    if symm:
+        r = np.clip(np.abs(_r), 0, 1)
+    else:
+        r = np.clip(_r, 0, 1)
+
     match apodizer:
         case Apodizer.HANN:
             return (np.cos(np.pi * r) + 1) / 2
@@ -53,10 +58,10 @@ def get_window(_r:npt.NDArray[np.floating], apodizer:Apodizer, parameter: float|
             return np.cos(np.pi * r / 2)
         case Apodizer.EXPONENTIAL:
             assert parameter is not None
-            return np.exp(-_r * parameter)
+            return np.exp(-r0 * parameter)
         case Apodizer.GAUSS:
             assert parameter is not None
-            return np.exp(-_r * _r * parameter)
+            return np.exp(-r0 * r0 * parameter)
     
 
 def get_flattop_window(
@@ -99,7 +104,6 @@ def finuft(
 ) -> npt.NDArray[np.complexfloating]:
     from finufft import nufft1d3
     return nufft1d3(x, y, 2*r, eps=1e-9)
-
 
 class Fourier(CommandHandler):
     @staticmethod
