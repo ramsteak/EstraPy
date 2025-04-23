@@ -17,9 +17,6 @@ from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_edgeenergy, parse_numberunit, E_to_sk, NumberUnit
 from ._parser import CommandParser
 
-# TODO:
-# Add the possibility to set the E0 in Edge command to be relative to the reference E0 if given as relative (+/-eV)
-
 
 class Operation(Enum):
     CUT = "c"
