@@ -69,19 +69,30 @@ def get_flattop_window(
     width: np.floating | float,
     apodizer: Apodizer,
     parameter: float | None = None,
+    symmetry:int = 0,
+    shift: tuple[float,float] | float | None = None
 ) -> npt.NDArray[np.floating]:
     if width == 0:
         return np.ones_like(x)
     
     width = np.min([(np.max(x) - np.min(x))/2, np.float64(width)])
 
-    _r = np.array((np.zeros_like(x), x + width - x.max(), x.min() - x + width))
+    if symmetry > 0:
+        if shift is None: shift = 0
+        _r = np.array((np.zeros_like(x), x + width - x.max() - shift))
+    elif symmetry < 0:
+        if shift is None: shift = 0
+        _r = np.array((np.zeros_like(x), x.min() + shift - x + width))
+    else:
+        if shift is None: shift = 0,0
+        _r = np.array((np.zeros_like(x), x + width - x.max() - shift[1], x.min() + shift[0] - x + width)) # type: ignore
     r = np.max(_r,axis=0,)/ width
+
     return get_window(r, apodizer, parameter)
 
 def fourier(
     x: npt.NDArray[np.floating],
-    y: npt.NDArray[np.floating],
+    y: npt.NDArray[np.floating] | npt.NDArray[np.complexfloating],
     r: npt.NDArray[np.floating],
 ) -> npt.NDArray[np.complexfloating]:
     dx = np.diff(x)
@@ -96,6 +107,13 @@ def fourier(
     I: npt.NDArray[np.floating] = yl.dot(np.sin(FTl)) + yr.dot(np.sin(FTr))
 
     return (R + 1.0j * I) / np.sqrt(2 * np.pi)
+
+def bfourier(
+    r: npt.NDArray[np.floating],
+    y: npt.NDArray[np.floating] | npt.NDArray[np.complexfloating],
+    x: npt.NDArray[np.floating],
+) -> npt.NDArray[np.complexfloating]:
+    return fourier(r, y.conj(), x).conj()
 
 def finuft(
     x: npt.NDArray[np.floating],
