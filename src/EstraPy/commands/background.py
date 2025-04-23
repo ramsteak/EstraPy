@@ -15,7 +15,7 @@ from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
 from ._parser import CommandParser
 
-from .fourier import fourier, get_window, Apodizer, get_flattop_window
+from .fourier import fourier, get_window, Apodizer, get_flattop_window, bfourier
 
 
 @dataclass(slots=True, frozen=True)
@@ -33,12 +33,11 @@ class BSpline(Method):
 @dataclass(slots=True, frozen=True)
 class Fourier(Method):
     Rmax: float
+    iter: int
 
 @dataclass(slots=True, frozen=True)
 class Constant(Method):
     ...
-
-
 
 class Args_Background(NamedTuple):
     method:Method
@@ -71,6 +70,7 @@ class Background(CommandHandler):
         fourier = subparsers.add_parser("fourier")
         fourier.add_argument("Rmax")
         fourier.add_argument("--kweight", "-k", type=float)
+        fourier.add_argument("--iterations", "-i", type=int, default=3)
 
         args = parser.parse(tokens)
 
@@ -84,7 +84,7 @@ class Background(CommandHandler):
                 method = BSpline(args.kweight, (range[0].value, range[1].value))
             case "fourier":
                 rmax = parse_numberunit(args.Rmax, ("A", None), "A")
-                method = Fourier(args.kweight, rmax.value)
+                method = Fourier(args.kweight, rmax.value, args.iterations)
 
             
 
@@ -100,42 +100,34 @@ class Background(CommandHandler):
                 case Constant():
                     S = np.ones_like(X)
                 
-                case BSpline(kweight, range):
-                    idx = (X>=range[0])&(X<=range[1])
+                case BSpline(kweight, _range):
+                    idx = (X>=_range[0])&(X<=_range[1])
                     x, y = X[idx], Y[idx]
 
                     s = bspline_method(x,y)
                     S = data.df.x.to_numpy().copy()
                     S[idx] = s
                 
-                case Fourier(kweight, Rmax):
-                    # Apodize with a gauss window, with w(R) = 1e-3
+                case Fourier(kweight, Rmax, iterations):
                     idx = X>=0
-                    # TODO
                     _Y = Y[idx]
-                    x,_y = X[idx], Y[idx]-1
+                    x,_y = X[idx], _Y-1
                     y = _y * x ** kweight
+                    eps = 0.3
+                    w = get_flattop_window(x, (x.max() - x.min())/8, Apodizer.HANN, None, 0, (-eps, +eps))
 
-                    # Double up the spectrum and window it
-                    Z = np.zeros(len(x)*2)
-                    Z[len(x)-1::-1] = -x
-                    Z[len(x)::] = x
-                    U = np.zeros(len(y)*2)
-                    U[len(y)-1::-1] = -y
-                    U[len(y)::] = y
+                    r = np.linspace(-2*Rmax,2*Rmax, 1001)
+                    W = get_flattop_window(r, Rmax/2, Apodizer.HANN, None, 0, (Rmax, -Rmax))
 
-                    W = get_flattop_window(Z, 2, Apodizer.HANN, None)
+                    bkgs:list[npt.NDArray[np.floating]] = []
+                    bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w)
                     
-                    R = np.linspace(0,2*Rmax,500)
-
-                    f = fourier(Z, U*W, R)
-                    w = get_window(R / Rmax, Apodizer.EXPONENTIAL, 3)
-                    b = np.imag(fourier(R, np.imag(f)*w, Z))*np.sqrt(2*np.pi)
-
-                    s = b[len(x):] / x ** kweight +1
+                    for _ in range(iterations):
+                        bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w)
+                    s = sum(bkgs)
 
                     S = data.df.x.to_numpy().copy()
-                    S[idx] = s
+                    S[idx] = s / x ** kweight +1
 
                 case _:
                     raise NotImplementedError("Method not implemented")
