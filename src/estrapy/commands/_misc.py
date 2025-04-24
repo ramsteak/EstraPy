@@ -3,6 +3,7 @@ import numpy as np
 import numpy.typing as npt
 
 from typing import overload, NamedTuple, Iterable
+from enum import Enum
 
 def attempt_parse_number(s: str) -> str | int | float:
     if s.isdigit():
@@ -35,20 +36,14 @@ def SI_multiplier(prefix: str | None) -> int:
         return 1000 ** (-SI_PREFIXES[1].index(prefix))
     return 1
 
-
-# def parse_energy(val: str) -> float:
-#     m = NUMBER_EV.match(val)
-#     if m is None:
-#         raise ValueError(f'Could not parse "{val}" as energy.')
-#     value, mult, _ = m.groups()
-#     return float(value) * SI_multiplier(mult)
-
-
 class NumberUnit(NamedTuple):
     value: float
     sign: int
     unit: str | None
 
+class Bound(Enum):
+    INTERNAL = 0
+    EXTERNAL = 1
 
 def parse_numberunit(val: str, acceptable_units: Iterable[str|None]|None = None, default_unit:str|None=None) -> NumberUnit:
     m = NUMBER_UNIT.match(val)
@@ -76,35 +71,45 @@ def parse_numberunit(val: str, acceptable_units: Iterable[str|None]|None = None,
 
     return NumberUnit(value, sign, unit)
 
+def parse_numberunit_bound(
+    bounds: tuple[str, str],
+    acceptable_units: Iterable[str | None] | None = None,
+    default_unit: str | None = None,
+) -> tuple[NumberUnit | Bound, NumberUnit | Bound]:
+    _lower, _upper = bounds
+
+    match _lower:
+        case "..": lower = NumberUnit(-np.inf, 0, default_unit)
+        case ":.": lower = Bound.EXTERNAL
+        case ".:": lower = Bound.INTERNAL
+        case _lower:
+            try:
+                lower = parse_numberunit(_lower, acceptable_units, default_unit)
+            except ValueError:
+                raise ValueError(f'Invalid lower bound specifier: "{_lower}"')
+    match _upper:
+        case "..": upper = NumberUnit(+np.inf, 0, default_unit)
+        case ":.": upper = Bound.EXTERNAL
+        case ".:": upper = Bound.INTERNAL
+        case _upper:
+            try:
+                upper = parse_numberunit(_upper, acceptable_units, default_unit)
+            except ValueError:
+                raise ValueError(f'Invalid upper bound specifier: "{_upper}"')
+
+    return lower, upper
+
 def parse_numberunit_range(
     bounds: tuple[str, str],
     acceptable_units: Iterable[str | None] | None = None,
     default_unit: str | None = None,
 ) -> tuple[NumberUnit, NumberUnit]:
-    _lower, _upper = bounds
+    _lower, _upper = parse_numberunit_bound(bounds, acceptable_units, default_unit)
 
-    if _lower == "..":
-        lower = NumberUnit(-np.inf, 0, default_unit)
-    else:
-        lower = parse_numberunit(_lower)
-        if acceptable_units is not None:
-            if lower.unit not in acceptable_units:
-                raise ValueError(f'Invalid lower bound specifier: "{_lower}"')
-            if lower.unit is None:
-                lower = NumberUnit(lower.value, lower.sign, default_unit)
-
-    if _upper == "..":
-        upper = NumberUnit(np.inf, 0, default_unit)
-    else:
-        upper = parse_numberunit(_upper)
-        if acceptable_units is not None:
-            if upper.unit not in acceptable_units:
-                raise ValueError(f'Invalid upper bound specifier: "{_upper}"')
-            if upper.unit is None:
-                upper = NumberUnit(upper.value, upper.sign, default_unit)
-
+    lower = _lower if isinstance(_lower, NumberUnit) else NumberUnit(-np.inf, 0, default_unit)
+    upper = _upper if isinstance(_upper, NumberUnit) else NumberUnit(np.inf, 0, default_unit)
+            
     return lower, upper
-
 
 def parse_edgeenergy(val: str) -> float:
     if (m := NUMBER_UNIT.match(val)) is not None:
@@ -123,6 +128,23 @@ def parse_edgeenergy(val: str) -> float:
     else:
         raise ValueError(f'Could not parse "{val}" as edge energy.')
 
+def actualize_bounds(bounds: tuple[NumberUnit|Bound, NumberUnit|Bound], data:Iterable[npt.NDArray], unit:str) -> tuple[NumberUnit, NumberUnit]:
+    m = np.array([np.min(d) for d in data])
+    M = np.array([np.max(d) for d in data])
+    li, le = max(m), min(m)
+    ui, ue = min(M), max(M)
+
+    _lower,_upper = bounds
+    if _lower == Bound.INTERNAL: lower = NumberUnit(li, 0, unit)
+    elif _lower == Bound.EXTERNAL: lower = NumberUnit(le, 0, unit)
+    else: lower = _lower
+    
+    if _upper == Bound.INTERNAL: upper = NumberUnit(ui, 0, unit)
+    elif _upper == Bound.EXTERNAL: upper = NumberUnit(ue, 0, unit)
+    else: upper = _upper
+
+    return lower,upper
+    
 
 # eV to k conversion
 

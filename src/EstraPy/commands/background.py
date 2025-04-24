@@ -10,13 +10,14 @@ from typing import NamedTuple
 from matplotlib import pyplot as plt
 from scipy import interpolate
 
-from ._context import Context
+from ._context import Context, Column, DataColType, AxisType, Domain
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
 from ._parser import CommandParser
 
 from .fourier import fourier, get_window, Apodizer, get_flattop_window, bfourier
 
+    
 
 @dataclass(slots=True, frozen=True)
 class Method:
@@ -95,7 +96,7 @@ class Background(CommandHandler):
         log = getLogger("background")
 
         for data in context.data:
-            X,Y = data.df.k.to_numpy(), data.df.x.to_numpy()
+            X,Y = data.get_col_("k"), data.get_col_("x")
             match args.method:
                 case Constant():
                     S = np.ones_like(X)
@@ -104,37 +105,36 @@ class Background(CommandHandler):
                     idx = (X>=_range[0])&(X<=_range[1])
                     x, y = X[idx], Y[idx]
 
-                    s = bspline_method(x,y)
-                    S = data.df.x.to_numpy().copy()
+                    s = bspline_method(x,y) # type: ignore
+                    S = Y.copy()
                     S[idx] = s
                 
                 case Fourier(kweight, Rmax, iterations):
                     idx = X>=0
-                    _Y = Y[idx]
-                    x,_y = X[idx], _Y-1
+                    x, _y = X[idx], Y[idx] -1
                     y = _y * x ** kweight
                     eps = 0.3
-                    w = get_flattop_window(x, (x.max() - x.min())/8, Apodizer.HANN, None, 0, (-eps, +eps))
+                    w = get_flattop_window(x, (x.max() - x.min())/8, Apodizer.HANN, None, 0, (-eps, +eps)) # type: ignore
 
                     r = np.linspace(-2*Rmax,2*Rmax, 1001)
                     W = get_flattop_window(r, Rmax/2, Apodizer.HANN, None, 0, (Rmax, -Rmax))
 
                     bkgs:list[npt.NDArray[np.floating]] = []
-                    bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w)
+                    bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
                     
                     for _ in range(iterations):
-                        bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w)
+                        bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
                     s = sum(bkgs)
 
-                    S = data.df.x.to_numpy().copy()
+                    S = Y.copy()
                     S[idx] = s / x ** kweight +1
 
                 case _:
                     raise NotImplementedError("Method not implemented")
 
 
-            data.df["bkg"] = S
-            data.df.x = data.df.x - S
+            data.add_col("bkg", S, Column(None, DataColType.BACKGROUND), Domain.REAL)
+            data.mod_col("x", Y-S) # type: ignore
 
         return CommandResult(True)
 

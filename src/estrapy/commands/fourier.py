@@ -8,9 +8,9 @@ from logging import getLogger
 from typing import NamedTuple
 from matplotlib import pyplot as plt
 
-from ._context import Context
+from ._context import Context, AxisType, Column, DataColType, Datum, SignalType, FourierType, Domain
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
+from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit, parse_numberunit_bound, Bound, actualize_bounds
 from ._parser import CommandParser
 
 class Apodizer(Enum):
@@ -28,8 +28,7 @@ class Method(Enum):
 
 
 class Args_Fourier(NamedTuple):
-    lowerbound: NumberUnit
-    upperbound: NumberUnit
+    bound: tuple[NumberUnit | Bound, NumberUnit | Bound]
     upperdist: float
     interval: float
     kweight: float
@@ -92,7 +91,7 @@ def get_flattop_window(
 
 def fourier(
     x: npt.NDArray[np.floating],
-    y: npt.NDArray[np.floating] | npt.NDArray[np.complexfloating],
+    y: npt.NDArray[np.floating | np.complexfloating],
     r: npt.NDArray[np.floating],
 ) -> npt.NDArray[np.complexfloating]:
     dx = np.diff(x)
@@ -161,7 +160,7 @@ class Fourier(CommandHandler):
 
         args = parser.parse(tokens)
 
-        a, b = parse_numberunit_range(args.range, ("eV", "k", None), "k")
+        a, b = parse_numberunit_bound(args.range, ("eV", "k", None), "k")
 
         R, I = args.outrange
         _R = parse_numberunit(R)
@@ -198,7 +197,7 @@ class Fourier(CommandHandler):
             case "finuft":
                 met = Method.FINUFT
 
-        return Args_Fourier(a, b, r, i, args.kweight, apd, args.width, met)
+        return Args_Fourier((a, b), r, i, args.kweight, apd, args.width, met)
 
     @staticmethod
     def execute(args: Args_Fourier, context: Context) -> CommandResult:
@@ -206,54 +205,46 @@ class Fourier(CommandHandler):
 
         R = np.arange(0, args.upperdist, args.interval)
 
-        for data in context.data:
-            match args.lowerbound:
-                case NumberUnit(value, 0, "eV"):
-                    lb = value
-                    idx_l = data.df.E >= lb
-                case NumberUnit(value, 1 | -1, "eV"):
-                    if data.meta.E0 is None:
-                        raise RuntimeError(
-                            "Cannot specify relative energy value if E0 is not set."
-                        )
-                    lb = data.meta.E0 + value
-                    idx_l = data.df.E >= lb
-                case NumberUnit(value, 0, "k"):
-                    lb = value
-                    idx_l = data.df.k >= lb
-                case _:
-                    raise RuntimeError("Invalid state exception: #645651")
+        lower, upper = actualize_bounds(args.bound, [data.get_col_("k") for data in context.data], "k")
 
-            match args.upperbound:
+        for data in context.data:
+            match lower:
                 case NumberUnit(value, 0, "eV"):
-                    ub = value
-                    idx_u = data.df.E <= ub
+                    idx_l = data.get_col("E") >= value
                 case NumberUnit(value, 1 | -1, "eV"):
-                    if data.meta.E0 is None:
-                        raise RuntimeError(
-                            "Cannot specify relative energy value if E0 is not set."
-                        )
-                    ub = data.meta.E0 + value
-                    idx_u = data.df.E <= ub
+                    idx_l = data.get_col("e") >= value
                 case NumberUnit(value, 0, "k"):
-                    ub = value
-                    idx_u = data.df.k <= ub
+                    idx_l = data.get_col("k") >= value
                 case _:
-                    raise RuntimeError("Invalid state exception: #645651")
+                    raise RuntimeError("Invalid lower bound")
+                
+            match upper:
+                case NumberUnit(value, 0, "eV"):
+                    idx_u = data.get_col("E") <= value
+                case NumberUnit(value, 1 | -1, "eV"):
+                    idx_u = data.get_col("e") <= value
+                case NumberUnit(value, 0, "k"):
+                    idx_u = data.get_col("k") <= value
+                case _:
+                    raise RuntimeError("Invalid upper bound")
 
             idx = idx_l & idx_u
-            X = data.df.k.to_numpy()
-            x = X[idx]
-            w = get_flattop_window(x, args.wwidth, *args.apodizer)
+
+            X = data.get_col_("k")
+            Y = data.get_col_("x")
+            x,_y = X[idx], Y[idx]
+
+            w = get_flattop_window(x, args.wwidth, *args.apodizer) # type: ignore
 
             # Check if the data has mean 1. If so, the background was not removed,
             # and is estimated as 1
-            _y = data.df.x[idx].to_numpy()
-            if _y.mean() > 0.5:
-                y = w * (_y - 1) * x**args.kweight
-            else:
-                y = w * _y * x**args.kweight
+            kw = np.ones(x.shape, dtype=np.float64) if args.kweight == 0 else x ** args.kweight # type: ignore
+            kw: npt.NDArray[np.floating]
+            if _y.mean() > 0.5: 
+                y = w * (_y - 1) * kw
+            else: y = w * _y * kw
 
+            # Approximate 1/Nyquist frequency
             _min_dR = 2 * np.diff(x).mean()
 
             log.debug(f"{data.meta.name}: Performing fourier transform")
@@ -265,16 +256,17 @@ class Fourier(CommandHandler):
 
             match args.method:
                 case Method.DFT:
-                    f = fourier(x, y, R)
+                    f = fourier(x, y, R) # type: ignore
                 case Method.FINUFT:
-                    f = finuft(x, y+0j, R)
+                    f = finuft(x, y+0j, R) # type: ignore
 
             W = np.zeros_like(X)
             W[idx] = w
-            data.df["win"] = W
 
-            data.fd["R"] = R
-            data.fd["f"] = f
+            data.add_col("win", W, Column(None, DataColType.WINDOW), Domain.REAL)
+
+            data.add_col("R", R, Column("A", AxisType.DISTANCE), Domain.FOURIER)
+            data.add_col("f", f, Column(None, FourierType.COMPLEX), Domain.FOURIER)
 
         return CommandResult(True)
 

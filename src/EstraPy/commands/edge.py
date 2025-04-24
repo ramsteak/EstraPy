@@ -12,7 +12,7 @@ from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootRes
 from scipy.interpolate import interp1d
 from logging import getLogger
 
-from ._context import Context
+from ._context import Context, Column, AxisType, SignalType, Domain
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_edgeenergy, parse_numberunit, E_to_sk, NumberUnit
 from ._parser import CommandParser
@@ -308,11 +308,12 @@ class Align(CommandHandler):
                     f"Reference preedge was already calculated for {data.meta.name}."
                 )
 
-            y = data.df.ref.to_numpy()
-            x = data.df.E.to_numpy()
+            y = data.get_col_("ref")
+            x = data.get_col_("E")
+
             try:
                 rE0 = find_E0_with_method(
-                    args.method, (args.E0 - args.dE0, args.E0 + args.dE0), y, x
+                    args.method, (args.E0 - args.dE0, args.E0 + args.dE0), y, x # type: ignore
                 )
             except ValueError:
                 log.error(f"{data.meta.name}: Cannot find reference E0 value with the specified method.")
@@ -335,7 +336,7 @@ class Align(CommandHandler):
             )
 
             data.meta.refE0 = args.E0
-            data.df.E = data.df.E - shift
+            data.mod_col("E", x - shift)
 
             if data.meta.E0 is not None:
                 data.meta.E0 = data.meta.E0 - shift
@@ -406,14 +407,15 @@ class Edge(CommandHandler):
                     f"Reference preedge was already calculated for {data.meta.name}."
                 )
 
-            y = data.df.x.to_numpy()
-            x = data.df.E.to_numpy()
+            x = data.get_col_("E")
+            y = data.get_col_("x")
+
             E0s = args.E0s if args.E0s is not None else data.meta.refE0
             if E0s is None:
                 raise RuntimeError("E0 search interval was not provided.")
 
             try:
-                E0 = find_E0_with_method(args.method, (E0s - args.dE0, E0s + args.dE0), y, x)
+                E0 = find_E0_with_method(args.method, (E0s - args.dE0, E0s + args.dE0), y, x) # type: ignore
             except ValueError:
                 log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
                 continue
@@ -427,8 +429,8 @@ class Edge(CommandHandler):
                 log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
 
             data.meta.E0 = E0
-            data.df["e"] = data.df.E - E0
-            data.df["k"] = E_to_sk(data.df.E.to_numpy(), E0)
+            data.add_col("e", x - E0, Column("eV", AxisType.RELENERGY), Domain.REAL)
+            data.add_col("k", E_to_sk(x, E0), Column("k", AxisType.KVECTOR), Domain.REAL)
 
         return CommandResult(True)
 

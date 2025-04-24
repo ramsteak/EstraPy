@@ -5,16 +5,15 @@ import numpy as np
 from typing import NamedTuple
 from logging import getLogger
 
-from ._context import Context
+from ._context import Context, Column, SignalType, DataColType, AxisType, Domain
 from ._format import sup, exp
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, NumberUnit
+from ._misc import parse_numberunit_range, NumberUnit, Bound, parse_numberunit_bound, actualize_bounds
 from ._parser import CommandParser
 
 
 class Args_PreEdge(NamedTuple):
-    lowerbound: NumberUnit
-    upperbound: NumberUnit
+    bounds: tuple[NumberUnit | Bound, NumberUnit | Bound]
     degree: int
 
 class PreEdge(CommandHandler):
@@ -68,60 +67,53 @@ class PreEdge(CommandHandler):
 
         args = parser.parse(tokens)
 
-        a,b = parse_numberunit_range(args.range, ("eV", None), "eV")
+        lower,upper = parse_numberunit_bound(args.range, ("eV", None), "eV")
 
-        return Args_PreEdge(a, b, args.degree)
+        return Args_PreEdge((lower,upper), args.degree)
 
     @staticmethod
     def execute(args: Args_PreEdge, context: Context) -> CommandResult:
         log = getLogger("preedge")
+
+        lower,upper = actualize_bounds(args.bounds, [data.get_col_("E") for data in context.data], "eV")
+
         for data in context.data:
             if "preedge" in data.meta.run:
                 raise RuntimeError(
                     f"Preedge was already calculated for {data.meta.name}"
                 )
 
-            match args.lowerbound:
+            match lower:
                 case NumberUnit(value, 0, "eV"):
-                    lb = value
-                    idx_l = data.df.E >= lb
+                    idx_l = data.get_col("E") >= value
                 case NumberUnit(value, 1 | -1, "eV"):
-                    if data.meta.E0 is None:
-                        raise RuntimeError(
-                            "Cannot specify relative energy value if E0 is not set."
-                        )
-                    lb = data.meta.E0 + value
-                    idx_l = data.df.E > lb
+                    idx_l = data.get_col("e") >= value
                 case _:
                     raise RuntimeError("Invalid state exception: #645651")
 
-            match args.upperbound:
+            match upper:
                 case NumberUnit(value, 0, "eV"):
-                    ub = value
-                    idx_u = data.df.E <= ub
+                    idx_u = data.get_col("E") <= value
                 case NumberUnit(value, 1 | -1, "eV"):
-                    if data.meta.E0 is None:
-                        raise RuntimeError(
-                            "Cannot specify relative energy value if E0 is not set."
-                        )
-                    ub = data.meta.E0 + value
-                    idx_u = data.df.E <= ub
+                    idx_u = data.get_col("e") <= value
                 case _:
                     raise RuntimeError("Invalid state exception: #645651")
 
-            log.debug(f"{data.meta.name}: Fitting preedge of order {args.degree} in the region {lb:0.3f}{args.lowerbound.unit} ~ {ub:0.3f}{args.upperbound.unit}")
+            log.debug(f"{data.meta.name}: Fitting preedge of order {args.degree} in the region {lower.value:0.3f}{lower.unit} ~ {upper.value:0.3f}{upper.unit}")
 
             idx = idx_l & idx_u
-            X = data.df.e
-            x, y = X[idx], data.df.x[idx]
-            poly = np.poly1d(np.polyfit(x, y, args.degree))
+
+            X,Y = data.get_col_("e"), data.get_col_("x")
+            x, y = X[idx], Y[idx]
+            poly = np.poly1d(np.polyfit(x, y, args.degree)) # type: ignore
+            P = poly(X)
 
             log.debug(f"{data.meta.name}: preedge = {" ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(poly.coef))}")
 
-            data.meta.run["preedge"] = poly, "eV"
-
-            data.df["preedge"] = poly(X)
-            data.df.x = data.df.x - data.df.preedge
+            data.meta.run["preedge"] = poly, AxisType.RELENERGY
+            data.add_col("pre", P, Column(None, DataColType.PREEDGE), Domain.REAL)
+            data.mod_col("x", Y - P)
+            pass
 
         return CommandResult(True)
 

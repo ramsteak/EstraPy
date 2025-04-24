@@ -8,7 +8,7 @@ from logging import getLogger
 from typing import NamedTuple
 from matplotlib import pyplot as plt
 
-from ._context import Context
+from ._context import Context, Column, FourierType, Domain
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
 from ._parser import CommandParser
@@ -81,14 +81,15 @@ class Phase(CommandHandler):
         match args.action:
             case PhaseAction.CORRECT:
                 for data in context.data:
-                    if "f" not in data.fd:
-                        raise RuntimeError(
-                            "Fourier transform was not calculated. Cannot correct phase."
-                        )
+                    r = data.get_col_("R")
+                    f = data.get_col_("f")
+                    corrected, phase = extract_phase(r, f) # type: ignore
 
-                    s, p = extract_phase(data.fd.R.to_numpy(), data.fd.f.to_numpy())
-                    data.fd.f = s
-                    data.meta.run["phase"] = p
+                    P = phase(r)
+
+                    data.mod_col("f", corrected)
+                    data.add_col("pcorr", P, Column(None, FourierType.PHASE), Domain.FOURIER)
+                    data.meta.run["phasecorrect"] = phase
 
             case PhaseAction.ALIGN:
                 raise NotImplementedError()

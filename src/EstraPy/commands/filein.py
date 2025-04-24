@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import NamedTuple, Sequence
 
 from ._exceptions import FileParsingException, ArgumentException
-from ._context import AxisType, Context, Data, MetaData, SignalType
+from ._context import AxisType, Context, Data, MetaData, SignalType, Datum, Column, Domain
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import attempt_parse_number
 from ._parser import CommandParser, InputFileParsingException
@@ -144,54 +144,69 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     name = file.name.removesuffix(file.suffix)
     signaltype = args.signaltype[0] if args.signaltype is not None else None
     refsigtype = args.refsigtype[0] if args.refsigtype is not None else None
-    metadata = MetaData(args.axis, signaltype, refsigtype, name, file, mdat)
+    metadata = MetaData(signaltype, refsigtype, name, file, mdat)
 
     headercolumns = list(filedat.columns)
-    dat = pd.DataFrame(
-        {
-            colname: filedat.iloc[:, _parse_column_range(headercolumns, colrange)].sum(
-                axis=1
-            )
-            for colname, colrange in args.columns.items()
-        }
-    )
+    dat = Data(metadata)
+
+    for cname, crange in args.columns.items():
+        dat.add_col(
+            cname,
+            filedat.iloc[:,_parse_column_range(headercolumns, crange)].sum(axis=1),
+            Column(None, SignalType.INTENSITY),
+            Domain.REAL
+        )
 
     xaxiscol = _get_column_index(headercolumns, args.xaxiscol)
+    # columns:dict[str, Column] = {colname:Column(None, SignalType.INTENSITY) for colname in args.columns}
+
+    xcolumn = filedat.iloc[:, xaxiscol]
     match args.axis:
         case AxisType.INDEX:
-            ...
+            signaldomain = Domain.REAL
         case AxisType.ENERGY:
-            dat.loc[:, "E"] = filedat.iloc[:, xaxiscol]
+            dat.add_col("E", xcolumn, Column("eV", AxisType.ENERGY), Domain.REAL)
+            signaldomain = Domain.REAL
+        case AxisType.RELENERGY:
+            dat.add_col("e", xcolumn, Column("eV", AxisType.RELENERGY), Domain.REAL)
+            signaldomain = Domain.REAL
         case AxisType.KVECTOR:
-            dat.loc[:, "k"] = filedat.iloc[:, xaxiscol]
+            dat.add_col("k", xcolumn, Column("k", AxisType.KVECTOR), Domain.REAL)
+            signaldomain = Domain.REAL
         case AxisType.DISTANCE:
-            dat.loc[:, "R"] = filedat.iloc[:, xaxiscol]
+            dat.add_col("R", xcolumn, Column("A", AxisType.DISTANCE), Domain.FOURIER)
+            signaldomain = Domain.FOURIER
         case AxisType.QVECTOR:
-            dat.loc[:, "q"] = filedat.iloc[:, xaxiscol]
+            dat.add_col("q", xcolumn, Column("q", AxisType.QVECTOR), Domain.REAL)
+            signaldomain = Domain.REAL
 
     if args.signaltype is not None:
         stype, scols = args.signaltype
         match stype:
             case SignalType.INTENSITY:
-                dat.loc[:, "x"] = dat.loc[:, scols[0]]
+                scolumn = dat.get_col(scols[0])
+                dat.add_col("x", scolumn, Column(None, SignalType.INTENSITY), signaldomain)
             case SignalType.TRANSMITTANCE:
-                dat.loc[:, "x"] = np.log10(dat.loc[:, scols[0]] / dat.loc[:, scols[1]])
+                scolumn = np.log10(dat.get_col(scols[0]) / dat.get_col(scols[1]))
+                dat.add_col("x", scolumn, Column(None, SignalType.TRANSMITTANCE), signaldomain)
             case SignalType.FLUORESCENCE:
-                dat.loc[:, "x"] = dat.loc[:, scols[0]] / dat.loc[:, scols[1]]
+                scolumn = dat.get_col(scols[0]) / dat.get_col(scols[1])
+                dat.add_col("x", scolumn, Column(None, SignalType.FLUORESCENCE), signaldomain)
 
     if args.refsigtype is not None:
         rtype, rcols = args.refsigtype
         match rtype:
             case SignalType.INTENSITY:
-                dat.loc[:, "ref"] = dat.loc[:, rcols[0]]
+                scolumn = dat.get_col(rcols[0])
+                dat.add_col("ref", scolumn, Column(None, SignalType.INTENSITY), signaldomain)
             case SignalType.TRANSMITTANCE:
-                dat.loc[:, "ref"] = np.log10(
-                    dat.loc[:, rcols[0]] / dat.loc[:, rcols[1]]
-                )
+                scolumn = np.log10(dat.get_col(rcols[0]) / dat.get_col(rcols[1]))
+                dat.add_col("ref", scolumn, Column(None, SignalType.TRANSMITTANCE), signaldomain)
             case SignalType.FLUORESCENCE:
-                dat.loc[:, "ref"] = dat.loc[:, rcols[0]] / dat.loc[:, rcols[1]]
+                scolumn = dat.get_col(rcols[0]) / dat.get_col(rcols[1])
+                dat.add_col("ref", scolumn, Column(None, SignalType.FLUORESCENCE), signaldomain)
 
-    return Data(dat, metadata)
+    return dat
 
 
 class Args_FileIn(NamedTuple):
