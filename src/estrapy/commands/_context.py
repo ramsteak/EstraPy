@@ -10,6 +10,13 @@ from dataclasses import dataclass, field
 
 from ._numberunit import Domain, NumberUnitRange, Bound
 
+@dataclass(slots=True, frozen=True)
+class CommandResult:
+    success: bool | None
+    result: Any | None = None
+    error: Any | None = None
+    warning: Any | None = None
+
 
 class Options(NamedTuple):
     interactive: bool
@@ -214,6 +221,7 @@ class Context:
         self.directives = directives
 
         self.vars: dict[str, Any] = {}
+        self.commands: list[tuple[NamedTuple, CommandResult]] = []
         self.data = DataStore()
 
 

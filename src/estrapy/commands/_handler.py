@@ -4,15 +4,7 @@ from shlex import split
 from typing import NamedTuple, Any
 
 from ._parser import Token
-from ._context import Context
-
-
-@dataclass(slots=True, frozen=True)
-class CommandResult:
-    success: bool | None
-    result: Any | None = None
-    error: Any | None = None
-    warning: Any | None = None
+from ._context import Context, CommandResult
 
 
 class AbstractCommandHandler(ABC):
