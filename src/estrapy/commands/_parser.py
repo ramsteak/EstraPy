@@ -2,7 +2,7 @@ import argparse
 
 from typing import NamedTuple
 from ._exceptions import InputFileParsingException
-
+from ._numberunit import NUMBER_UNIT
 
 class Token(NamedTuple):
     value: str
@@ -27,6 +27,10 @@ class CommandParser(argparse.ArgumentParser):
         self, tokens: list[Token], _namespace: None | argparse.Namespace = None
     ) -> argparse.Namespace:
         args = [token.value for token in tokens]
+        # Dirty workaround: if the value is of the form NUMBER_UNIT then replace
+        # the "-" with "!THISISANEGATIVE!" temporarily. parse_nu can handle this prefix.
+        args = [a if not a.startswith("-") else 
+                (a if NUMBER_UNIT.match(a) is None else "!THISISANEGATIVE!"+a.removeprefix("-")) for a in args]
 
         try:
             namespace = self.parse_args(args, _namespace)
