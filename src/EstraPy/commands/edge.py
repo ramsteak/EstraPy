@@ -12,9 +12,10 @@ from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootRes
 from scipy.interpolate import interp1d
 from logging import getLogger
 
-from ._context import Context, Column, AxisType, SignalType, Domain
+from ._context import Context, Column, AxisType, SignalType
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_edgeenergy, parse_numberunit, E_to_sk, NumberUnit
+from ._misc import E_to_sk, parse_edgeenergy
+from ._numberunit import NumberUnit, NumberUnitRange, parse_nu, parse_range, Domain
 from ._parser import CommandParser
 
 
@@ -244,35 +245,13 @@ def parse_method_to_ops(method: str) -> list[tuple[Operation, int | None]]:
 class Align(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Align:
-        parser = CommandParser(
-            "align",
-            description="Aligns the reference data to a standard or a reference E0 value.",
-        )
+        parser = CommandParser("align", description="Aligns the reference data to a standard or a reference E0 value.")
         parser.add_argument("method", help="Uses the specified method to find the E0.")
-        parser.add_argument(
-            "--E0",
-            "-E",
-            type=parse_edgeenergy,
-            required=True,
-            help="Sets the E0 value for the edge.",
-        )
-        parser.add_argument(
-            "--dE0", "-d", type=parse_numberunit, help="Interval search width."
-        )
-        parser.add_argument(
-            "--search",
-            "-s",
-            type=parse_edgeenergy,
-            help="Searches around this value. If not set, searches around E0",
-        )
-        parser.add_argument(
-            "--wplot", action="store_true", help="Plots the result of each edge search."
-        )
-        parser.add_argument(
-            "--rplot",
-            action="store_true",
-            help="Plots the result of all edge searches together.",
-        )
+        parser.add_argument("--E0", "-E", type=parse_edgeenergy, required=True, help="Sets the E0 value for the edge.")
+        parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
+        parser.add_argument("--search","-s",type=parse_edgeenergy,help="Searches around this value. If not set, searches around E0")
+        parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
+        parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
 
         args = parser.parse(tokens)
 
@@ -282,10 +261,8 @@ class Align(CommandHandler):
         if args.dE0 is not None:
             _dE0 = args.dE0
             _dE0: NumberUnit
-            if _dE0.unit not in ("eV", None):
-                raise ValueError(
-                    f'Unit mismatch: unit "{_dE0.unit}" is not compatible with eV.'
-                )
+            if _dE0.unit != "eV":
+                raise ValueError(f'Unit mismatch: unit "{_dE0.unit}" is not compatible with eV.')
             dE0 = _dE0.value
         else:
             dE0 = 5.0
@@ -352,28 +329,12 @@ class Align(CommandHandler):
 class Edge(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Edge:
-        parser = CommandParser(
-            "edgeenergy",
-            description="Aligns the reference data to a standard or a reference E0 value.",
-        )
+        parser = CommandParser("edgeenergy", description="Aligns the reference data to a standard or a reference E0 value.")
         parser.add_argument("method", help="Uses the specified method to find the E0.")
-        parser.add_argument(
-            "--E0",
-            "-E",
-            type=parse_edgeenergy,
-            help="Sets the E0 value for the edge.",
-        )
-        parser.add_argument(
-            "--dE0", "-d", type=parse_numberunit, help="Interval search width."
-        )
-        parser.add_argument(
-            "--wplot", action="store_true", help="Plots the result of each edge search."
-        )
-        parser.add_argument(
-            "--rplot",
-            action="store_true",
-            help="Plots the result of all edge searches together.",
-        )
+        parser.add_argument("--E0", "-E", type=parse_edgeenergy, help="Sets the E0 value for the edge.")
+        parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
+        parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
+        parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
 
         args = parser.parse(tokens)
 
@@ -382,10 +343,8 @@ class Edge(CommandHandler):
         if args.dE0 is not None:
             _dE0 = args.dE0
             _dE0: NumberUnit
-            if _dE0.unit not in ("eV", None):
-                raise ValueError(
-                    f'Unit mismatch: unit "{_dE0.unit}" is not compatible with eV.'
-                )
+            if _dE0.unit != "eV":
+                raise ValueError(f'Unit mismatch: unit "{_dE0.unit}" is not compatible with eV.')
             dE0 = _dE0.value
         else:
             dE0 = 5.0
@@ -429,8 +388,8 @@ class Edge(CommandHandler):
                 log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
 
             data.meta.E0 = E0
-            data.add_col("e", x - E0, Column("eV", AxisType.RELENERGY), Domain.REAL)
-            data.add_col("k", E_to_sk(x, E0), Column("k", AxisType.KVECTOR), Domain.REAL)
+            data.add_col("e", x - E0, Column("eV", True, AxisType.RELENERGY), Domain.REAL)
+            data.add_col("k", E_to_sk(x, E0), Column("k", None, AxisType.KVECTOR), Domain.REAL)
 
         return CommandResult(True)
 

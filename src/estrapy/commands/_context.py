@@ -8,6 +8,8 @@ from typing import Any, NamedTuple
 from enum import Enum
 from dataclasses import dataclass, field
 
+from ._numberunit import Domain, NumberUnitRange, Bound
+
 
 class Options(NamedTuple):
     interactive: bool
@@ -43,7 +45,8 @@ class SignalType(Enum):
     TRANSMITTANCE = "tr"
     INTENSITY = "i"
     OTHER = "o"
-    
+
+
 class FourierType(Enum):
     COMPLEX = "c"
     PHASE = "p"
@@ -58,12 +61,9 @@ class DataColType(Enum):
     BACKGROUND = "bkg"
     WINDOW = "win"
 
-class Domain(Enum):
-    REAL = "real"
-    FOURIER = "fourier"
-    PCA = "pca"
 
 ColumnType = AxisType | SignalType | DataColType | FourierType
+
 
 @dataclass(slots=True)
 class MetaData:
@@ -79,15 +79,18 @@ class MetaData:
 @dataclass(slots=True, frozen=True)
 class Column:
     unit: str | None
+    sign: bool | None
     axis: ColumnType | None
     
 
 class Datum:
-    __slots__ = "df","cols"
+    __slots__ = "df","cols","default_axis"
     # df: pd.DataFrame
     # cols: dict[str, Column]
+    # default_axis: str | None
 
     def __init__(self, df:pd.DataFrame|None=None, cols:dict[str,Column]|None=None) -> None:
+        self.default_axis:str|None = None
         match df,cols:
             case None,None:
                 self.df = pd.DataFrame()
@@ -96,6 +99,16 @@ class Datum:
                 self.df = df
                 self.cols = cols
             case _: raise AttributeError("Cannot instanciate if only one of df, cols is None")
+
+    def set_default_axis(self, colname:str) -> None:
+        if colname not in self.cols: raise KeyError(f"Column {colname} does not exist.")
+        if not isinstance(self.cols[colname].axis, AxisType):
+            raise ValueError(f"Column {colname} is not an axis column.")
+        self.default_axis = colname
+
+    def get_default_axis(self) -> pd.Series:
+        if self.default_axis is None: raise KeyError("No default axis specified.")
+        return self.df[self.default_axis]
 
     def add_col(self, values:npt.NDArray[np.floating | np.complexfloating] | pd.Series, coltype: Column, colname: str) -> None:
         if colname in self.cols: raise NameError("A column with the given name already exists.")
@@ -118,29 +131,6 @@ class Datum:
         if colname is not ...: return self.df.loc[:,[colname]]
         if coltype is not ...: return self.df.loc[:,[c for c,ct in self.cols.items() if ct.axis==coltype]]
         return self.df
-    
-    # def get_col(self, colname:str) -> pd.Series:
-    #     if colname not in self.cols: raise KeyError(f"No column with the given name: {colname}")
-    #     return self.df[colname]
-
-    # def get_col_(self, colname:str) -> npt.NDArray[np.floating | np.complexfloating]:
-    #     if colname not in self.cols: raise KeyError(f"No column with the given name: {colname}")
-    #     return self.get_col(colname).to_numpy()
-
-    # def get_cols_by_type(self, *, unit:str|None=..., axis:ColumnType|None=...) -> pd.DataFrame: # type: ignore
-    #     _cols = [*self.cols]
-    #     if unit is not ...: _cols = filter(lambda c:self.cols[c].unit == unit, _cols)
-    #     if axis is not ...: _cols = filter(lambda c:self.cols[c].axis == axis, _cols)
-    #     _cols = [*_cols]
-    #     return self.df.loc[:,_cols]
-    
-    # def get_col_by_type(self, *, unit:str|None=..., axis:ColumnType|None=...) -> pd.Series: # type: ignore
-    #     cols = self.get_cols_by_type(unit=unit, axis=axis)
-    #     if len(cols.columns) > 1: raise ValueError("More than one columns match")
-    #     return cols[cols.columns[0]]
-    
-    # def get_col_by_type_(self, *, unit:str|None=..., axis:ColumnType|None=...) -> npt.NDArray[np.floating | np.complexfloating]: # type: ignore
-    #     return self.get_col_by_type(unit=unit, axis=axis).to_numpy()
 
 class Data:
     def __init__(self, metadata: MetaData) -> None:
@@ -159,6 +149,11 @@ class Data:
         if len(_ds) == 0: raise KeyError(f"column {colname} was not found")
         elif len(_ds) == 1: return _ds[0]
         else: raise KeyError(f"Multiple matching columns.")
+
+    def _get_all_cols(self) -> list[tuple[str, Column, Domain]]:
+        return [(colname, coltype, domain)
+                for domain,datum in self.datums.items()
+                for colname,coltype in datum.cols.items()]
 
     def mod_col(self, colname:str, values:npt.NDArray | pd.Series) -> None:
         domain = self._get_col_domain(colname)
@@ -220,3 +215,47 @@ class Context:
 
         self.vars: dict[str, Any] = {}
         self.data = DataStore()
+
+
+def range_to_index(data: Data, range: NumberUnitRange) -> pd.Series:
+    if range.domain is None: raise KeyError("Unknown index domain.")
+    if range.inter is not None:
+        raise ValueError("Index selection cannot be done if interval is not None.")
+    if isinstance(range.lower, Bound) or isinstance(range.upper, Bound):
+        raise ValueError("Index selection must be done only if the bounds are actualized.")
+    
+    datum = data.datums[range.domain]
+    # Get only the live columns
+    cols = [col for col in datum.cols if len(col.split("_")) == 1]
+    
+    for colname in cols:
+        col = datum.cols[colname]
+        if range.lower.unit != col.unit: continue
+        match col.sign, range.lower.sign:
+            case [None, _]:...
+            case [False, 0]:...
+            case [True, -1|1]:...
+            case _: continue
+        idx_l = datum.df[colname] >= range.lower.value
+        break
+    else:
+        raise KeyError("No matching column found.")
+    
+    
+    for colname in cols:
+        col = datum.cols[colname]
+        if range.upper.unit != col.unit: continue
+        match col.sign, range.upper.sign:
+            case [None, _]:...
+            case [False, 0]:...
+            case [True, -1|1]:...
+            case _: continue
+        idx_u = datum.df[colname] <= range.upper.value
+        break
+    else:
+        raise KeyError("No matching column found.")
+    
+    return idx_l&idx_u
+
+def range_to_index_(data: Data, range: NumberUnitRange) -> npt.NDArray[np.bool_]:
+    return range_to_index(data, range).to_numpy()

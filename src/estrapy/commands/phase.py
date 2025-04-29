@@ -10,7 +10,8 @@ from matplotlib import pyplot as plt
 
 from ._context import Context, Column, FourierType, Domain
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
+from ._numberunit import NumberUnit, Bound, parse_nu, parse_range
+
 from ._parser import CommandParser
 
 
@@ -69,6 +70,8 @@ class Phase(CommandHandler):
         match args.action:
             case "correct":
                 action = PhaseAction.CORRECT
+            case "align":
+                action = PhaseAction.ALIGN
             case _:
                 raise RuntimeError("Invalid phase transformation.")
 
@@ -81,18 +84,29 @@ class Phase(CommandHandler):
         match args.action:
             case PhaseAction.CORRECT:
                 for data in context.data:
-                    r = data.get_col_("R")
-                    f = data.get_col_("f")
+                    r = data.get_col_("R", domain=Domain.FOURIER)
+                    f = data.get_col_("f", domain=Domain.FOURIER)
                     corrected, phase = extract_phase(r, f) # type: ignore
 
                     P = phase(r)
 
                     data.mod_col("f", corrected)
-                    data.add_col("pcorr", P, Column(None, FourierType.PHASE), Domain.FOURIER)
+                    data.add_col("pcorr", P, Column(None, None, FourierType.PHASE), Domain.FOURIER)
                     data.meta.run["phasecorrect"] = phase
 
             case PhaseAction.ALIGN:
-                raise NotImplementedError()
+                for dataidx, data in enumerate(context.data):
+                    # Take the first data, then align everything to it
+                    if dataidx == 0:
+                        firstdata = data.get_xy("R", "f")
+                        data.mod_col("f", firstdata.to_numpy())
+                        continue
+                    
+                    f = data.get_xy("R", "f")
+                    dot = np.vdot(firstdata, f)
+                    c = dot / np.abs(dot)
+                    data.mod_col("f", f * c.conj())
+
 
         return CommandResult(True)
 

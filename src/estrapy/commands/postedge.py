@@ -7,10 +7,11 @@ from typing import NamedTuple
 from logging import getLogger
 
 
-from ._context import Context, AxisType, DataColType, Column, Domain
+from ._context import Context, AxisType, DataColType, Column, Domain, range_to_index
 from ._format import sup, exp
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, NumberUnit, Bound, parse_numberunit_bound, actualize_bounds
+from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange, actualize_range
+
 from ._parser import CommandParser
 
 
@@ -20,7 +21,7 @@ class RemovalOperation(Enum):
 
 
 class Args_PostEdge(NamedTuple):
-    bounds: tuple[NumberUnit | Bound, NumberUnit | Bound]
+    bounds: NumberUnitRange
     action: RemovalOperation
     fitaxis: AxisType
     degree: int
@@ -85,7 +86,7 @@ class PostEdge(CommandHandler):
 
         groupa = parser.add_mutually_exclusive_group()
         groupa.add_argument(
-            "--energy", "-e", dest="fitaxis", action="store_const", const="eV"
+            "--energy", "-e", dest="fitaxis", action="store_const", const="e"
         )
         groupa.add_argument(
             "--wavevector", "-k", dest="fitaxis", action="store_const", const="k"
@@ -93,54 +94,26 @@ class PostEdge(CommandHandler):
 
         args = parser.parse(tokens)
 
+        range = parse_range(*args.range)
+        if range.domain != Domain.REAL:
+            raise ValueError("Invalid fit domain: the postedge can only be calculated in energy or wavevector.")
+
+
         # Match bounds and fitaxis
         match args.fitaxis:
-            case "eV":
-                fitaxis = AxisType.RELENERGY
-                lower,upper = parse_numberunit_bound(args.range, ("eV", "k", None), "eV")
-            case "k":
-                fitaxis = AxisType.KVECTOR
-                lower,upper = parse_numberunit_bound(args.range, ("eV", "k", None), "k")
+            case "e": fitaxis = AxisType.RELENERGY
+            case "k": fitaxis = AxisType.KVECTOR
             case None:
-                lower,upper = parse_numberunit_bound(args.range, ("eV", "k", None))
-                match lower, upper:
-                    case NumberUnit(_, _, None), NumberUnit(_, _, None):
-                        raise ValueError("Neither bound has units specified. Specify the fit axis explicitly.")
-                    case NumberUnit(_, _, lu), NumberUnit(u, us, None) if lu is not None:
-                        match lu:
-                            case "eV":
-                                fitaxis = AxisType.RELENERGY
-                                upper = NumberUnit(u, us, "eV")
-                            case "k":
-                                fitaxis = AxisType.KVECTOR
-                                upper = NumberUnit(u, us, "k")
-                            case _:
-                                raise RuntimeError("Unknown lower bound unit.")
-                    case NumberUnit(l, ls, None), NumberUnit(_, _, uu) if uu is not None:
-                        match uu:
-                            case "eV":
-                                fitaxis = AxisType.RELENERGY
-                                lower = NumberUnit(l, ls, "eV")
-                            case "k":
-                                fitaxis = AxisType.KVECTOR
-                                lower = NumberUnit(l, ls, "k")
-                            case _:
-                                raise RuntimeError("Unknown upper bound unit.")
-                    case NumberUnit(_, _, lu), NumberUnit(_, _, uu) if lu == uu:
-                        # Both units are the same
-                        match lu:
-                            case "eV": fitaxis = AxisType.RELENERGY
-                            case "k": fitaxis = AxisType.KVECTOR
-                            case _: raise RuntimeError("Unknown bounds unit.")
-                    case NumberUnit(_, _, lu), NumberUnit(_, _, uu):
-                        # Le unità sono diverse
-                        raise ValueError("The bounds have different units. Specify the fit axis explicitly.")
+                match range.lower:
+                    case NumberUnit(_, _, "eV"): fitaxis = AxisType.RELENERGY
+                    case NumberUnit(_, _, "k"): fitaxis = AxisType.KVECTOR
                     case _:
-                        raise RuntimeError("Unknown error")
-            case _:
-                raise RuntimeError("Unknown error.")
-        
-        
+                        match range.upper:
+                            case NumberUnit(_, _, "eV"): fitaxis = AxisType.RELENERGY
+                            case NumberUnit(_, _, "k"): fitaxis = AxisType.KVECTOR
+                            case _:
+                                raise ValueError("Neither bound has units specified. Specify the fit axis explicitly.")
+
         match args.method:
             case "div":
                 action = RemovalOperation.DIVIDE
@@ -151,43 +124,24 @@ class PostEdge(CommandHandler):
             
         
 
-        return Args_PostEdge((lower,upper), action, fitaxis, args.degree)
+        return Args_PostEdge(range, action, fitaxis, args.degree)
 
     @staticmethod
     def execute(args: Args_PostEdge, context: Context) -> CommandResult:
         log = getLogger("postedge")
 
-        lower,upper = actualize_bounds(args.bounds, [data.get_col_("E") for data in context.data], "eV")
+        domain = args.bounds.domain or Domain.REAL
+        if domain != Domain.REAL:
+            raise RuntimeError("Cannot fit postedge to a different domain.")
+        
+        _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
+        range = actualize_range(args.bounds, _axes, "eV")
 
         for data in context.data:
             if "postedge" in data.meta.run:
-                raise RuntimeError(
-                    f"Postedge was already calculated for {data.meta.name}"
-                )
-
-            match lower:
-                case NumberUnit(value, 0, "eV"):
-                    idx_l = data.get_col("E") >= value
-                case NumberUnit(value, 1 | -1, "eV"):
-                    idx_l = data.get_col("e") >= value
-                case NumberUnit(value, 0, "k"):
-                    idx_l = data.get_col("k") >= value
-                case _:
-                    raise RuntimeError("Invalid lower bound")
-                
-            match upper:
-                case NumberUnit(value, 0, "eV"):
-                    idx_u = data.get_col("E") <= value
-                case NumberUnit(value, 1 | -1, "eV"):
-                    idx_u = data.get_col("e") <= value
-                case NumberUnit(value, 0, "k"):
-                    idx_u = data.get_col("k") <= value
-                case _:
-                    raise RuntimeError("Invalid upper bound")
-
-            log.debug(f"{data.meta.name}: Fitting postedge of order {args.degree} in the region {lower.value:0.3f}{lower.unit} ~ {upper.value:0.3f}{upper.unit}")
-
-            idx = idx_l & idx_u
+                raise RuntimeError(f"Postedge was already calculated for {data.meta.name}")
+            idx = range_to_index(data, range)
+            log.debug(f"{data.meta.name}: Fitting postedge of order {args.degree} in the region {range.lower.value:0.3f}{range.lower.unit} ~ {range.upper.value:0.3f}{range.upper.unit}") # type: ignore
 
             X = data.get_col_(coltype=args.fitaxis)
             Y = data.get_col_("x")
@@ -198,10 +152,12 @@ class PostEdge(CommandHandler):
             log.debug(f"{data.meta.name}: postedge = {" ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(poly.coef))}")
             
             data.meta.run["postedge"] = (poly, args.fitaxis, args.action)
-            data.add_col("post", P, Column(None, DataColType.POSTEDGE), Domain.REAL)
+            J0 = poly(0)
+            data.meta.run["J0"] = J0
+            data.add_col("post", P, Column(None, None, DataColType.POSTEDGE), Domain.REAL)
 
             match args.action:
-                case RemovalOperation.SUBTRACT: Y1 = Y - P
+                case RemovalOperation.SUBTRACT: Y1 = (Y - P) / J0
                 case RemovalOperation.DIVIDE: Y1 = Y / P
             
             data.mod_col("x", Y1)

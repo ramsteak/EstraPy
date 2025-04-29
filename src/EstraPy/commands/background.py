@@ -9,13 +9,15 @@ from logging import getLogger
 from typing import NamedTuple
 from matplotlib import pyplot as plt
 from scipy import interpolate
+from statsmodels.nonparametric.smoothers_lowess import lowess
 
-from ._context import Context, Column, DataColType, AxisType, Domain
+from ._context import Context, Column, DataColType, AxisType, Domain, range_to_index_
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit
+from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, actualize_range
+
 from ._parser import CommandParser
 
-from .fourier import fourier, get_window, Apodizer, get_flattop_window, bfourier
+from .fourier import fourier, get_window, Apodizer, get_flattop_window, bfourier, NumberUnitRange
 
     
 
@@ -29,12 +31,18 @@ class Spline(Method):
 
 @dataclass(slots=True, frozen=True)
 class BSpline(Method):
-    range: tuple[float,float]
+    range: NumberUnitRange
 
 @dataclass(slots=True, frozen=True)
 class Fourier(Method):
     Rmax: float
     iter: int
+
+@dataclass(slots=True, frozen=True)
+class Smoothing(Method):
+    range: NumberUnitRange
+    fraction: float
+    iterations: int
 
 @dataclass(slots=True, frozen=True)
 class Constant(Method):
@@ -73,6 +81,13 @@ class Background(CommandHandler):
         fourier.add_argument("--kweight", "-k", type=float)
         fourier.add_argument("--iterations", "-i", type=int, default=3)
 
+        smooth = subparsers.add_parser("smoothing")
+        smooth.add_argument("range", nargs=2)
+        smooth.add_argument("--kweight", "-k", type=float)
+        smooth.add_argument("--fraction", "-f", type=float, default=0.3)
+        smooth.add_argument("--iterations", "-i", type=int, default=1)
+
+
         args = parser.parse(tokens)
 
         match args.method:
@@ -81,13 +96,19 @@ class Background(CommandHandler):
             case "constant":
                 method = Constant(args.kweight)
             case "bspline":
-                range = parse_numberunit_range(args.range, ("k", None), "k")
-                method = BSpline(args.kweight, (range[0].value, range[1].value))
+                range = parse_range(*args.range)
+                if range.domain != Domain.REAL:
+                    raise ValueError("Background must be fitted to the real domain.")
+                method = BSpline(args.kweight, range)
             case "fourier":
-                rmax = parse_numberunit(args.Rmax, ("A", None), "A")
+                rmax = parse_nu(args.Rmax)
+                if rmax.unit != "A": raise ValueError("The max distance must be in angstrom.")
                 method = Fourier(args.kweight, rmax.value, args.iterations)
-
-            
+            case "smoothing":
+                range = parse_range(*args.range)
+                if range.domain != Domain.REAL:
+                    raise ValueError("Background must be fitted to the real domain.")
+                method = Smoothing(args.kweight, range, args.fraction, args.iterations)
 
         return Args_Background(method)
 
@@ -95,21 +116,38 @@ class Background(CommandHandler):
     def execute(args: Args_Background, context: Context) -> CommandResult:
         log = getLogger("background")
 
-        for data in context.data:
-            X,Y = data.get_col_("k"), data.get_col_("x")
-            match args.method:
-                case Constant():
+        match args.method:
+            case Constant():
+                for data in context.data:
+                    X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
                     S = np.ones_like(X)
-                
-                case BSpline(kweight, _range):
-                    idx = (X>=_range[0])&(X<=_range[1])
-                    x, y = X[idx], Y[idx]
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.mod_col("x", Y-S)
+            
+            case BSpline(kweight, _range):
+                domain = _range.domain or Domain.REAL
+                if domain != Domain.REAL:
+                    raise RuntimeError("Cannot fit postedge to a different domain.")
+        
+                _axes = [data.get_col_("k") for data in context.data]
+                bounds = actualize_range(_range, _axes, "k")
 
-                    s = bspline_method(x,y) # type: ignore
+                for data in context.data:
+                    X,Y = data.get_col_("k", domain=domain), data.get_col_("x", domain=domain)
+                    idx = range_to_index_(data, bounds)
+                    x, _y = X[idx], Y[idx] -1
+                    y = _y * x ** kweight
+
+                    s = bspline_method(x,y)
                     S = Y.copy()
-                    S[idx] = s
-                
-                case Fourier(kweight, Rmax, iterations):
+                    S[idx] = s / x ** kweight +1
+
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.mod_col("x", Y-S)
+            
+            case Fourier(kweight, Rmax, iterations):
+                for data in context.data:
+                    X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
                     idx = X>=0
                     x, _y = X[idx], Y[idx] -1
                     y = _y * x ** kweight
@@ -129,12 +167,30 @@ class Background(CommandHandler):
                     S = Y.copy()
                     S[idx] = s / x ** kweight +1
 
-                case _:
-                    raise NotImplementedError("Method not implemented")
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.mod_col("x", Y-S)
+            
+            case Smoothing(kweight, _range, fraction, iterations):
+                domain = _range.domain or Domain.REAL
+                if domain != Domain.REAL:
+                    raise RuntimeError("Cannot fit postedge to a different domain.")
+        
+                _axes = [data.get_col_("k") for data in context.data]
+                bounds = actualize_range(_range, _axes, "k")
 
+                for data in context.data:
+                    X,Y = data.get_col_("k", domain=domain), data.get_col_("x", domain=domain)
+                    idx = range_to_index_(data, bounds)
+                    x,_y = X[idx], Y[idx] -1
+                    y = _y * x ** kweight
 
-            data.add_col("bkg", S, Column(None, DataColType.BACKGROUND), Domain.REAL)
-            data.mod_col("x", Y-S) # type: ignore
+                    s = lowess(y, x, fraction, iterations, return_sorted=False)
+                    S = Y.copy()
+                    S[idx] = s / x ** kweight +1
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.mod_col("x", Y-S)
+            case _:
+                raise NotImplementedError("Method not implemented")
 
         return CommandResult(True)
 

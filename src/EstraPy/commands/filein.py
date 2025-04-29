@@ -55,16 +55,6 @@ def _read_file_m1(
 
     # --- Parse metadata -------------------------------------------------------
     metavars: dict[str, str | int | float] = {}
-    # Add file name metadata. The split is done at every underscore.
-    metavars.update(
-        {
-            f".f{n+1}": attempt_parse_number(e)
-            for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))
-        }
-    )
-    metavars[".f"] = file.name
-    metavars[".fn"] = file.name.removesuffix(file.suffix)
-    metavars[".fe"] = file.suffix
 
     # Add file header metadata. The split is done at every space.
     metavars.update(
@@ -83,11 +73,7 @@ def _read_file_m1(
             vname, vval = line[1], attempt_parse_number(line[2])
             metavars[f"${vname}"] = vval
 
-    # Add all the given variable names
-    for vname, vval in args.vars.items():
-        metavars[f"${vname}"] = vval
-
-    return CommandResult(None, warning=warn), data, metavars
+    return CommandResult(True, warning=warn), data, metavars
 
 
 _file_read_methods = [_read_file_m1]
@@ -137,9 +123,31 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
         res, filedat, mdat = method(file, args)
         if res.success:
             break
+    else:
+        raise RuntimeError(f"Unrecognized file format: {_log_fname}")
 
     if res.warning is not None:
         log.warning(f"{_log_fname}: {res.warning}")
+    
+    # Add file name metadata. The split is done at every underscore.
+    mdat.update(
+        {
+            f".f{n+1}": attempt_parse_number(e)
+            for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))
+        }
+    )
+    mdat[".f"] = file.name
+    mdat[".fn"] = file.name.removesuffix(file.suffix)
+    mdat[".fe"] = file.suffix
+
+    # Add all the given variables from the command
+    for vname, vval in args.vars.items():
+        if isinstance(vval, str) and vval.startswith("."):
+            # If the variable value starts with a period, check if it is a header
+            # or filename var, and set the predefined value to a pretty $name
+            mdat[f"${vname}"] = mdat.get(vval, vval)
+        else:
+            mdat[f"${vname}"] = vval
 
     name = file.name.removesuffix(file.suffix)
     signaltype = args.signaltype[0] if args.signaltype is not None else None
@@ -147,64 +155,69 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     metadata = MetaData(signaltype, refsigtype, name, file, mdat)
 
     headercolumns = list(filedat.columns)
-    dat = Data(metadata)
+    dat = Data(metadata=metadata)
 
     for cname, crange in args.columns.items():
         dat.add_col(
             cname,
             filedat.iloc[:,_parse_column_range(headercolumns, crange)].sum(axis=1),
-            Column(None, SignalType.INTENSITY),
+            Column(None, None, SignalType.INTENSITY),
             Domain.REAL
         )
 
     xaxiscol = _get_column_index(headercolumns, args.xaxiscol)
-    # columns:dict[str, Column] = {colname:Column(None, SignalType.INTENSITY) for colname in args.columns}
+    # columns:dict[str, Column] = {colname:Column(None, None, SignalType.INTENSITY) for colname in args.columns}
 
     xcolumn = filedat.iloc[:, xaxiscol]
     match args.axis:
         case AxisType.INDEX:
             signaldomain = Domain.REAL
         case AxisType.ENERGY:
-            dat.add_col("E", xcolumn, Column("eV", AxisType.ENERGY), Domain.REAL)
+            dat.add_col("E", xcolumn, Column("eV", False, AxisType.ENERGY), Domain.REAL)
             signaldomain = Domain.REAL
+            dat.datums[signaldomain].set_default_axis("E")
         case AxisType.RELENERGY:
-            dat.add_col("e", xcolumn, Column("eV", AxisType.RELENERGY), Domain.REAL)
+            dat.add_col("e", xcolumn, Column("eV", True, AxisType.RELENERGY), Domain.REAL)
             signaldomain = Domain.REAL
+            dat.datums[signaldomain].set_default_axis("e")
         case AxisType.KVECTOR:
-            dat.add_col("k", xcolumn, Column("k", AxisType.KVECTOR), Domain.REAL)
+            dat.add_col("k", xcolumn, Column("k", None, AxisType.KVECTOR), Domain.REAL)
             signaldomain = Domain.REAL
+            dat.datums[signaldomain].set_default_axis("k")
         case AxisType.DISTANCE:
-            dat.add_col("R", xcolumn, Column("A", AxisType.DISTANCE), Domain.FOURIER)
+            dat.add_col("R", xcolumn, Column("A", None, AxisType.DISTANCE), Domain.FOURIER)
             signaldomain = Domain.FOURIER
+            dat.datums[signaldomain].set_default_axis("R")
         case AxisType.QVECTOR:
-            dat.add_col("q", xcolumn, Column("q", AxisType.QVECTOR), Domain.REAL)
+            dat.add_col("q", xcolumn, Column("q", None, AxisType.QVECTOR), Domain.REAL)
             signaldomain = Domain.REAL
+            dat.datums[signaldomain].set_default_axis("q")
 
     if args.signaltype is not None:
         stype, scols = args.signaltype
         match stype:
             case SignalType.INTENSITY:
                 scolumn = dat.get_col(scols[0])
-                dat.add_col("x", scolumn, Column(None, SignalType.INTENSITY), signaldomain)
+                dat.add_col("x", scolumn, Column(None, None, SignalType.INTENSITY), signaldomain)
             case SignalType.TRANSMITTANCE:
                 scolumn = np.log10(dat.get_col(scols[0]) / dat.get_col(scols[1]))
-                dat.add_col("x", scolumn, Column(None, SignalType.TRANSMITTANCE), signaldomain)
+                dat.add_col("x", scolumn, Column(None, None, SignalType.TRANSMITTANCE), signaldomain)
             case SignalType.FLUORESCENCE:
                 scolumn = dat.get_col(scols[0]) / dat.get_col(scols[1])
-                dat.add_col("x", scolumn, Column(None, SignalType.FLUORESCENCE), signaldomain)
+                dat.add_col("x", scolumn, Column(None, None, SignalType.FLUORESCENCE), signaldomain)
 
     if args.refsigtype is not None:
         rtype, rcols = args.refsigtype
         match rtype:
             case SignalType.INTENSITY:
                 scolumn = dat.get_col(rcols[0])
-                dat.add_col("ref", scolumn, Column(None, SignalType.INTENSITY), signaldomain)
+                dat.add_col("ref", scolumn, Column(None, None, SignalType.INTENSITY), signaldomain)
             case SignalType.TRANSMITTANCE:
                 scolumn = np.log10(dat.get_col(rcols[0]) / dat.get_col(rcols[1]))
-                dat.add_col("ref", scolumn, Column(None, SignalType.TRANSMITTANCE), signaldomain)
+                dat.add_col("ref", scolumn, Column(None, None, SignalType.TRANSMITTANCE), signaldomain)
             case SignalType.FLUORESCENCE:
                 scolumn = dat.get_col(rcols[0]) / dat.get_col(rcols[1])
-                dat.add_col("ref", scolumn, Column(None, SignalType.FLUORESCENCE), signaldomain)
+                dat.add_col("ref", scolumn, Column(None, None, SignalType.FLUORESCENCE), signaldomain)
 
     return dat
 

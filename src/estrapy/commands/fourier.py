@@ -8,9 +8,9 @@ from logging import getLogger
 from typing import NamedTuple
 from matplotlib import pyplot as plt
 
-from ._context import Context, AxisType, Column, DataColType, Datum, SignalType, FourierType, Domain
+from ._context import Context, AxisType, Column, DataColType, Datum, SignalType, FourierType, Domain, range_to_index
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import parse_numberunit_range, parse_numberunit, NumberUnit, parse_numberunit_bound, Bound, actualize_bounds
+from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange, actualize_range
 from ._parser import CommandParser
 
 class Apodizer(Enum):
@@ -25,12 +25,12 @@ class Apodizer(Enum):
 class Method(Enum):
     DFT = "dft"
     FINUFT = "finuft"
+    FFT = "fft"
 
 
 class Args_Fourier(NamedTuple):
-    bound: tuple[NumberUnit | Bound, NumberUnit | Bound]
-    upperdist: float
-    interval: float
+    bounds: NumberUnitRange
+    fbounds: NumberUnitRange
     kweight: float
     apodizer: tuple[Apodizer, float | None]
     wwidth: float
@@ -125,53 +125,18 @@ def finuft(
 class Fourier(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Fourier:
-        parser = CommandParser(
-            "fourier", description="Performs the discrete Fourier transform."
-        )
+        parser = CommandParser("fourier", description="Performs the discrete Fourier transform.")
         parser.add_argument("range", nargs=2, help="The transformation range.")
-        parser.add_argument(
-            "outrange", nargs=2, help="The maximum R value and spacing of the DFT."
-        )
-        parser.add_argument(
-            "--kweight",
-            "-k",
-            type=float,
-            default=0,
-            help="The k-weight to scale the signal by.",
-        )
-        parser.add_argument(
-            "--width",
-            "-w",
-            type=float,
-            default=np.inf,
-            help="The ramp width of the apodizer window.",
-        )
-        parser.add_argument(
-            "--apodizer",
-            "-a",
-            default="hann",
-            help="The window function to apodize the data with.",
-        )
-        parser.add_argument(
-            "--method",
-            default="dft",
-            choices=["dft", "finuft"]
-        )
+        parser.add_argument("outrange", nargs=2, help="The maximum R value and spacing of the DFT.")
+        parser.add_argument("--kweight", "-k", type=float, default=0, help="The k-weight to scale the signal by.")
+        parser.add_argument("--width", "-w", type=float, default=np.inf, help="The ramp width of the apodizer window.")
+        parser.add_argument("--apodizer", "-a", default="hann", help="The window function to apodize the data with.")
+        parser.add_argument("--method",default="dft",choices=["dft", "finuft", "fft"])
 
         args = parser.parse(tokens)
 
-        a, b = parse_numberunit_bound(args.range, ("eV", "k", None), "k")
-
-        R, I = args.outrange
-        _R = parse_numberunit(R)
-        if _R.unit not in ("A", None):
-            raise ValueError(f"Invalid upper bound specifier: {R}.")
-        r = _R.value
-
-        _I = parse_numberunit(I)
-        if _I.unit not in ("A", None):
-            raise ValueError(f"Invalid interval specifier: {I}.")
-        i = _I.value
+        range = parse_range(*args.range)
+        outrn = parse_range("0A", *args.outrange)
 
         match args.apodizer[:3]:
             case "han":
@@ -196,39 +161,35 @@ class Fourier(CommandHandler):
                 met = Method.DFT
             case "finuft":
                 met = Method.FINUFT
+            case "fft":
+                met = Method.FFT
 
-        return Args_Fourier((a, b), r, i, args.kweight, apd, args.width, met)
+        return Args_Fourier(range, outrn, args.kweight, apd, args.width, met)
 
     @staticmethod
     def execute(args: Args_Fourier, context: Context) -> CommandResult:
         log = getLogger("fourier")
 
-        R = np.arange(0, args.upperdist, args.interval)
+        if args.fbounds.domain != Domain.FOURIER:
+            raise RuntimeError("The fourier transform requires valid fourier units.")
+        
+        match args.fbounds.inter:
+            case int(n):
+                R = np.linspace(args.fbounds.lower.value, args.fbounds.upper.value, n)
+            case NumberUnit(v, _, "A"):
+                R = np.arange(args.fbounds.lower.value, args.fbounds.upper.value, v)
+            case _: raise RuntimeError("Invalid R axis specification.")
+        interval = R[1] - R[0]
 
-        lower, upper = actualize_bounds(args.bound, [data.get_col_("k") for data in context.data], "k")
+        domain = args.bounds.domain or Domain.REAL
+        if domain != Domain.REAL:
+            raise RuntimeError("Cannot fit postedge to a different domain.")
+        _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
+        range = actualize_range(args.bounds, _axes, "eV")
 
         for data in context.data:
-            match lower:
-                case NumberUnit(value, 0, "eV"):
-                    idx_l = data.get_col("E") >= value
-                case NumberUnit(value, 1 | -1, "eV"):
-                    idx_l = data.get_col("e") >= value
-                case NumberUnit(value, 0, "k"):
-                    idx_l = data.get_col("k") >= value
-                case _:
-                    raise RuntimeError("Invalid lower bound")
-                
-            match upper:
-                case NumberUnit(value, 0, "eV"):
-                    idx_u = data.get_col("E") <= value
-                case NumberUnit(value, 1 | -1, "eV"):
-                    idx_u = data.get_col("e") <= value
-                case NumberUnit(value, 0, "k"):
-                    idx_u = data.get_col("k") <= value
-                case _:
-                    raise RuntimeError("Invalid upper bound")
 
-            idx = idx_l & idx_u
+            idx = range_to_index(data, range)
 
             X = data.get_col_("k")
             Y = data.get_col_("x")
@@ -249,9 +210,9 @@ class Fourier(CommandHandler):
 
             log.debug(f"{data.meta.name}: Performing fourier transform")
 
-            if _min_dR > args.interval:
+            if _min_dR > interval:
                 log.warning(
-                    f"The required frequency ({1/args.interval:0.1f}) is smaller than the average Nyquist frequency ({1/_min_dR:0.1f}). The minimum interval is {_min_dR:0.4f}"
+                    f"The required frequency ({1/interval:0.1f}) is smaller than the average Nyquist frequency ({1/_min_dR:0.1f}). The minimum interval is {_min_dR:0.4f}"
                 )
 
             match args.method:
@@ -259,14 +220,18 @@ class Fourier(CommandHandler):
                     f = fourier(x, y, R) # type: ignore
                 case Method.FINUFT:
                     f = finuft(x, y+0j, R) # type: ignore
+                case Method.FFT:
+                    raise NotImplementedError("FFT not yet implemented.")
 
             W = np.zeros_like(X)
             W[idx] = w
 
-            data.add_col("win", W, Column(None, DataColType.WINDOW), Domain.REAL)
+            data.add_col("win", W, Column(None, None, DataColType.WINDOW), Domain.REAL)
 
-            data.add_col("R", R, Column("A", AxisType.DISTANCE), Domain.FOURIER)
-            data.add_col("f", f, Column(None, FourierType.COMPLEX), Domain.FOURIER)
+            data.add_col("R", R, Column("A", None, AxisType.DISTANCE), Domain.FOURIER)
+            data.datums[Domain.FOURIER].set_default_axis("R")
+            
+            data.add_col("f", f, Column(None, None, FourierType.COMPLEX), Domain.FOURIER)
 
         return CommandResult(True)
 
