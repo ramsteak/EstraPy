@@ -166,6 +166,7 @@ class Rebin(CommandHandler):
             dig = np.digitize(X, bins)
             df = data.datums[domain]
             df.df = df.df.groupby(dig).mean().loc[1:len(newx),:]
+            df.df[axis] = newx[df.df.index-1]
             
         return CommandResult(True)
 
