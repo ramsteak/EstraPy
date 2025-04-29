@@ -162,5 +162,6 @@ def main():
 
     for executor, commandargs in commands:
         res = executor.execute(commandargs, context)
+        context.commands.append((commandargs, res))
 
     pass
