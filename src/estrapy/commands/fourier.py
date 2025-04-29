@@ -6,11 +6,10 @@ import numpy.typing as npt
 from enum import Enum
 from logging import getLogger
 from typing import NamedTuple
-from matplotlib import pyplot as plt
 
-from ._context import Context, AxisType, Column, DataColType, Datum, SignalType, FourierType, Domain, range_to_index
+from ._context import Context, AxisType, Column, DataColType, FourierType, Domain, range_to_index
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange, actualize_range
+from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 from ._parser import CommandParser
 
 class Apodizer(Enum):

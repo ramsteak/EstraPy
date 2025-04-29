@@ -1,20 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
-import numpy.typing as npt
 
-from enum import Enum
 from logging import getLogger
 from typing import NamedTuple
-from matplotlib import pyplot as plt
 from statsmodels.nonparametric.smoothers_lowess import lowess
-from dataclasses import dataclass
-from itertools import batched
 
 from ._context import Context, Domain, range_to_index
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange, actualize_range
-from ._misc import E_to_sk, sk_to_E
+from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 from ._parser import CommandParser
 
 

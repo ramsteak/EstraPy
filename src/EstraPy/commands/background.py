@@ -4,20 +4,18 @@ import numpy as np
 import numpy.typing as npt
 
 from dataclasses import dataclass
-from enum import Enum
 from logging import getLogger
 from typing import NamedTuple
-from matplotlib import pyplot as plt
 from scipy import interpolate
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
-from ._context import Context, Column, DataColType, AxisType, Domain, range_to_index_
+from ._context import Context, Column, DataColType, Domain, range_to_index_
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, actualize_range
+from ._numberunit import parse_nu, parse_range, actualize_range
 
 from ._parser import CommandParser
 
-from .fourier import fourier, get_window, Apodizer, get_flattop_window, bfourier, NumberUnitRange
+from .fourier import fourier, Apodizer, get_flattop_window, bfourier, NumberUnitRange
 
     
 

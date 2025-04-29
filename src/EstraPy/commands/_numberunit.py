@@ -2,7 +2,7 @@ import re
 import numpy as np
 import numpy.typing as npt
 
-from typing import overload, NamedTuple, Sequence
+from typing import NamedTuple, Sequence
 from enum import Enum
 
 SI_PREFIXES = ("kMGTPEZYRQ", "munpfazyrq")

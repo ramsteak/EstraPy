@@ -10,7 +10,7 @@ from logging import getLogger
 from ._context import Context, AxisType, DataColType, Column, Domain, range_to_index
 from ._format import sup, exp
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange, actualize_range
+from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 
 from ._parser import CommandParser
 

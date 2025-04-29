@@ -5,11 +5,11 @@ import numpy as np
 from typing import NamedTuple
 from logging import getLogger
 
-from ._context import Context, Column, SignalType, DataColType, AxisType, Domain, range_to_index
+from ._context import Context, Column, DataColType, AxisType, Domain, range_to_index
 from ._format import sup, exp
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange
-from ._numberunit import actualize_lower, actualize_range, actualize_upper
+from ._numberunit import parse_range, NumberUnitRange
+from ._numberunit import actualize_range
 
 from ._parser import CommandParser
 

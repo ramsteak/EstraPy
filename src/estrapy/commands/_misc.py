@@ -2,8 +2,7 @@ import re
 import numpy as np
 import numpy.typing as npt
 
-from typing import overload, NamedTuple, Iterable
-from enum import Enum
+from typing import overload
 
 from ._numberunit import parse_nu, SI_multiplier
 

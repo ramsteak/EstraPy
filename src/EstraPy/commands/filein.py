@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import NamedTuple, Sequence
 
 from ._exceptions import FileParsingException, ArgumentException
-from ._context import AxisType, Context, Data, MetaData, SignalType, Datum, Column, Domain
+from ._context import AxisType, Context, Data, MetaData, SignalType, Column, Domain
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import attempt_parse_number
 from ._parser import CommandParser, InputFileParsingException

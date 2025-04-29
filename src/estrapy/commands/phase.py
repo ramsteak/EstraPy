@@ -6,11 +6,9 @@ import numpy.typing as npt
 from enum import Enum
 from logging import getLogger
 from typing import NamedTuple
-from matplotlib import pyplot as plt
 
 from ._context import Context, Column, FourierType, Domain
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range
 
 from ._parser import CommandParser
 

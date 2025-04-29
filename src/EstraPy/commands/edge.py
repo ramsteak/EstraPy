@@ -12,10 +12,10 @@ from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootRes
 from scipy.interpolate import interp1d
 from logging import getLogger
 
-from ._context import Context, Column, AxisType, SignalType
+from ._context import Context, Column, AxisType
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import E_to_sk, parse_edgeenergy
-from ._numberunit import NumberUnit, NumberUnitRange, parse_nu, parse_range, Domain
+from ._numberunit import NumberUnit, parse_nu, Domain
 from ._parser import CommandParser
 
 
