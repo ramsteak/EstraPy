@@ -59,9 +59,9 @@ def _read_file_m1(
     # Add file header metadata. The split is done at every space.
     metavars.update(
         {
-            f".h{ln+1}.{pn+1}": attempt_parse_number(item)
-            for ln, line in enumerate(metadatalines)
-            for pn, item in enumerate(line)
+            f".h{ln}.{pn}": attempt_parse_number(item)
+            for ln, line in enumerate(metadatalines, 1)
+            for pn, item in enumerate(line, 1)
         }
     )
 
@@ -71,7 +71,9 @@ def _read_file_m1(
             continue
         if line[0] == "#U" and len(line) >= 3:
             vname, vval = line[1], attempt_parse_number(line[2])
-            metavars[f"${vname}"] = vval
+            if vname.startswith("."):
+                raise NameError("Variables cannot start with dot.")
+            metavars[vname] = vval
 
     return CommandResult(True, warning=warn), data, metavars
 
@@ -132,8 +134,8 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     # Add file name metadata. The split is done at every underscore.
     mdat.update(
         {
-            f".f{n+1}": attempt_parse_number(e)
-            for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"))
+            f".f{n}": attempt_parse_number(e)
+            for n, e in enumerate(file.name.removesuffix(file.suffix).split("_"), 1)
         }
     )
     mdat[".f"] = file.name
@@ -142,12 +144,14 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
 
     # Add all the given variables from the command
     for vname, vval in args.vars.items():
+        if vname.startswith("."):
+            raise NameError("Variables cannot start with dot.")
         if isinstance(vval, str) and vval.startswith("."):
             # If the variable value starts with a period, check if it is a header
             # or filename var, and set the predefined value to a pretty $name
-            mdat[f"${vname}"] = mdat.get(vval, vval)
+            mdat[vname] = mdat.get(vval, vval)
         else:
-            mdat[f"${vname}"] = vval
+            mdat[vname] = vval
 
     name = file.name.removesuffix(file.suffix)
     signaltype = args.signaltype[0] if args.signaltype is not None else None

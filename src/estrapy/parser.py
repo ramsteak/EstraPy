@@ -35,6 +35,12 @@ def parse_directives(input: str) -> Directives:
     # be between directives or version, and all directives must be at the top of
     # the file.
     directives: list[str] = []
+    varreplacement: dict[str, str] = {}
+
+    clear = False
+    noplot = False
+    vars = {}
+
     for line in lines[1:]:
         # Skip empty lines
         if not line.strip():
@@ -42,13 +48,16 @@ def parse_directives(input: str) -> Directives:
         # Stop directive parsing after the first command line
         if not line.startswith("%"):
             break
+        
+        directive = line.removeprefix("%").strip()
+        if directive == "clear": clear = True
+        if directive == "noplot": noplot = True
 
-        directives.append(line.removeprefix("%").strip())
+        if directive.startswith("define "):
+            vname, vval = directive.removeprefix("define ").split(" ", maxsplit=1)
+            vars[vname] = vval
 
-    return Directives(
-        "clear" in directives,
-        "noplot" in directives,
-    )
+    return Directives(clear, noplot, vars)
 
 
 def parse_commands(
@@ -60,8 +69,13 @@ def parse_commands(
         raise ValueError(
             f"Estrapy version ({VERSION}) does not match file version {context.options.version}"
         )
+    
+    replaced = input
+    for varname, varval in context.directives.vars.items():
+        replaced = replaced.replace(f"%{varname}%", varval)
+        replaced = replaced.replace(f"${{{varname}}}", varval)
 
-    lines = input.splitlines()
+    lines = replaced.splitlines()
 
     parsedcommands: list[tuple[CommandHandler, NamedTuple]] = []
 

@@ -7,6 +7,8 @@ from .phase import Phase
 from .plot import Plot
 from .background import Background
 from .othercmds import Cut, Smooth, Rebin
+from .glitch import Deglitch, MultiEdge
+from .save import Save
 
 from ._handler import CommandHandler
 
@@ -24,4 +26,7 @@ commands: dict[str, CommandHandler] = {
     "cut": Cut(),
     "smooth": Smooth(),
     "rebin": Rebin(),
+    "deglitch": Deglitch(),
+    "multiedge": MultiEdge(),
+    "save": Save(),
 }

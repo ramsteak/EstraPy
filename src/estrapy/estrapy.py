@@ -12,6 +12,8 @@ from . import __version__
 from .commands._context import Paths, Context, Options
 from .parser import parse_version, parse_directives, parse_commands
 
+from .commands.plot import FigureRuntime
+from matplotlib import pyplot as plt
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -46,6 +48,7 @@ def main():
     parser.add_argument(
         "--no-cache", action="store_true", help="Does not read or store from the cache."
     )
+    parser.add_argument("--vars", nargs="+", help="Sets runtime variables, accessed as %1% or ${1} in the input file.")
 
     args = parser.parse_args()
 
@@ -98,6 +101,10 @@ def main():
 
     inputfiledata = inputfile.read_text("utf-8")
     directives = parse_directives(inputfiledata)
+
+    if args.vars is not None:        
+        for i,var in enumerate(args.vars, 1):
+            directives.vars[str(i)] = var
 
     options = Options(
         False,
@@ -163,5 +170,14 @@ def main():
     for executor, commandargs in commands:
         res = executor.execute(commandargs, context)
         context.commands.append((commandargs, res))
-
     pass
+
+    # At the end of the commands, check if there are any figures that are not shown.
+    if "figurerun" in context.options.other:
+        all_figures = context.options.other["figurerun"]
+        all_figures:dict[int, FigureRuntime]
+
+        figures = [fig for fig in all_figures.values() if not fig.shown]
+        if figures:
+            plt.show()
+

@@ -6,7 +6,7 @@ from typing import NamedTuple
 from logging import getLogger
 
 from ._context import Context, Column, DataColType, AxisType, Domain, range_to_index
-from ._format import sup, exp
+from ._format import pol
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import parse_range, NumberUnitRange
 from ._numberunit import actualize_range
@@ -97,7 +97,7 @@ class PreEdge(CommandHandler):
             poly = np.poly1d(np.polyfit(x, y, args.degree)) # type: ignore
             P = poly(X)
 
-            log.debug(f"{data.meta.name}: preedge = {" ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(poly.coef))}")
+            log.debug(f"{data.meta.name}: preedge = {pol(poly.coef)}")
 
             data.meta.run["preedge"] = poly, AxisType.RELENERGY
             data.add_col("pre", P, Column(None, None, DataColType.PREEDGE), Domain.REAL)

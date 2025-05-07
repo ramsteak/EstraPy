@@ -122,25 +122,26 @@ class Rebin(CommandHandler):
         if args.region.lower.value == -np.inf or args.region.upper.value == np.inf:
             raise RuntimeError("Rebin range must be specified. Cannot be \"..\".")
         
-        match args.region.inter:
-            case NumberUnit(_,-1|1,"eV"): axis, unit = "e", "eV"
-            case NumberUnit(_,0,"eV"): axis, unit = "E", "eV"
-            case NumberUnit(_,_,"k"): axis, unit = "k", "k"
-            case NumberUnit(_,_,"A"): axis, unit = "R", "A"
-            case int():
-                match args.region.lower:
-                    case NumberUnit(_,-1|1,"eV"): axis, unit = "e", "eV"
-                    case NumberUnit(_,0,"eV"): axis, unit = "E", "eV"
-                    case NumberUnit(_,_,"k"): axis, unit = "k", "k"
-                    case NumberUnit(_,_,"A"): axis, unit = "R", "A"
-                    case _:
-                        match args.region.upper:
-                            case NumberUnit(_,-1|1,"eV"): axis, unit = "e", "eV"
-                            case NumberUnit(_,0,"eV"): axis, unit = "E", "eV"
-                            case NumberUnit(_,_,"k"): axis, unit = "k", "k"
-                            case NumberUnit(_,_,"A"): axis, unit = "R", "A"
-                            case _:
-                                raise RuntimeError("No unit specified for rebinning interval.")
+        match args.region:
+            case NumberUnitRange(_, _, None):
+                raise RuntimeError("No interval specified for rebin.")
+
+            case NumberUnitRange(_, _, NumberUnit(_,-1|1,"eV")): axis, unit = "e", "eV"
+            case NumberUnitRange(_, _, NumberUnit(_,0,"eV")): axis, unit = "E", "eV"
+            case NumberUnitRange(_, _, NumberUnit(_,_,"k")): axis, unit = "k", "k"
+            case NumberUnitRange(_, _, NumberUnit(_,_,"A")): axis, unit = "R", "A"
+
+            case NumberUnitRange(NumberUnit(_,-1|1,"eV"), _, _): axis, unit = "e", "eV"
+            case NumberUnitRange(NumberUnit(_,0,"eV"), _, _): axis, unit = "E", "eV"
+            case NumberUnitRange(NumberUnit(_,_,"k"), _, _): axis, unit = "k", "k"
+            case NumberUnitRange(NumberUnit(_,_,"A"), _, _): axis, unit = "R", "A"
+            
+            case NumberUnitRange(_, NumberUnit(_,-1|1,"eV"), _): axis, unit = "e", "eV"
+            case NumberUnitRange(_, NumberUnit(_,0,"eV"), _): axis, unit = "E", "eV"
+            case NumberUnitRange(_, NumberUnit(_,_,"k"), _): axis, unit = "k", "k"
+            case NumberUnitRange(_, NumberUnit(_,_,"A"), _): axis, unit = "R", "A"
+
+            case _:raise RuntimeError("No unit specified for rebin.")
         
         _axes = [data.get_col_(axis) for data in context.data] # type: ignore
         range = actualize_range(args.region, _axes, unit)
@@ -160,7 +161,7 @@ class Rebin(CommandHandler):
             dig = np.digitize(X, bins)
             df = data.datums[domain]
             df.df = df.df.groupby(dig).mean().loc[1:len(newx),:]
-            df.df[axis] = newx[df.df.index-1]
+            df.df.loc[:,axis] = newx[df.df.index-1]
             
         return CommandResult(True)
 

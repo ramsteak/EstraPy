@@ -4,6 +4,8 @@ import numpy as np
 import numpy.typing as npt
 
 from matplotlib import pyplot as plt
+from scipy.signal import correlate
+from scipy.interpolate import interp1d
 
 from enum import Enum
 from typing import NamedTuple, Any
@@ -11,6 +13,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootResults
 from scipy.interpolate import interp1d
 from logging import getLogger
+from dataclasses import dataclass
 
 from ._context import Context, Column, AxisType
 from ._handler import CommandHandler, Token, CommandResult
@@ -44,13 +47,28 @@ FINAL_METHODS = [
     Operation.SET,
 ]
 
+@dataclass(slots=True, frozen=True)
+class Method:...
 
-class Args_Align(NamedTuple):
-    method: list[tuple[Operation, int | None]]
-    E0: float
-
+@dataclass(slots=True, frozen=True)
+class Finder(Method):
+    operations: list[tuple[Operation, int|None]]
     E0s: float
     dE0: float
+
+@dataclass(slots=True, frozen=True)
+class Set(Method):
+    ...
+
+@dataclass(slots=True, frozen=True)
+class Across(Method):...
+
+
+class Args_Align(NamedTuple):
+    method: Method
+    # method: list[tuple[Operation, int | None]]
+    E0: float
+
     wplot: bool
     rplot: bool
 
@@ -267,11 +285,17 @@ class Align(CommandHandler):
         else:
             dE0 = 5.0
 
+        match args.method:
+            case "set":
+                method = Set()
+            case "across":
+                method = Across()
+            case str(ops):
+                method = Finder(parse_method_to_ops(ops),search, dE0)
+
         return Args_Align(
-            parse_method_to_ops(args.method),
+            method,
             E0,
-            search,
-            dE0,
             args.wplot,
             args.rplot,
         )
@@ -279,45 +303,62 @@ class Align(CommandHandler):
     @staticmethod
     def execute(args: Args_Align, context: Context) -> CommandResult:
         log = getLogger("align")
-        for data in context.data:
-            if data.meta.refE0 is not None:
-                raise RuntimeError(
-                    f"Reference preedge was already calculated for {data.meta.name}."
-                )
 
-            y = data.get_col_("ref")
-            x = data.get_col_("E")
+        match args.method:
+            case Set():
+                for data in context.data:
+                    data.meta.refE0 = args.E0
 
-            try:
-                rE0 = find_E0_with_method(
-                    args.method, (args.E0 - args.dE0, args.E0 + args.dE0), y, x # type: ignore
-                )
-            except ValueError:
-                log.error(f"{data.meta.name}: Cannot find reference E0 value with the specified method.")
-                continue
+            case Finder(ops, E0s, dE0):
+                for data in context.data:
+                    y = data.get_col_("ref")
+                    x = data.get_col_("E")
+
+                    try:
+                        rE0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x)
+                    except ValueError:
+                        log.error(f"{data.meta.name}: Cannot find reference E0 value with the specified method.")
+                        continue
                 
-            # Check where the value falls. If it is outside the range, error
-            _l, _u = args.E0 - args.dE0, args.E0 + args.dE0
-            if (rE0 <= _l) or (rE0 >= _u):
-                log.error(f"{data.meta.name}: E0 value found outside the specified range ({rE0:.3f}eV).")
-                continue
-            elif (rE0 <= _l + 0.05*args.dE0) or (rE0 >= _u - 0.05*args.dE0):
-                log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({rE0:.3f}eV)")
-            # If it is in the ±5% of the borders of the range, warning
+                    # Check where the value falls. If it is outside the range, error
+                    _l, _u = E0s - dE0, E0s + dE0
+                    if (rE0 <= _l) or (rE0 >= _u):
+                        log.error(f"{data.meta.name}: E0 value found outside the specified range ({rE0:.3f}eV).")
+                        continue
+                    elif (rE0 <= _l + 0.05*dE0) or (rE0 >= _u - 0.05*dE0):
+                        log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({rE0:.3f}eV)")
+                    # If it is in the ±5% of the borders of the range, warning
                 
 
-            shift = rE0 - args.E0
+                    shift = rE0 - args.E0
 
-            log.info(
-                f"{data.meta.name}: Found reference E0 value at {rE0:.3f}eV (shift by {-shift:+.3f}eV)"
-            )
+                    log.info(
+                        f"{data.meta.name}: Found reference E0 value at {rE0:.3f}eV (shift by {-shift:+.3f}eV)"
+                    )
 
-            data.meta.refE0 = args.E0
-            data.mod_col("E", x - shift)
+                    data.meta.refE0 = args.E0
+                    data.mod_col("E", x - shift)
 
-            if data.meta.E0 is not None:
-                data.meta.E0 = data.meta.E0 - shift
+                    if data.meta.E0 is not None:
+                        data.meta.E0 = data.meta.E0 - shift
 
+            case Across():
+                raise NotImplementedError()
+                # rXs = [data.get_col_("E") for data in context.data]
+                # rYs = [data.get_col_("x") for data in context.data]
+                # rdYs = [np.gradient(Y,X) for X,Y in zip(rXs, rYs)]
+                
+
+                # m,M = max(rX.min() for rX in rXs), min(rX.max() for rX in rXs)
+                # dx = np.mean([np.diff(rX) for rX in rXs])
+                # D = M - m
+                # X = np.arange(m + D*0.05, M - D*0.6, dx/100)
+
+                # dYs = [interp1d(rX, rdY)(X) for rX,rdY in zip(rXs, rdYs)]
+                # dYs = [(Y)/np.std(Y) for Y in dYs]
+
+                # c = correlate(dYs[0], dYs[1][400:-400], "valid")
+                # pass
         return CommandResult(True)
 
     @staticmethod

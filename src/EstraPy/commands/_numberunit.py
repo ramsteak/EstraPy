@@ -7,9 +7,9 @@ from enum import Enum
 
 SI_PREFIXES = ("kMGTPEZYRQ", "munpfazyrq")
 SI_MULTIPLIER:dict[str,int] = {
-    pname:(1000 ** (pval+1)) * (1 if sign == 0 else -1)
+    pname:(1000 ** pval) * (1 if sign == 0 else -1)
     for sign,prefixes in enumerate(SI_PREFIXES)
-    for pval,pname in enumerate(prefixes)
+    for pval,pname in enumerate(prefixes,1)
 }
 
 def SI_multiplier(prefix: str | None) -> int:
@@ -53,7 +53,7 @@ def parse_nu(val: str) -> NumberUnit:
     
     _value, _sign, _mult, _unit = m.groups()
     # TODO: TMP:
-    if _unit is None: raise ValueError("Temporary error")
+    # if _unit is None: raise ValueError("Temporary error")
     value = float(_value) * SI_multiplier(_mult)
     sign = ["-", "", "+"].index(_sign) -1
 

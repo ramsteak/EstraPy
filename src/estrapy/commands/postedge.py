@@ -8,7 +8,7 @@ from logging import getLogger
 
 
 from ._context import Context, AxisType, DataColType, Column, Domain, range_to_index
-from ._format import sup, exp
+from ._format import pol
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 
@@ -149,11 +149,11 @@ class PostEdge(CommandHandler):
             poly = np.poly1d(np.polyfit(x, y, args.degree)) # type: ignore
             P = poly(X)
 
-            log.debug(f"{data.meta.name}: postedge = {" ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(poly.coef))}")
+            log.debug(f"{data.meta.name}: postedge = {pol(poly.coef)}")
             
             data.meta.run["postedge"] = (poly, args.fitaxis, args.action)
             J0 = poly(0)
-            data.meta.run["J0"] = J0
+            data.meta.vars["J0"] = J0
             data.add_col("post", P, Column(None, None, DataColType.POSTEDGE), Domain.REAL)
 
             match args.action:

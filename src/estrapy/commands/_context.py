@@ -4,7 +4,7 @@ import numpy.typing as npt
 
 
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Callable
 from enum import Enum
 from dataclasses import dataclass, field
 
@@ -67,6 +67,8 @@ class DataColType(Enum):
     POSTEDGE = "post"
     BACKGROUND = "bkg"
     WINDOW = "win"
+    MULTIEDGE = "mult"
+    GLITCH = "gli"
 
 
 ColumnType = AxisType | SignalType | DataColType | FourierType
@@ -83,12 +85,38 @@ class MetaData:
     refE0: float | None = None
     E0: float | None = None
 
+    def __contains__(self, varname:str) -> bool:
+        match varname:
+            case ".st" if self.signaltype is not None: return True
+            case ".rt" if self.refsigtype is not None: return True
+            case "E0" if self.E0 is not None: return True
+            case "rE0" if self.refE0 is not None: return True
+            case var if var in self.vars: return True
+        return False
+
+
+    def get(self, varname:str) -> str | int | float:
+        if varname not in self:
+            raise RuntimeError(f"Variable {varname} is not defined.")
+        match varname:
+            case ".st" if self.signaltype is not None:
+                return self.signaltype.value
+            case ".rt" if self.refsigtype is not None:
+                return self.refsigtype.value
+            case "E0" if self.E0 is not None:
+                return self.E0
+            case "rE0" if self.refE0 is not None:
+                return self.refE0
+            case var if var in self.vars:
+                return self.vars[var]
+            case var:
+                raise RuntimeError(f"Variable {var} is not defined.")
+
 @dataclass(slots=True, frozen=True)
 class Column:
     unit: str | None
     sign: bool | None
     axis: ColumnType | None
-    
 
 class Datum:
     __slots__ = "df","cols","default_axis"
@@ -117,11 +145,17 @@ class Datum:
         if self.default_axis is None: raise KeyError("No default axis specified.")
         return self.df[self.default_axis]
 
-    def add_col(self, values:npt.NDArray[np.floating | np.complexfloating] | pd.Series, coltype: Column, colname: str) -> None:
-        if colname in self.cols: raise NameError("A column with the given name already exists.")
+    def add_col(self, values:npt.NDArray[np.floating | np.complexfloating] | pd.Series, coltype: Column, colname: str, unique:bool=True) -> str:
+        if colname in self.cols:
+            if unique:
+                raise NameError("A column with the given name already exists.")
+            else:
+                n = len([c for c in self.cols if c.startswith(colname) and not c.startswith(f"{colname}_")])
+                colname = f"{colname}{n}"
 
         self.df.loc[:,colname] = values
         self.cols[colname] = coltype
+        return colname
 
     def mod_col(self, colname:str, values:npt.NDArray | pd.Series) -> None:
         if colname not in self.cols: raise KeyError(f"No column with the given name: {colname}")
@@ -134,7 +168,8 @@ class Datum:
 
         self.cols[old] = self.cols[colname]
     
-    def get_cols(self, colname:str=..., *, coltype: ColumnType=...) -> pd.DataFrame: # type: ignore
+    def get_cols(self, colname:str|None=..., *, coltype: ColumnType=...) -> pd.DataFrame: # type: ignore
+        if colname is None: return self.df.index.to_frame()
         if colname is not ...: return self.df.loc[:,[colname]]
         if coltype is not ...: return self.df.loc[:,[c for c,ct in self.cols.items() if ct.axis==coltype]]
         return self.df
@@ -166,7 +201,7 @@ class Data:
         domain = self._get_col_domain(colname)
         self.datums[domain].mod_col(colname, values)
 
-    def get_cols(self, colname:str = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> pd.DataFrame: # type: ignore
+    def get_cols(self, colname:str|None = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> pd.DataFrame: # type: ignore
         if domain is not ...:
             return self.datums[domain].get_cols(colname, coltype=coltype)
         for domain,datum in self.datums.items():
@@ -176,11 +211,11 @@ class Data:
             if len(r.columns): return r
         return pd.DataFrame()
 
-    def get_col(self, colname:str = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> pd.Series: # type: ignore
+    def get_col(self, colname:str|None = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> pd.Series: # type: ignore
         cols = self.get_cols(colname, coltype=coltype, domain=domain)
         if len(cols.columns) > 1: raise ValueError("More than one columns match.")
         return cols[cols.columns[0]]
-    def get_col_(self, colname:str = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> npt.NDArray: # type: ignore
+    def get_col_(self, colname:str|None = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> npt.NDArray: # type: ignore
         return self.get_col(colname, coltype=coltype, domain=domain).to_numpy()
     
     def get_xy(self, xname:str, yname:str) -> pd.Series:
@@ -205,6 +240,7 @@ class DataStore:
 class Directives(NamedTuple):
     clear: bool
     noplot: bool
+    vars: dict[str, str]
 
 
 class Context:

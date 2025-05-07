@@ -1,3 +1,5 @@
+from typing import Iterable
+
 ORDINAL = {"1":"st", "2":"nd", "3":"rd"}
 CHR = "0123456789+-=()"
 SUP = "⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾"
@@ -28,3 +30,6 @@ def exp(v:float, ndig:int=1) -> str:
         return f"{val}{sup(e)}"
     else:
         return preformatted
+
+def pol(p:Iterable) -> str:
+    return " ".join(f"{exp(a)}x{sup(e)}" for e,a in enumerate(p))
