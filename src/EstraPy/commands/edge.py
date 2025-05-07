@@ -53,12 +53,12 @@ class Method:...
 @dataclass(slots=True, frozen=True)
 class Finder(Method):
     operations: list[tuple[Operation, int|None]]
-    E0s: float
+    E0s: float | None
     dE0: float
 
 @dataclass(slots=True, frozen=True)
 class Set(Method):
-    ...
+    E0: float
 
 @dataclass(slots=True, frozen=True)
 class Across(Method):...
@@ -74,10 +74,8 @@ class Args_Align(NamedTuple):
 
 
 class Args_Edge(NamedTuple):
-    method: list[tuple[Operation, int | None]]
+    method: Method
 
-    E0s: float | None
-    dE0: float
     wplot: bool
     rplot: bool
 
@@ -259,6 +257,14 @@ def parse_method_to_ops(method: str) -> list[tuple[Operation, int | None]]:
 
     return methods
 
+_method_aliases = {
+    "fitderivative": "c1.s5.d1.p3.M",
+    "fitpolynomial": "c1.p3.d1.M",
+    "fitmaximum": "c1.p3.M",
+    "interpderivative": "c1.s5.d1.i3.M",
+    "maximum": "c1.i3.M",
+}
+
 
 class Align(CommandHandler):
     @staticmethod
@@ -287,10 +293,12 @@ class Align(CommandHandler):
 
         match args.method:
             case "set":
-                method = Set()
+                method = Set(E0)
             case "across":
                 method = Across()
             case str(ops):
+                if ops in _method_aliases:
+                    ops = _method_aliases[ops]
                 method = Finder(parse_method_to_ops(ops),search, dE0)
 
         return Args_Align(
@@ -305,11 +313,11 @@ class Align(CommandHandler):
         log = getLogger("align")
 
         match args.method:
-            case Set():
+            case Set(rE0):
                 for data in context.data:
-                    data.meta.refE0 = args.E0
+                    data.meta.refE0 = rE0
 
-            case Finder(ops, E0s, dE0):
+            case Finder(ops, E0s, dE0) if E0s is not None:
                 for data in context.data:
                     y = data.get_col_("ref")
                     x = data.get_col_("E")
@@ -372,14 +380,14 @@ class Edge(CommandHandler):
     def parse(tokens: list[Token], context: Context) -> Args_Edge:
         parser = CommandParser("edgeenergy", description="Aligns the reference data to a standard or a reference E0 value.")
         parser.add_argument("method", help="Uses the specified method to find the E0.")
-        parser.add_argument("--E0", "-E", type=parse_edgeenergy, help="Sets the E0 value for the edge.")
+        parser.add_argument("--E0", "-E", type=parse_edgeenergy, help="Searches around this value. If not set, searches around reference E0.")
         parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
         parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
         parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
 
         args = parser.parse(tokens)
 
-        E0s = args.E0
+        E0s:float|None = args.E0
 
         if args.dE0 is not None:
             _dE0 = args.dE0
@@ -390,10 +398,23 @@ class Edge(CommandHandler):
         else:
             dE0 = 5.0
 
+        match args.method:
+            case "set":
+                if E0s is None: raise ValueError("If the E0 value is set, the value must be given.")
+                method = Set(E0s)
+            case str(ops):
+                if ops in _method_aliases:
+                    ops = _method_aliases[ops]
+                method = Finder(parse_method_to_ops(ops), E0s, dE0)
+
+        # return Args_Align(
+        #     method,
+        #     E0,
+        #     args.wplot,
+        #     args.rplot,
+        # )
         return Args_Edge(
-            parse_method_to_ops(args.method),
-            E0s,
-            dE0,
+            method,
             args.wplot,
             args.rplot,
         )
@@ -401,35 +422,59 @@ class Edge(CommandHandler):
     @staticmethod
     def execute(args: Args_Edge, context: Context) -> CommandResult:
         log = getLogger("edge")
+
+        match args.method:
+            case Set(E0):
+                for data in context.data:
+                    data.meta.E0 = E0
+
         for data in context.data:
             if data.meta.E0 is not None:
                 raise RuntimeError(
                     f"Reference preedge was already calculated for {data.meta.name}."
                 )
+            
+            match args.method:
+                case Set(E0):
+                    data.meta.E0 = E0
+                
+                case Finder(ops, E0s, dE0):
+                    x = data.get_col_("E")
+                    y = data.get_col_("x")
 
-            x = data.get_col_("E")
-            y = data.get_col_("x")
+                    if E0s is None:
+                        E0s = data.meta.refE0
+                    if E0s is None:
+                        raise RuntimeError("E0 search interval was not provided.")
 
-            E0s = args.E0s if args.E0s is not None else data.meta.refE0
-            if E0s is None:
-                raise RuntimeError("E0 search interval was not provided.")
+                    try:
+                        E0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x) # type: ignore
+                    except ValueError:
+                        log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
+                        continue
 
-            try:
-                E0 = find_E0_with_method(args.method, (E0s - args.dE0, E0s + args.dE0), y, x) # type: ignore
-            except ValueError:
-                log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
-                continue
+                    # Check where the value falls. If it is outside the range, error
+                    _l, _u = E0s - dE0, E0s + dE0
+                    if (E0 <= _l) or (E0 >= _u):
+                        log.error(f"{data.meta.name}: E0 value found outside the specified range ({E0:.3f}eV).")
+                        continue
+                    elif (E0 <= _l + 0.05*dE0) or (E0 >= _u - 0.05*dE0):
+                        log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({E0:.3f}eV)")
+                    # If it is in the ±5% of the borders of the range, warning
+                
 
-            if data.meta.refE0:
-                relativeE0 = E0 - data.meta.refE0
-                log.info(
-                    f"{data.meta.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV)"
-                )
-            else:
-                log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
+                    if data.meta.refE0:
+                        relativeE0 = E0 - data.meta.refE0
+                        log.info(
+                            f"{data.meta.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV)"
+                        )
+                    else:
+                        log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")
 
-            data.meta.E0 = E0
-            data.add_col("e", x - E0, Column("eV", True, AxisType.RELENERGY), Domain.REAL)
+                    data.meta.E0 = E0
+                case _: raise RuntimeError("Invalid state: #23578423")
+            
+            data.add_col("e", np.array(x - E0), Column("eV", True, AxisType.RELENERGY), Domain.REAL)
             data.add_col("k", E_to_sk(x, E0), Column("k", None, AxisType.KVECTOR), Domain.REAL)
 
         return CommandResult(True)
