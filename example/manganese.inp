@@ -3,21 +3,23 @@
 % define kpow  2
 % define kpowp 3
 
-batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
+batchin -E BraggEnergy -I 21 2
 
-filein data/*.xy -b -f -T
+filein Fe/AD09_a_01.xdi -b -t
 
-align c2.s5.d2.i2.Z -E 24350eV -d 2eV
-edge c2.s5.d2.i2.Z -E 24354eV -d 2eV
+edge S -E 6540eV
 
 preedge .. -80eV -l
 postedge 3k .. -cde
 
-save xE.dat batch E:x
-save {.fn}_norm.dat columns E x 
+plot E:x    --fig 1:1.1
+plot E:pre  --fig 1:1.1
+plot E:post --fig 1:1.1
 
-plot E:x   --fig 1:1.1
+
 plot k:x   --fig 1:1.2
+
+cut .. 12.3k
 
 background fourier 1.1A -k ${kpow}
 
@@ -29,9 +31,9 @@ phase correct
 plot R:a.f --fig 1:2.1
 plot R:r.f --fig 1:2.1 --linewidth 0.2
 plot R:i.f --fig 1:2.1 --linewidth 0.2
-plot r.f:i.f --fig 1:2.2
 
-save k.dat batch k:x --align 0k :. 0.1k
+plot E:I0  --fig 1:2.2
+
 
 # ------------------------------------------------------------------------------
 # Set all labels and titles
@@ -51,3 +53,4 @@ plot --fig 1:2.1 --title  "$Fourier\ transform$"
 plot --fig 1:2.2 --xlabel "$Real\ part$"
 plot --fig 1:2.2 --ylabel "$Imaginary\ part$"
 plot --fig 1:2.2 --title  "$Winding\ diagram$"
+
