@@ -1,0 +1,8 @@
+title: Estrapy2 documentation
+description: Documentation for the XANESE/EXAFS analysis tool EstraPy
+theme: just-the-docs
+
+url: https://ramsteak.github.io/EstraPy2/
+
+aux_links:
+  Template Repository: https://github.com/just-the-docs/just-the-docs-template
