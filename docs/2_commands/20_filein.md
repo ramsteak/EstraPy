@@ -32,11 +32,11 @@ The `batchin` command sets the default arguments for the file input, and takes t
 |`--rdistance` / `-R` `[column]`|Imports the given axis column as a distance in Angstroms. If no column is specified, uses the column given by `--xaxiscolumn`.|
 |`--qvector` / `-q` `[column]`|Imports the given axis column as a q wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
 |`--shift` `<float>`|Shifts the x axis index by the specified amount.|
-|`--intensities` / `-I` `<column> <column> <column> <column>`|Imports the specified columns as intensities, importing between 1 and 4 columns. They are, in order, $I_0$, $I_1$, $I_2$, $I_f$, imported as the columns `I0` `I1` `I2` `If`. If `--intensities` is not specified, the columns are inferred from the other signal options.|
-|`--transmission` / `-t` `[column] [column]`|Calculates $\mu_{exp}$ as $\log_{10}{\frac{I_0}{I_1}}$, imported as the column `x`.|
-|`--fluorescence` / `-f` `[column] [column]`|Calculates $\mu_{exp}$ as $\frac{I_f}{I_0}$, imported as the column `x`.|
+|`--intensities` / `-I` `<column> <column> <column> <column>`|Imports the specified columns as intensities, importing between 1 and 4 columns. They are, in order, $$I_0$$, $$I_1$$, $$I_2$$, $$I_f$$, imported as the columns `I0` `I1` `I2` `If`. If `--intensities` is not specified, the columns are inferred from the other signal options.|
+|`--transmission` / `-t` `[column] [column]`|Calculates $$\mu_{exp}$$ as $$\log_{10}{\frac{I_0}{I_1}}$$, imported as the column `x`.|
+|`--fluorescence` / `-f` `[column] [column]`|Calculates $$\mu_{exp}$$ as $$\frac{I_f}{I_0}$$, imported as the column `x`.|
 |`--intensity` / `-i` `<column>`|Imports the signal value directly, importing it as the column `x`.|
-|`--reftransmittance` / `-T` `[column] [column]`|Calculates $\mu_{ref}$ as $\log_{10}{\frac{I_1}{I_2}}$, imported as the column `ref`.|
+|`--reftransmittance` / `-T` `[column] [column]`|Calculates $$\mu_{ref}$$ as $$\log_{10}{\frac{I_1}{I_2}}$$, imported as the column `ref`.|
 |`--refabsorption` / `-A` `<column>`|Imports the signal value directly, importing it as the column `ref`.|
 |`--var` `<name> <value>`|Adds the given variable to the file metadata, useful in other commands. The automatic variable definition is defined in the [metadata](#metadata) section. The value can be an auto-defined variable, such as .h1.1, wich will be resolved to the imported value.|
 
@@ -78,9 +78,9 @@ This snippet reads all the .xy files from the data folder. It then imports the f
 
 |Argument|Resulting column|Explanation|
 |--|--|--|
-|`-I dif_ic0 .. .. ..`|$I_0$: `I0`|Imports the $I_0$ intensity|
-|`-I .. dif_ic1 .. ..`|$I_1$: `I1`|Imports the $I_1$ intensity|
-|`-I .. .. dif_ic2 ..`|$I_2$: `I2`|Imports the $I_2$ reference intensity|
-|`-I .. .. .. x_ch1_roi1..x_ch13_roi1`| $I_f$: `If` |Imports the $I_f$ fluorescence intensity|
-|`-f`|$\mu(E)$: `x`|Calculates the experimental fluorescence signal, as $\frac{I_f}{I_0}$ |
-|`-T`|$\mu_{ref}(E)$: `ref`|Calculates the experimental reference transmission signal, as $\log_{10}{\frac{I_0}{I_1}}$|
+|`-I dif_ic0 .. .. ..`|$$I_0$$: `I0`|Imports the $$I_0$$ intensity|
+|`-I .. dif_ic1 .. ..`|$$I_1$$: `I1`|Imports the $$I_1$$ intensity|
+|`-I .. .. dif_ic2 ..`|$$I_2$$: `I2`|Imports the $$I_2$$ reference intensity|
+|`-I .. .. .. x_ch1_roi1..x_ch13_roi1`| $$I_f$$: `If` |Imports the $$I_f$$ fluorescence intensity|
+|`-f`|$$\mu(E)$$: `x`|Calculates the experimental fluorescence signal, as $$\frac{I_f}{I_0}$$ |
+|`-T`|$$\mu_{ref}(E)$$: `ref`|Calculates the experimental reference transmission signal, as $$\log_{10}{\frac{I_0}{I_1}}$$|
