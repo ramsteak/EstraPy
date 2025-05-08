@@ -57,10 +57,6 @@ class Finder(Method):
     dE0: float
 
 @dataclass(slots=True, frozen=True)
-class Set(Method):
-    E0: float
-
-@dataclass(slots=True, frozen=True)
 class Across(Method):...
 
 
@@ -258,6 +254,7 @@ def parse_method_to_ops(method: str) -> list[tuple[Operation, int | None]]:
     return methods
 
 _method_aliases = {
+    "set": "S",
     "fitderivative": "c1.s5.d1.p3.M",
     "fitpolynomial": "c1.p3.d1.M",
     "fitmaximum": "c1.p3.M",
@@ -292,8 +289,6 @@ class Align(CommandHandler):
             dE0 = 5.0
 
         match args.method:
-            case "set":
-                method = Set(E0)
             case "across":
                 method = Across()
             case str(ops):
@@ -313,10 +308,6 @@ class Align(CommandHandler):
         log = getLogger("align")
 
         match args.method:
-            case Set(rE0):
-                for data in context.data:
-                    data.meta.refE0 = rE0
-
             case Finder(ops, E0s, dE0) if E0s is not None:
                 for data in context.data:
                     y = data.get_col_("ref")
@@ -399,9 +390,6 @@ class Edge(CommandHandler):
             dE0 = 5.0
 
         match args.method:
-            case "set":
-                if E0s is None: raise ValueError("If the E0 value is set, the value must be given.")
-                method = Set(E0s)
             case str(ops):
                 if ops in _method_aliases:
                     ops = _method_aliases[ops]
@@ -423,11 +411,6 @@ class Edge(CommandHandler):
     def execute(args: Args_Edge, context: Context) -> CommandResult:
         log = getLogger("edge")
 
-        match args.method:
-            case Set(E0):
-                for data in context.data:
-                    data.meta.E0 = E0
-
         for data in context.data:
             if data.meta.E0 is not None:
                 raise RuntimeError(
@@ -435,9 +418,6 @@ class Edge(CommandHandler):
                 )
             
             match args.method:
-                case Set(E0):
-                    data.meta.E0 = E0
-                
                 case Finder(ops, E0s, dE0):
                     x = data.get_col_("E")
                     y = data.get_col_("x")
