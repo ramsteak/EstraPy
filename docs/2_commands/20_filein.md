@@ -3,6 +3,7 @@ title: File input
 parent: Commands
 nav_order: 2
 permalink: /commands/file-input
+math: katex
 ---
 
 # File input
