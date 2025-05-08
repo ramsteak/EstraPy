@@ -18,3 +18,7 @@ defaults:
 
 markdown: kramdown
 mathjax: true
+
+just_the_docs:
+  custom_css:
+    - assets/css/extra.css
