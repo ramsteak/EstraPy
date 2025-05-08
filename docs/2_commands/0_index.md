@@ -1,5 +1,5 @@
 ---
-title: Installation
+title: Commands
 nav_order: 3
 permalink: /commands/
 ---
