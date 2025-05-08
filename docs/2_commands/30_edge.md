@@ -45,15 +45,15 @@ Methods for both commands can be constructed from a series of operations, define
 
 |Operation|n|Explanation|
 |--|--|--|
-|`c`|&#10004;|Cuts the current data range to the range defined as `E0`-`dE0`~`E0`+`dE0`. If `n` is specified, expands the range by `n`$$\cdot$$`dE0` on both sides to provide a buffer for other operations.|
-|`p`|&#10004;|Performs polynomial regression of order `n` on the current data.|
-|`s`|&#10004;|Smooths the data, with a window of size `n`.|
-|`d`|&#10004;|Calculates the `n`-th derivative of the data.|
-|`i`|&#10004;|Interpolates the data with a spline of order `n`.|
-|`M`|&#10008;|Terminal method, calculates the maximum of the current data.|
-|`m`|&#10008;|Terminal method, calculates the minimum of the current data.|
-|`Z`|&#10008;|Terminal method, calculates the zero of the current data.|
-|`S`|&#10008;|Terminal method, bypasses all instructions and sets the E0 value to the given `E0`.|
+|`c`|&#10003;|Cuts the current data range to the range defined as `E0`-`dE0`~`E0`+`dE0`. If `n` is specified, expands the range by `n`$$\cdot$$`dE0` on both sides to provide a buffer for other operations.|
+|`p`|&#10003;|Performs polynomial regression of order `n` on the current data.|
+|`s`|&#10003;|Smooths the data, with a window of size `n`.|
+|`d`|&#10003;|Calculates the `n`-th derivative of the data.|
+|`i`|&#10003;|Interpolates the data with a spline of order `n`.|
+|`M`|&#10007;|Terminal method, calculates the maximum of the current data.|
+|`m`|&#10007;|Terminal method, calculates the minimum of the current data.|
+|`Z`|&#10007;|Terminal method, calculates the zero of the current data.|
+|`S`|&#10007;|Terminal method, bypasses all instructions and sets the E0 value to the given `E0`.|
 
 Alternatively, the method can be one of the following options, which are simply aliases for some common methods.
 
