@@ -12,11 +12,11 @@ XAS analysis requires removal of the background contributions to the signal and 
 
 ## PreEdge
 
+The `preedge` command extracts the preedge contribution from the signal in the `x` column, assigning it to the `pre` column, and modifies the signal column with the corrected value. The preedge is modelled as a polynomial of degree n in the given range, and this estimation is extended to the entire data range. The range can be specified in either eV or k.
+
 ```sh
 preedge <range> [--options]
 ```
-
-The `preedge` command extracts the preedge contribution from the signal in the `x` column, assigning it to the `pre` column, and modifies the signal column with the corrected value. The preedge is modelled as a polynomial of degree n in the given range, and this estimation is extended to the entire data range. The range can be specified in either eV or k.
 
 |Argument|Explanation|
 |--|--|
