@@ -37,7 +37,7 @@ save <filename> aligned <column> --align <range>
 |Argument|Explanation|
 |--|--|
 |`column`|The column is specified in the same manner as for plotting, specifying the x:y columns to be selected.|
-|`--align` / `-a` `range`|Contains the interpolation output range, with spacing. The bounds cannot be .., but :. and .: are allowed.|
+|`--align` / `-a` `range`|Contains the interpolation output range, with spacing. The bounds cannot be `..`, but `:.` and `.:` are allowed.|
 
 This command is similar to the `save batch` command, but instead of having pairs of columns, the required data is interpolated over the given range and spacing. The output file has the given x range as the first column, and the other columns are the interpolated y values. The header of each y column is the file name.
 
