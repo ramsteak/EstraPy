@@ -45,15 +45,15 @@ Methods for both commands can be constructed from a series of operations, define
 
 |Operation|n|Explanation|
 |--|--|--|
-|`c`|&#10003;|Cuts the current data range to the range defined as `E0`-`dE0`~`E0`+`dE0`. If `n` is specified, expands the range by `n`$$\cdot$$`dE0` on both sides to provide a buffer for other operations.|
-|`p`|&#10003;|Performs polynomial regression of order `n` on the current data.|
-|`s`|&#10003;|Smooths the data, with a window of size `n`.|
-|`d`|&#10003;|Calculates the `n`-th derivative of the data.|
-|`i`|&#10003;|Interpolates the data with a spline of order `n`.|
-|`M`|&#10007;|Terminal method, calculates the maximum of the current data.|
-|`m`|&#10007;|Terminal method, calculates the minimum of the current data.|
-|`Z`|&#10007;|Terminal method, calculates the zero of the current data.|
-|`S`|&#10007;|Terminal method, bypasses all instructions and sets the E0 value to the given `E0`.|
+|`c`|<span class="text-green-000">&#10003;</span>|Cuts the current data range to the range defined as `E0`-`dE0`~`E0`+`dE0`. If `n` is specified, expands the range by `n`$$\cdot$$`dE0` on both sides to provide a buffer for other operations.|
+|`p`|<span class="text-green-000">&#10003;</span>|Performs polynomial regression of order `n` on the current data.|
+|`s`|<span class="text-green-000">&#10003;</span>|Smooths the data, with a window of size `n`.|
+|`d`|<span class="text-green-000">&#10003;</span>|Calculates the `n`-th derivative of the data.|
+|`i`|<span class="text-green-000">&#10003;</span>|Interpolates the data with a spline of order `n`.|
+|`M`|<span class="text-red-200">&#10007;</span>|Terminal method, calculates the maximum of the current data.|
+|`m`|<span class="text-red-200">&#10007;</span>|Terminal method, calculates the minimum of the current data.|
+|`Z`|<span class="text-red-200">&#10007;</span>|Terminal method, calculates the zero of the current data.|
+|`S`|<span class="text-red-200">&#10007;</span>|Terminal method, bypasses all instructions and sets the E0 value to the given `E0`.|
 
 Alternatively, the method can be one of the following options, which are simply aliases for some common methods.
 
