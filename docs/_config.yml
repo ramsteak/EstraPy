@@ -8,3 +8,10 @@ aux_links:
   GitHub: https://github.com/ramsteak/EstraPy2
 
 color_scheme: dark
+
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default
