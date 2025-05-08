@@ -44,7 +44,7 @@ edgeenergy <method> [--options]
 Methods for both commands can be constructed from a series of operations, defined in the table below. The operations must end with a terminal method, which estimates a single number.
 
 |Operation|n|Explanation|
-|--|--|--|
+|--|:--:|--|
 |`c`|<span class="text-green-000">&#10003;</span>|Cuts the current data range to the range defined as `E0`-`dE0`~`E0`+`dE0`. If `n` is specified, expands the range by `n`$$\cdot$$`dE0` on both sides to provide a buffer for other operations.|
 |`p`|<span class="text-green-000">&#10003;</span>|Performs polynomial regression of order `n` on the current data.|
 |`s`|<span class="text-green-000">&#10003;</span>|Smooths the data, with a window of size `n`.|
