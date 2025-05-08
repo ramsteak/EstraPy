@@ -12,7 +12,7 @@ File input in EstraPy is done with the `filein` command, and optionally with the
 The command reads from a data file, importing the selected columns and performing the necessary calculations.
 It also handles metadata and additional variables.
 
-## Usage
+## FileIn
 
 ```sh
 filein <file> [options]
