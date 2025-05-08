@@ -33,11 +33,11 @@ The `batchin` command sets the default arguments for the file input, and takes t
 |`--qvector` / `-q` `[column]`|Imports the given axis column as a q wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
 |`--shift` `<float>`|Shifts the x axis index by the specified amount.|
 |`--intensities` / `-I` `<column> <column> <column> <column>`|Imports the specified columns as intensities, importing between 1 and 4 columns. They are, in order, $$I_0$$, $$I_1$$, $$I_2$$, $$I_f$$, imported as the columns `I0` `I1` `I2` `If`. If `--intensities` is not specified, the columns are inferred from the other signal options.|
-|`--transmission` / `-t` `[column] [column]`|Calculates $$\mu_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, imported as the column `x`.|
-|`--fluorescence` / `-f` `[column] [column]`|Calculates $$\mu_{exp}$$ as $$\dfrac{I_f}{I_0}$$, imported as the column `x`.|
-|`--intensity` / `-i` `<column>`|Imports the signal value directly, importing it as the column `x`.|
-|`--reftransmittance` / `-T` `[column] [column]`|Calculates $$\mu_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, imported as the column `ref`.|
-|`--refabsorption` / `-A` `<column>`|Imports the signal value directly, importing it as the column `ref`.|
+|`--transmission` / `-t` `[column] [column]`|Calculates the signal $$\mu_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, importing it as the column `x`.|
+|`--fluorescence` / `-f` `[column] [column]`|Calculates the signal $$\mu_{exp}$$ as $$\dfrac{I_f}{I_0}$$, importing it as the column `x`.|
+|`--intensity` / `-i` `<column>`|Reads the signal $$\mu_{exp}$$ directly, importing it as the column `x`.|
+|`--reftransmittance` / `-T` `[column] [column]`|Calculates the reference signal $$\mu_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, importing it as the column `ref`.|
+|`--refabsorption` / `-A` `<column>`|Imports the reference signal $$\mu_{ref}$$ directly, importing it as the column `ref`.|
 |`--var` `<name> <value>`|Adds the given variable to the file metadata, useful in other commands. The automatic variable definition is defined in the [metadata](#metadata) section. The value can be an auto-defined variable, such as .h1.1, wich will be resolved to the imported value.|
 
 ### Columns
