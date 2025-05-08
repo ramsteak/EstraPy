@@ -26,14 +26,6 @@ The `preedge` command extracts the preedge contribution from the signal in the `
 |`--cubic` / `-c`|Models the preedge as a polynomial of order 3|
 |`--polynomial` / `-p` `<degree>`|Models the preedge as a polynomial of order `degree`|
 
-### PreEdge example
-
-```sh
-preedge .. -80eV -l
-```
-
-This snippet subtracts a linear preedge from the `x` column, selecting the region from $$-\infty$$ to -80eV relative to the $$E_{0}$$ determined in a previous `edgeenergy` step.
-
 ## PostEdge
 
 The `postedge` command extracts the postedge contribution from the signal in the `x` column, assigning it to the `post` column, and modifies the signal column with the corrected value. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extended to the entire data range. The range can be specified in either eV or k.
@@ -54,14 +46,6 @@ postedge <range> [--options]
 |`--subtract` / `-s`|Corrects the data by subtracting the postedge from the `x` column.|
 |`--energy` / `-e`|Performs the polynomial regression on $$\mu(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
 |`--wavevector` / `-k`|Performs the polynomial regression on $$\mu(k)$$, in wavevector space If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
-
-### PostEdge example
-
-```sh
-postedge 3k .. -cde
-```
-
-This snippet divides the data by a cubic polinomial, fitted over $$\mu(E)$$ that models the postedge of the `x` column, selecting the region from 3k to $$\infty$$
 
 ## Background
 
@@ -121,6 +105,24 @@ background smoothing <range> [--options]
 |`--kweight` / `-k` `<value>`|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |`--iterations` / `-i`|The number of times to iterate the method. By default, applies the background removal once.|
 |`--fraction` / `-f`|The fraction of the total datapoints to use for the smoothing. Must be between 0 and 1. By default uses 30% of the datapoints (0.3)|
+
+## Examples
+
+### PreEdge example
+
+```sh
+preedge .. -80eV -l
+```
+
+This snippet subtracts a linear preedge from the `x` column, selecting the region from $$-\infty$$ to -80eV relative to the $$E_{0}$$ determined in a previous `edgeenergy` step.
+
+### PostEdge example
+
+```sh
+postedge 3k .. -cde
+```
+
+This snippet divides the data by a cubic polinomial, fitted over $$\mu(E)$$ that models the postedge of the `x` column, selecting the region from 3k to $$\infty$$
 
 ### Background example
 
