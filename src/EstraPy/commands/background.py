@@ -6,16 +6,16 @@ import numpy.typing as npt
 from dataclasses import dataclass
 from logging import getLogger
 from typing import NamedTuple
-from scipy import interpolate
+from scipy.interpolate import UnivariateSpline
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
 from ._context import Context, Column, DataColType, Domain, range_to_index_
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import parse_nu, parse_range, actualize_range
+from ._numberunit import parse_nu, parse_range, actualize_range, NumberUnit, NumberUnitRange
 
 from ._parser import CommandParser
 
-from .fourier import fourier, Apodizer, get_flattop_window, bfourier, NumberUnitRange
+from .fourier import fourier, Apodizer, get_flattop_window, bfourier
 
     
 
@@ -44,7 +44,7 @@ class Smoothing(Method):
 
 @dataclass(slots=True, frozen=True)
 class Constant(Method):
-    ...
+    value: float
 
 class Args_Background(NamedTuple):
     method:Method
@@ -53,7 +53,7 @@ def spline_method(x:npt.NDArray[np.floating], y:npt.NDArray[np.floating]) -> npt
     ...
 
 def bspline_method(x:npt.NDArray[np.floating], y:npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-    s = interpolate.UnivariateSpline(x,y,w=None,bbox=(None,None), k=3, s=None)
+    s = UnivariateSpline(x,y,w=None,bbox=(None,None), k=3, s=None)
     return np.array(s(x))
     
 
@@ -67,6 +67,8 @@ class Background(CommandHandler):
         subparsers = parser.add_subparsers(dest="method")
 
         const = subparsers.add_parser("constant")
+        const.add_argument("--value", "-v", type=float, default=1.0)
+
         spline = subparsers.add_parser("spline")
         spline.add_argument("--kweight", "-k", type=float)
 
@@ -92,7 +94,7 @@ class Background(CommandHandler):
             case "spline":
                 method = Spline(args.kweight)
             case "constant":
-                method = Constant(args.kweight)
+                method = Constant(args.kweight, args.value)
             case "bspline":
                 range = parse_range(*args.range)
                 if range.domain != Domain.REAL:
@@ -100,6 +102,8 @@ class Background(CommandHandler):
                 method = BSpline(args.kweight, range)
             case "fourier":
                 rmax = parse_nu(args.Rmax)
+                if rmax.unit is None:
+                    rmax = NumberUnit(rmax.value, rmax.sign, "A")
                 if rmax.unit != "A": raise ValueError("The max distance must be in angstrom.")
                 method = Fourier(args.kweight, rmax.value, args.iterations)
             case "smoothing":
@@ -115,10 +119,10 @@ class Background(CommandHandler):
         log = getLogger("background")
 
         match args.method:
-            case Constant():
+            case Constant(kweight, value):
                 for data in context.data:
                     X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
-                    S = np.ones_like(X)
+                    S = np.full_like(X, value)
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
             
