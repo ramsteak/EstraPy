@@ -2,9 +2,10 @@
 title: File input
 parent: Commands
 nav_order: 2
+permalink: /commands/file-input
 ---
 
-# FileIn
+# File input
 
 File input in EstraPy is done with the `filein` command, and optionally with the `batchin` command.
 The command reads from a data file, importing the selected columns and performing the necessary calculations.

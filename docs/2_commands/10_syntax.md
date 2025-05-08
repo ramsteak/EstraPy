@@ -2,6 +2,7 @@
 title: General syntax
 parent: Commands
 nav_order: 1
+permalink: /commands/general-syntax/
 ---
 
 # General syntax
