@@ -52,7 +52,7 @@ postedge <range> [--options]
 The `background` command extracts the background contribution from the signal in the `x` column, and stores it in the `bkg` column. This contribution is then subtracted from the signal. The command supports multiple methods for background estimation.
 
 ```sh
-background mode [--options]
+background <mode> [--options]
 ```
 
 ### Constant
