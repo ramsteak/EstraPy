@@ -16,5 +16,4 @@ defaults:
     values:
       layout: default
 
-markdown: kramdown
 mathjax: true
