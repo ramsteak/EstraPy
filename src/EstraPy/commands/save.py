@@ -93,7 +93,11 @@ class Each(Mode):
 
 @dataclass(slots=True, frozen=True)
 class Batch(Mode):
-    align: NumberUnitRange | None
+    column: ColKind
+
+@dataclass(slots=True, frozen=True)
+class Aligned(Mode):
+    align: NumberUnitRange
     column: ColKind
 
 class Args_Save(NamedTuple):
@@ -107,9 +111,12 @@ class Save(CommandHandler):
         parser.add_argument("filename")
 
         subparsers = parser.add_subparsers(dest="mode")
+        aligned = subparsers.add_parser("aligned")
+        aligned.add_argument("column")
+        aligned.add_argument("--align", "-a", nargs=3, required=True)
+
         batch = subparsers.add_parser("batch")
         batch.add_argument("column")
-        batch.add_argument("--align", "-a", nargs=3)
 
         columns = subparsers.add_parser("columns")
         columns.add_argument("columns", nargs="+")
@@ -120,18 +127,20 @@ class Save(CommandHandler):
             case "batch":
                 col = parse_column(args.column)
                 if col.xcol is None: raise ValueError("No x column specified.")
+                mode = Batch(args.filename, args.column)
+                
+            case "aligned":
+                col = parse_column(args.column)
+                if col.xcol is None: raise ValueError("No x column specified.")
 
                 if col.xop:
                     raise ValueError("The output x column cannot be modified.")
                 
-                if args.align is not None:
-                    bounds = parse_range(*args.align)
-                    if bounds.lower.value == -np.inf: raise ValueError("Alignment range cannot be ..")
-                    if bounds.upper.value == np.inf: raise ValueError("Alignment range cannot be ..")
-                else:
-                    bounds = None
+                bounds = parse_range(*args.align)
+                if bounds.lower.value == -np.inf: raise ValueError("Alignment range cannot be ..")
+                if bounds.upper.value == np.inf: raise ValueError("Alignment range cannot be ..")
                     
-                mode = Batch(args.filename, bounds, col)
+                mode = Aligned(args.filename, bounds, col)
             case "columns":
                 cols = [parse_column(c) for c in args.columns]
                 mode = Each(args.filename, cols)
@@ -144,50 +153,58 @@ class Save(CommandHandler):
         log = getLogger("save")
         
         match args.mode:
-            case Batch(fname, align, column):
+            case Batch(fname, column):
                 outfile = context.paths.outputdir / fname
-                if align is None:
-                    cols:list[pd.Series] = []
-                    for data in context.data:
-                        x,y = get_column_(column, data)
-                        X = pd.Series(x, name=f"{column.xcol}_{data.meta.name}")
-                        cols.append(X)
-                        Y = pd.Series(y, name=f"{column.ycol}_{data.meta.name}")
-                        cols.append(Y)
-                    df = pd.concat(cols, axis=1)
-                    save_df_to_dat(outfile, df, index=False)
-                else:
-                    if column.xcol is None: raise RuntimeError("No x column specified.")
-                    domain = context.data.data[0]._get_col_domain(column.xcol)
-                    if domain != align.domain:
-                        raise RuntimeError("Invalid range selection: range does not match given abscissa.")
-                    unit = context.data.data[0].datums[domain].cols[column.xcol].unit
-                    bounds = actualize_range(align, [data.get_col_(column.xcol) for data in context.data], unit)
-                    
-                    match bounds.inter:
-                        case NumberUnit(i, _, _):
-                            newx = np.arange(bounds.lower.value, bounds.upper.value, i)
-                        case int(n):
-                            newx = np.linspace(bounds.lower.value, bounds.upper.value, n)
-                        case _: raise RuntimeError("Unknown error. #23794618")
-                    
-                    out:list[pd.Series] = []
-                    x = pd.Index(newx, name = column.xcol)
-                    for data in context.data:
-                        X,Y = get_column_(column, data)
-                        y = interp1d(X,Y,"cubic")(newx)
-                        out.append(pd.Series(y, x, name=data.meta.name))
-                    df = pd.concat(out, axis=1)
-                    save_df_to_dat(outfile, df, index=True)
+                cols:list[pd.Series] = []
+                for data in context.data:
+                    x,y = get_column_(column, data)
+                    X = pd.Series(x, name=f"{column.xcol}_{data.meta.name}")
+                    cols.append(X)
+                    Y = pd.Series(y, name=f"{column.ycol}_{data.meta.name}")
+                    cols.append(Y)
+                df = pd.concat(cols, axis=1)
+                save_df_to_dat(outfile, df, index=False)
+            case Aligned(fname, align, column):
+                outfile = context.paths.outputdir / fname
+                if column.xcol is None: raise RuntimeError("No x column specified.")
+                domain = context.data.data[0]._get_col_domain(column.xcol)
+                if domain != align.domain:
+                    raise RuntimeError("Invalid range selection: range does not match given abscissa.")
+                unit = context.data.data[0].datums[domain].cols[column.xcol].unit
+                bounds = actualize_range(align, [data.get_col_(column.xcol) for data in context.data], unit)
+                
+                match bounds.inter:
+                    case NumberUnit(i, _, _):
+                        newx = np.arange(bounds.lower.value, bounds.upper.value, i)
+                    case int(n):
+                        newx = np.linspace(bounds.lower.value, bounds.upper.value, n)
+                    case _: raise RuntimeError("Unknown error. #23794618")
+                
+                out:list[pd.Series] = []
+                x = pd.Index(newx, name = column.xcol)
+                for data in context.data:
+                    X,Y = get_column_(column, data)
+                    y = interp1d(X,Y,"cubic")(newx)
+                    out.append(pd.Series(y, x, name=data.meta.name))
+                df = pd.concat(out, axis=1)
+                save_df_to_dat(outfile, df, index=True)
                     
 
             case Each(fname, columns):
+                outnames:dict[str,int] = {}
                 for data in context.data:
                     filename = fname
                     for m in reversed([*re.finditer(r"\{([^{}]*)\}", fname)]):
                         val = data.meta.get(m.group(1))
                         filename = filename[:m.start()] + str(val) + filename[m.end():]
                     outfile = context.paths.outputdir / filename
+                    if outfile.name in outnames:
+                        n = outnames[outfile.name]
+                        newname = outfile.name.removesuffix(outfile.suffix) + f"_{n}" + outfile.suffix
+                        outfile = context.paths.outputdir / newname
+                        outnames[outfile.name] = n + 1
+                    else:
+                        outnames[outfile.name] = 1
 
                     cols = [pd.Series(get_column_(c, data)[1], name=c.ydef) for c in columns]
                     df = pd.concat(cols, axis=1)
