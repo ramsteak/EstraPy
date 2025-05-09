@@ -78,6 +78,7 @@ class ColKind(NamedTuple):
 
 def derivative(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
     raise NotImplementedError()
+
 def smooth(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
     return lowess(y, x, d/len(x), it=0, is_sorted=False, return_sorted=False)
 
