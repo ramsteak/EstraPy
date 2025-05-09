@@ -22,23 +22,23 @@ The `batchin` command sets the default arguments for the file input, and takes t
 
 |Argument|Explanation|
 |--|--|
-|`file`|The path that points to the file. Can be either an absolute path, or a relative path from the working directory. Glob patterns are supported.|
-|`--dir` `<directory>`|Uses this directory to import the files from, if the path is relative, instead of the current working directory.|
-|`--batch` / `-b`|Signals to the `filein` command to use the arguments defined by all previous `batchin` commands.|
-|`--xaxiscolumn` / `-x` `<column>` |Sets the column containing the x axis. By default, it is equivalent to `--index <column>`. To modify the behavior, you can either use one of the other axis flags, or use e.g. `-x <column> -E`, equivalent to `-E <column>`|
-|`--index` `[column]`|Imports the given axis column as a raw index. If no column is specified, uses the column given by `--xaxiscolumn`.|
-|`--energy` / `-E` `[column]`|Imports the given axis column as energy in electronvolts. If no column is specified, uses the column given by `--xaxiscolumn`.|
-|`--kvector` / `-k` `[column]`|Imports the given axis column as a k wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
-|`--rdistance` / `-R` `[column]`|Imports the given axis column as a distance in Angstroms. If no column is specified, uses the column given by `--xaxiscolumn`.|
-|`--qvector` / `-q` `[column]`|Imports the given axis column as a q wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
-|`--shift` `<float>`|Shifts the x axis index by the specified amount.|
-|`--intensities` / `-I` `<column> <column> <column> <column>`|Imports the specified columns as intensities, importing between 1 and 4 columns. They are, in order, $$I_0$$, $$I_1$$, $$I_2$$, $$I_f$$, imported as the columns `I0` `I1` `I2` `If`. If `--intensities` is not specified, the columns are inferred from the other signal options.|
-|`--transmission` / `-t` `[column] [column]`|Calculates the signal $$\mu_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, importing it as the column `x`.|
-|`--fluorescence` / `-f` `[column] [column]`|Calculates the signal $$\mu_{exp}$$ as $$\dfrac{I_f}{I_0}$$, importing it as the column `x`.|
-|`--intensity` / `-i` `<column>`|Reads the signal $$\mu_{exp}$$ directly, importing it as the column `x`.|
-|`--reftransmittance` / `-T` `[column] [column]`|Calculates the reference signal $$\mu_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, importing it as the column `ref`.|
-|`--refabsorption` / `-A` `<column>`|Imports the reference signal $$\mu_{ref}$$ directly, importing it as the column `ref`.|
-|`--var` `<name> <value>`|Adds the given variable to the file metadata, useful in other commands. The automatic variable definition is defined in the [metadata](#metadata) section. The value can be an auto-defined variable, such as .h1.1, wich will be resolved to the imported value.|
+|<div class="nowrap">`file`</div>|The path that points to the file. Can be either an absolute path, or a relative path from the working directory. Glob patterns are supported.|
+|<div class="nowrap">`--dir` `<directory>`</div>|Uses this directory to import the files from, if the path is relative, instead of the current working directory.|
+|<div class="nowrap">`--batch` / `-b`</div>|Signals to the `filein` command to use the arguments defined by all previous `batchin` commands.|
+|<div class="nowrap">`--xaxiscolumn` / `-x` `<column>` </div>|Sets the column containing the x axis. By default, it is equivalent to `--index <column>`. To modify the behavior, you can either use one of the other axis flags, or use e.g. `-x <column> -E`, equivalent to `-E <column>`|
+|<div class="nowrap">`--index` `[column]`</div>|Imports the given axis column as a raw index. If no column is specified, uses the column given by `--xaxiscolumn`.|
+|<div class="nowrap">`--energy` / `-E` `[column]`</div>|Imports the given axis column as energy in electronvolts. If no column is specified, uses the column given by `--xaxiscolumn`.|
+|<div class="nowrap">`--kvector` / `-k` `[column]`</div>|Imports the given axis column as a k wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
+|<div class="nowrap">`--rdistance` / `-R` `[column]`</div>|Imports the given axis column as a distance in Angstroms. If no column is specified, uses the column given by `--xaxiscolumn`.|
+|<div class="nowrap">`--qvector` / `-q` `[column]`</div>|Imports the given axis column as a q wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
+|<div class="nowrap">`--shift` `<float>`</div>|Shifts the x axis index by the specified amount.|
+|<div class="nowrap">`--intensities` / `-I` `<column> <column> <column> <column>`</div>|Imports the specified columns as intensities, importing between 1 and 4 columns. They are, in order, $$I_0$$, $$I_1$$, $$I_2$$, $$I_f$$, imported as the columns `I0` `I1` `I2` `If`. If `--intensities` is not specified, the columns are inferred from the other signal options.|
+|<div class="nowrap">`--transmission` / `-t` `[column] [column]`</div>|Calculates the signal $$\mu_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, importing it as the column `x`.|
+|<div class="nowrap">`--fluorescence` / `-f` `[column] [column]`</div>|Calculates the signal $$\mu_{exp}$$ as $$\dfrac{I_f}{I_0}$$, importing it as the column `x`.|
+|<div class="nowrap">`--intensity` / `-i` `<column>`</div>|Reads the signal $$\mu_{exp}$$ directly, importing it as the column `x`.|
+|<div class="nowrap">`--reftransmittance` / `-T` `[column] [column]`</div>|Calculates the reference signal $$\mu_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, importing it as the column `ref`.|
+|<div class="nowrap">`--refabsorption` / `-A` `<column>`</div>|Imports the reference signal $$\mu_{ref}$$ directly, importing it as the column `ref`.|
+|<div class="nowrap">`--var` `<name> <value>`</div>|Adds the given variable to the file metadata, useful in other commands. The automatic variable definition is defined in the [metadata](#metadata) section. The value can be an auto-defined variable, such as .h1.1, wich will be resolved to the imported value.|
 
 ### Columns
 

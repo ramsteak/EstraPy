@@ -21,10 +21,10 @@ fourier <range> <output> [--options]
 
 |Argument|Explanation|
 |--|--|
-|`--kweight` / `-k` `<value>`|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
-|`--apodizer` / `-a`|The apodizing window shape. By default, uses a Hann window. The available windows are listed in the [related section](#apodizer)|
-|`--width` / `-w`|The width of the ramps of the window. See the [related section](#apodizer) for a visual explanation of this parameter.|
-|`--method`|<div><p>Uses a different method to perform the fourier transform.</p><ul><li>`dft` is the default method, and uses matrix multiplication to calculate the transform</li><li>`finuft` uses the finufft.nufft1d3 method</li><li>`fft` uses the numpy rfft method, which requires the data to be uniformly spaced.</li></ul></div>|
+|<div class="nowrap">`--kweight` / `-k` `<value>`</div>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<div class="nowrap">`--apodizer` / `-a` `<apodizer>`</div>|The apodizing window shape. By default, uses a Hann window. The available windows are listed in the [related section](#apodizer)|
+|<div class="nowrap">`--width` / `-w` `<value>`</div>|The width of the ramps of the window. See the [related section](#apodizer) for a visual explanation of this parameter.|
+|<div class="nowrap">`--method` `<method>`</div>|<div><p>Uses a different method to perform the fourier transform.</p><ul><li>`dft` is the default method, and uses matrix multiplication to calculate the transform</li><li>`finuft` uses the finufft.nufft1d3 method</li><li>`fft` uses the numpy rfft method, which requires the data to be uniformly spaced.</li></ul></div>|
 
 ## Apodizer
 

@@ -20,10 +20,10 @@ align <method> [--options]
 
 |Argument|Explanation|
 |--|--|
-|`method`|Defines the method used in the $$E_{0}$$ estimation. The method syntax is defined [below](#method)|
-|`--E0` / `-E` `<energy>`|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
-|`--dE0` / `-d` `<value>`|The range around which to search for the $$E_{0}$$.|
-|`--search` / `-s` `<energy>`|The energy around which to search for the $$E_{0}$$. If not specified, searches around `--E0`. The energy value follows the same syntax as `--E0`.|
+|<div class="nowrap">`method`</div>|Defines the method used in the $$E_{0}$$ estimation. The method syntax is defined [below](#method)|
+|<div class="nowrap">`--E0` / `-E` `<energy>`</div>|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
+|<div class="nowrap">`--dE0` / `-d` `<value>`</div>|The range around which to search for the $$E_{0}$$.|
+|<div class="nowrap">`--search` / `-s` `<energy>`</div>|The energy around which to search for the $$E_{0}$$. If not specified, searches around `--E0`. The energy value follows the same syntax as `--E0`.|
 
 ## EdgeEnergy
 
@@ -35,9 +35,9 @@ edgeenergy <method> [--options]
 
 |Argument|Explanation|
 |--|--|
-|`method`|Defines the method used in the $$E_{0}$$ estimation. The method syntax is defined [below](#method)|
-|`--E0` / `-E` `<energy>`|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
-|`--dE0` / `-d` `<value>`|The range around which to search for the $$E_{0}$$.|
+|<div class="nowrap">`method`</div>|Defines the method used in the $$E_{0}$$ estimation. The method syntax is defined [below](#method)|
+|<div class="nowrap">`--E0` / `-E` `<energy>`</div>|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
+|<div class="nowrap">`--dE0` / `-d` `<value>`</div>|The range around which to search for the $$E_{0}$$.|
 
 ## Method
 
