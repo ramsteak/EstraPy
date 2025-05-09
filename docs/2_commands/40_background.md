@@ -20,11 +20,11 @@ preedge <range> [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--constant` / `-C`</div>|Models the preedge as a polynomial of order 0 (a constant contribution)|
-|<div class="nowrap">`--linear` / `-l`</div>|Models the preedge as a polynomial of order 1 (a linear contribution)|
-|<div class="nowrap">`--quadratic` / `-q`</div>|Models the preedge as a polynomial of order 2|
-|<div class="nowrap">`--cubic` / `-c`</div>|Models the preedge as a polynomial of order 3|
-|<div class="nowrap">`--polynomial` / `-p` `<degree>`</div>|Models the preedge as a polynomial of order `degree`|
+|<span class="nowrap">`--constant` / `-C`</span>|Models the preedge as a polynomial of order 0 (a constant contribution)|
+|<span class="nowrap">`--linear` / `-l`</span>|Models the preedge as a polynomial of order 1 (a linear contribution)|
+|<span class="nowrap">`--quadratic` / `-q`</span>|Models the preedge as a polynomial of order 2|
+|<span class="nowrap">`--cubic` / `-c`</span>|Models the preedge as a polynomial of order 3|
+|<span class="nowrap">`--polynomial` / `-p` `<degree>`</span>|Models the preedge as a polynomial of order `degree`|
 
 ## PostEdge
 
@@ -37,15 +37,15 @@ postedge <range> [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--constant` / `-C`</div>|Models the postedge as a polynomial of order 0 (a constant contribution).|
-|<div class="nowrap">`--linear` / `-l`</div>|Models the postedge as a polynomial of order 1 (a linear contribution).|
-|<div class="nowrap">`--quadratic` / `-q`</div>|Models the postedge as a polynomial of order 2.|
-|<div class="nowrap">`--cubic` / `-c`</div>|Models the postedge as a polynomial of order 3.|
-|<div class="nowrap">`--polynomial` / `-p` `<degree>`</div>|Models the postedge as a polynomial of order `degree`.|
-|<div class="nowrap">`--divide` / `-d`</div>|Corrects the data by dividing the `x` column by the postedge.|
-|<div class="nowrap">`--subtract` / `-s`</div>|Corrects the data by subtracting the postedge from the `x` column.|
-|<div class="nowrap">`--energy` / `-e`</div>|Performs the polynomial regression on $$\mu(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
-|<div class="nowrap">`--wavevector` / `-k`</div>|Performs the polynomial regression on $$\mu(k)$$, in wavevector space If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
+|<span class="nowrap">`--constant` / `-C`</span>|Models the postedge as a polynomial of order 0 (a constant contribution).|
+|<span class="nowrap">`--linear` / `-l`</span>|Models the postedge as a polynomial of order 1 (a linear contribution).|
+|<span class="nowrap">`--quadratic` / `-q`</span>|Models the postedge as a polynomial of order 2.|
+|<span class="nowrap">`--cubic` / `-c`</span>|Models the postedge as a polynomial of order 3.|
+|<span class="nowrap">`--polynomial` / `-p` `<degree>`</span>|Models the postedge as a polynomial of order `degree`.|
+|<span class="nowrap">`--divide` / `-d`</span>|Corrects the data by dividing the `x` column by the postedge.|
+|<span class="nowrap">`--subtract` / `-s`</span>|Corrects the data by subtracting the postedge from the `x` column.|
+|<span class="nowrap">`--energy` / `-e`</span>|Performs the polynomial regression on $$\mu(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
+|<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\mu(k)$$, in wavevector space If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
 
 ## Background
 
@@ -65,7 +65,7 @@ background constant [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--value` / `-v` `<value>`</div>|Subtracts the given `value` from the signal. Default is 1.0.|
+|<span class="nowrap">`--value` / `-v` `<value>`</span>|Subtracts the given `value` from the signal. Default is 1.0.|
 
 ### BSpline
 
@@ -77,7 +77,7 @@ background bspline <range> [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--kweight` / `-k` `<value>`</div>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 
 ### Fourier
 
@@ -89,8 +89,8 @@ background fourier <Rmax> [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--kweight` / `-k` `<value>`</div>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
-|<div class="nowrap">`--iterations` / `-i`</div>|The number of times to iterate the method. By default, applies the background removal three times.|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal three times.|
 
 ### Smoothing
 
@@ -102,9 +102,9 @@ background smoothing <range> [--options]
 
 |Argument|Explanation|
 |--|--|
-|<div class="nowrap">`--kweight` / `-k` `<value>`</div>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
-|<div class="nowrap">`--iterations` / `-i`</div>|The number of times to iterate the method. By default, applies the background removal once.|
-|<div class="nowrap">`--fraction` / `-f`</div>|The fraction of the total datapoints to use for the smoothing. Must be between 0 and 1. By default uses 30% of the datapoints (0.3)|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal once.|
+|<span class="nowrap">`--fraction` / `-f`</span>|The fraction of the total datapoints to use for the smoothing. Must be between 0 and 1. By default uses 30% of the datapoints (0.3)|
 
 ## Examples
 
