@@ -7,6 +7,7 @@ import pandas as pd
 import threading
 
 from dataclasses import dataclass, field
+from functools import partial
 from enum import Enum
 from logging import getLogger
 from typing import NamedTuple, Any, Callable
@@ -49,11 +50,9 @@ class FigureRuntime:
 @dataclass(slots=True)
 class AxisRuntime:
     axis: Axes
-    xmins: list[float] = field(default_factory=list)
-    ymins: list[float] = field(default_factory=list)
-    xmaxs: list[float] = field(default_factory=list)
-    ymaxs: list[float] = field(default_factory=list)
-
+    xlimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
+    ylimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
+    _lines: list[tuple[npt.NDArray, npt.NDArray]] = field(default_factory=list)
 
 
 class Args_Plot(NamedTuple):
@@ -79,6 +78,19 @@ class ColKind(NamedTuple):
 def derivative(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
     raise NotImplementedError()
 
+def weight(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
+    if d <= 0: return y
+    return y * x ** d
+
+def weight_noavg(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
+    if d <= 0: return y
+    ym = y.mean()
+    return (y - ym) * x ** d + ym
+
+def weight_one(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
+    if d <= 0: return y
+    return (y - 1) * x ** d + 1
+
 def smooth(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
     return lowess(y, x, d/len(x), it=0, is_sorted=False, return_sorted=False)
 
@@ -88,37 +100,40 @@ def parse_column(p:str) -> ColKind:
     m = XY_CLN_KIND.match(p)
     if m is None: raise ValueError(f"Invalid plot type: {p}")
 
-    Xdef, Ydef = m.groups()
+    x_specs, y_specs = m.groups()
     x_ops, y_ops = [],[]
 
-    if Xdef is not None:
-        xs = Xdef.split(".")
-        for x in reversed(xs[:-1]):
-            match x:
+    if x_specs is not None:
+        x_spec = x_specs.split(".")
+        for xs in reversed(x_spec[:-1]):
+            match xs:
                 case "r": op = lambda x: np.real(x)
                 case "i": op = lambda x: np.imag(x)
                 case "a": op = lambda x: np.abs(x)
                 case "p": op = lambda x: np.unwrap(np.angle(x))
-                case _: raise ValueError(f"Unknown x operation: {x}")
+                case _: raise ValueError(f"Unknown x operation: {xs}")
             x_ops.append(op)
-        xcol = xs[-1]
+        xcol = x_spec[-1]
     else:
         xcol = None
 
-    ys = Ydef.split(".")
-    for y in reversed(ys[:-1]):
-        match y[0]:
+    y_spec = y_specs.split(".")
+    for ys in reversed(y_spec[:-1]):
+        match ys[0]:
             case "r": op = lambda y,_: np.real(y)
             case "i": op = lambda y,_: np.imag(y)
             case "a": op = lambda y,_: np.abs(y)
             case "p": op = lambda y,_: np.unwrap(np.angle(y))
-            case "s": op = lambda y,x: smooth(y, x, int(y[1:]))
-            case "d": op = lambda y,x: derivative(y,x, int(y[1:]))
-            case _: raise ValueError(f"Unknown x operation: {y}")
+            case "s": op = lambda y,x: partial(smooth,       d=int(ys[1:]))(y,x)
+            case "d": op = lambda y,x: partial(derivative,   d=int(ys[1:]))(y,x)
+            case "k": op = lambda y,x: partial(weight_one,   d=int(ys[1:]))(y,x)
+            case "w": op = lambda y,x: partial(weight,       d=int(ys[1:]))(y,x)
+            case "W": op = lambda y,x: partial(weight_noavg, d=int(ys[1:]))(y,x)
+            case _: raise ValueError(f"Unknown x operation: {ys}")
         y_ops.append(op)
-    ycol = ys[-1]
+    ycol = y_spec[-1]
 
-    return ColKind(xcol, ycol, x_ops, y_ops, Xdef, Ydef)
+    return ColKind(xcol, ycol, x_ops, y_ops, x_specs, y_specs)
 
 def get_column_(col:ColKind, data:Data) -> tuple[npt.NDArray, npt.NDArray]:
     domain = data._get_col_domain(col.ycol)
@@ -277,44 +292,42 @@ class Plot(CommandHandler):
         if args.plot is not None:
             for data in context.data:
                 x,y = get_column_(args.plot, data)
-                ax.xmins.append(np.min(x))
-                ax.xmaxs.append(np.max(x))
-                ax.ymins.append(np.min(y))
-                ax.ymaxs.append(np.max(y))
+                ax._lines.append((x,y))
 
                 ax.axis.plot(x, y, linewidth=args.linewidth, alpha=args.alpha)
-
 
         if args.labels is not None:
             if args.labels.xlabel is not None: ax.axis.set_xlabel(args.labels.xlabel)
             if args.labels.ylabel is not None: ax.axis.set_ylabel(args.labels.ylabel)
             if args.labels.title is not None: ax.axis.set_title(args.labels.title)
 
+
         if args.xlimits is not None:
             match args.xlimits.lower:
-                case Bound.EXTERNAL: x_lower = min(ax.xmins)
-                case Bound.INTERNAL: x_lower = max(ax.xmins)
-                case NumberUnit(_l,_,_) if _l == -np.inf: x_lower = None
-                case NumberUnit(_l,_,_): x_lower = _l
+                case NumberUnit(_l, _, _) if _l != -np.inf:
+                    ax.xlimits = (args.xlimits.lower, ax.xlimits[1])
             match args.xlimits.upper:
-                case Bound.EXTERNAL: x_upper = max(ax.xmaxs)
-                case Bound.INTERNAL: x_upper = min(ax.xmaxs)
-                case NumberUnit(_u,_,_) if _u == np.inf: x_upper = None
-                case NumberUnit(_u,_,_): x_upper = _u
-            ax.axis.set_xlim(x_lower, x_upper)
-
+                case NumberUnit(_u, _, _) if _u != np.inf:
+                    ax.xlimits = (ax.xlimits[0], args.xlimits.upper)
+            
         if args.ylimits is not None:
             match args.ylimits.lower:
-                case Bound.EXTERNAL: y_lower = min(ax.ymins)
-                case Bound.INTERNAL: y_lower = max(ax.ymins)
-                case NumberUnit(_l,_,_) if _l == -np.inf: y_lower = None
-                case NumberUnit(_l,_,_): y_lower = _l
+                case NumberUnit(_l, _, _) if _l != -np.inf:
+                    ax.ylimits = (args.ylimits.lower, ax.ylimits[1])
             match args.ylimits.upper:
-                case Bound.EXTERNAL: y_upper = max(ax.ymaxs)
-                case Bound.INTERNAL: y_upper = min(ax.ymaxs)
-                case NumberUnit(_u,_,_) if _u == np.inf: y_upper = None
-                case NumberUnit(_u,_,_): y_upper = _u
-            ax.axis.set_ylim(y_lower, y_upper)
+                case NumberUnit(_u, _, _) if _u != np.inf:
+                    ax.ylimits = (ax.ylimits[0], args.ylimits.upper)
+        
+        match ax.xlimits[0]:
+            case Bound.EXTERNAL:...
+            case Bound.INTERNAL:...
+            case NumberUnit(_l):...
+
+        match ax.xlimits[1]:
+            case _:...
+        
+        match ax.ylimits:
+            case _:...
 
         if args.show:
             def on_close(event): fig.canvas.stop_event_loop()
