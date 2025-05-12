@@ -204,7 +204,7 @@ def find_E0_with_method(
             case [Operation.AVERAGEINT, "data"]:
                 ...
             case [Operation.SET, _]:
-                return 0 + _bounds[0]
+                return 0 + (_bounds[0] + _bounds[1])/2
     
     raise ValueError("Method must terminate with a final method.")
 
@@ -424,8 +424,8 @@ class Edge(CommandHandler):
 
                     if E0s is None:
                         E0s = data.meta.refE0
-                    if E0s is None:
-                        raise RuntimeError("E0 search interval was not provided.")
+                        if E0s is None:
+                            raise RuntimeError("E0 search interval was not provided.")
 
                     try:
                         E0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x) # type: ignore
