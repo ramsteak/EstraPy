@@ -70,7 +70,7 @@ class Background(CommandHandler):
         const.add_argument("--value", "-v", type=float, default=1.0)
 
         spline = subparsers.add_parser("spline")
-        spline.add_argument("--kweight", "-k", type=float)
+        spline.add_argument("--kweight", "-k", default=0, type=float)
 
         bspline = subparsers.add_parser("bspline")
         bspline.add_argument("range", nargs=2)
@@ -78,12 +78,12 @@ class Background(CommandHandler):
 
         fourier = subparsers.add_parser("fourier")
         fourier.add_argument("Rmax")
-        fourier.add_argument("--kweight", "-k", type=float)
+        fourier.add_argument("--kweight", "-k", default=0, type=float)
         fourier.add_argument("--iterations", "-i", type=int, default=3)
 
         smooth = subparsers.add_parser("smoothing")
         smooth.add_argument("range", nargs=2)
-        smooth.add_argument("--kweight", "-k", type=float)
+        smooth.add_argument("--kweight", "-k", default=0, type=float)
         smooth.add_argument("--fraction", "-f", type=float, default=0.3)
         smooth.add_argument("--iterations", "-i", type=int, default=1)
 
