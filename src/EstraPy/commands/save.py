@@ -127,7 +127,7 @@ class Save(CommandHandler):
             case "batch":
                 col = parse_column(args.column)
                 if col.xcol is None: raise ValueError("No x column specified.")
-                mode = Batch(args.filename, args.column)
+                mode = Batch(args.filename, col)
                 
             case "aligned":
                 col = parse_column(args.column)
