@@ -1,45 +1,41 @@
 # version: 1.0.0
 % clear
+% define kp 2
 
 batchin -E Energy_enc -I I0 I1 I2
 
 filein Hf/Hf40_50K_Hf_L3_0000.xdi -b -T -t
 
-edge S -E 9561
+edge set -E 9561eV
 
-plot x(E)
-  --title "Hf L3 Edge"
-  --xlabel "$Energy\ [eV]$"
-  --ylabel "$Intensity$"
+preedge .. -80eV -l
+postedge 4k .. -cdk
 
-preedge .. -40 -l
-postedge 3k .. -cdk
+plot k:k${kp}.x    --fig 1:1.2
+background smoothing 0k .. -k${kp}
 
-plot E:+(*(x,postedge),preedge) E:preedge E:+(postedge,preedge)
-  --title "Hf L3: raw data"
-  --xlabel "$Energy\ [eV]$"
-  --ylabel "$Intensity$"
+fourier 3k 16k 6A 0.02A -a hann -k${kp} -w3
 
-background fourier 1.1A -k1
+plot E:x_0     --fig 1:1.1
+plot E:pre     --fig 1:1.1
+plot E:post    --fig 1:1.1
+plot k:k${kp}.bkg  --fig 1:1.2
 
-plot k1.x(k) bkg(k)
-  --title "Hf: normalized intensity"
-  --xlim 0 ..
-  --xlabel "$Wavevector\ [k]$"
-  --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"
+plot R:a.f     --fig 1:1.3
 
-fourier 3k 16k 6A 0.02A -a hann -k1 -w3
+# ------------------------------------------------------------------------------
 
-plot a.f(R)
-  --colorby .n
-  --color tab10
-  --title "Hf: fourier transform"
-  --xlabel "$Distance\ [A]$"
-  --ylabel "$FT\{k^1 \cdot \chi(k)\} [A^{-1}]\}$"
+plot --fig 1:1.1 --title "Hf L3 Edge"
+plot --fig 1:1.1 --xlabel "$Energy\ [eV]$"
+plot --fig 1:1.1 --ylabel "$Intensity$"
 
-plot *(k1.x,win)(k) win(k)
-  --norm
-  --title "Hf: normalized intensity"
-  --xlim 0 ..
-  --xlabel "$Wavevector\ [k]$"
-  --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"
+plot --fig 1:1.2  --title "Hf: normalized intensity"
+plot --fig 1:1.2  --xlim 0 ..
+plot --fig 1:1.2  --xlabel "$Wavevector\ [k]$"
+plot --fig 1:1.2  --ylabel "$k^1 \cdot \chi(k)\ [A^{-1}]$"
+
+plot --fig 1:1.3  --colorby .n
+plot --fig 1:1.3  --color tab10
+plot --fig 1:1.3  --title "Hf: fourier transform"
+plot --fig 1:1.3  --xlabel "$Distance\ [A]$"
+plot --fig 1:1.3  --ylabel "$FT\{k^1 \cdot \chi(k)\} [A^{-1}]\}$"

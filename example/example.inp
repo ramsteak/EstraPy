@@ -14,7 +14,7 @@ preedge .. -80eV -l
 postedge 3k .. -cde
 
 save xE.dat batch E:x
-save {.fn}_norm.dat columns E x 
+save {.fn}_norm.dat columns E x
 
 plot E:x   --fig 1:1.1
 plot k:x   --fig 1:1.2
@@ -31,7 +31,7 @@ plot R:r.f --fig 1:2.1 --linewidth 0.2
 plot R:i.f --fig 1:2.1 --linewidth 0.2
 plot r.f:i.f --fig 1:2.2
 
-save k.dat batch k:x --align 0k :. 0.1k
+save k.dat aligned k:x --align 0k :. 0.1k
 
 # ------------------------------------------------------------------------------
 # Set all labels and titles
