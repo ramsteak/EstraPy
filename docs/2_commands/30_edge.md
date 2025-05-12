@@ -1,7 +1,7 @@
 ---
 title: Edge detection
 parent: Commands
-nav_order: 3
+nav_order: 30
 permalink: /commands/edge-detection
 math: katex
 ---

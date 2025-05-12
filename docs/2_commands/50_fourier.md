@@ -1,7 +1,7 @@
 ---
 title: Fourier transform
 parent: Commands
-nav_order: 5
+nav_order: 50
 permalink: /commands/fourier-transform
 math: katex
 ---
