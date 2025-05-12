@@ -34,7 +34,7 @@ class CommandParser(argparse.ArgumentParser):
 
         try:
             namespace = self.parse_args(args, _namespace)
-        except argparse.ArgumentError:
-            raise InputFileParsingException
+        except argparse.ArgumentError as E:
+            raise InputFileParsingException(E)
 
         return namespace  # type: ignore

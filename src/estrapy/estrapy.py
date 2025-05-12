@@ -167,8 +167,12 @@ def main():
 
     commands = parse_commands(inputfiledata, context)
 
-    for executor, commandargs in commands:
-        res = executor.execute(commandargs, context)
+    for linenumber, executor, commandargs in commands:
+        try:
+            res = executor.execute(commandargs, context)
+        except Exception as E:
+            log.critical(f"Error at line {linenumber}: {E}")
+            break
         context.commands.append((commandargs, res))
     pass
 

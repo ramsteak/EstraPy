@@ -1,4 +1,5 @@
 from typing import NamedTuple
+from logging import getLogger
 
 from . import __version__
 from .commands import commands
@@ -62,7 +63,9 @@ def parse_directives(input: str) -> Directives:
 
 def parse_commands(
     input: str, context: Context
-) -> list[tuple[CommandHandler, NamedTuple]]:
+) -> list[tuple[int, CommandHandler, NamedTuple]]:
+    log = getLogger("parser")
+
     # Check file version
     if context.options.version[:3] != VERSION[:3]:
         # TODO: is not valueerror
@@ -75,14 +78,14 @@ def parse_commands(
         replaced = replaced.replace(f"%{varname}%", varval)
         replaced = replaced.replace(f"${{{varname}}}", varval)
 
-    lines = replaced.splitlines()
+    lines = [*enumerate(replaced.splitlines(), 1)]
 
-    parsedcommands: list[tuple[CommandHandler, NamedTuple]] = []
+    parsedcommands: list[tuple[int, CommandHandler, NamedTuple]] = []
 
     lineid = 0
     while lineid + 1 < len(lines):
         lineid += 1
-        line = lines[lineid]
+        index, line = lines[lineid]
         if not line.strip():
             continue
         if line.startswith("#"):
@@ -108,16 +111,20 @@ def parse_commands(
         step = 1
         while (
             (lineid + step < len(lines))
-            and (lines[lineid + step].startswith(" "))
-            and lines[lineid + step].strip()
+            and (lines[lineid + step][1].startswith(" "))
+            and lines[lineid + step][1].strip()
         ):
             step += 1
 
-        tokens = command.tokenize([(i, lines[i]) for i in range(lineid, lineid + step)])
+        tokens = command.tokenize([(i, lines[i][1]) for i in range(lineid, lineid + step)])
         # Removes the first token, corresponding to the command name.
-        commandargs = command.parse(tokens[1:], context)
+        try:
+            commandargs = command.parse(tokens[1:], context)
+        except Exception as E:
+            log.critical(f"Syntax error: line {index} {str(E)}")
+            exit(-1)
 
-        parsedcommands.append((command, commandargs))
+        parsedcommands.append((index, command, commandargs))
 
         # -1 is due to the +1 at the beginning of the loop
         lineid += step - 1
