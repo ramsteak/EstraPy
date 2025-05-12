@@ -1,18 +1,18 @@
 ---
 title: Background removal
 parent: Commands
-nav_order: 4
+nav_order: 40
 permalink: /commands/background-removal
 math: katex
 ---
 
 # Background removal
 
-XAS analysis requires removal of the background contributions to the signal and signal normalization. This operation is performed in multiple consecutive steps, represented by different commands. In EstraPy, the background removal is represented by the subtraction of the background before the edge, called the preedge, the removal of the background after the edge, called the postedge, and removing contributions to the signal due to free, non-interacting electrons. These three steps are performed by three different commands, namely [`preedge`](#preedge), [`postedge`](#postedge) and [`background`](#background).
+XAS analysis requires removing background contributions and normalizing the signal. This is performed in different steps, represented by different commands. In EstraPy, the background removal is represented by the subtraction of the background before the edge, called the preedge, the removal of the background after the edge, called the postedge, and removing contributions to the signal due to free, non-interacting electrons. These three steps are performed using the [`preedge`](#preedge), [`postedge`](#postedge) and [`background`](#background) commands.
 
 ## PreEdge
 
-The `preedge` command extracts the preedge contribution from the signal in the `x` column, assigning it to the `pre` column, and modifies the signal column with the corrected value. The preedge is modelled as a polynomial of degree n in the given range, and this estimation is extended to the entire data range. The range can be specified in either eV or k.
+The `preedge` command estimates the preedge contribution from the signal in the `x` column, stores it in the `pre` column, and updates the signal with the corrected values. The preedge is modelled as a polynomial of degree n, usually linear, in the given range, and extrapolates the estimate across the entire data range. The range can be specified in either eV or k.
 
 ```sh
 preedge <range> [--options]
@@ -28,8 +28,8 @@ preedge <range> [--options]
 
 ## PostEdge
 
-The `postedge` command extracts the postedge contribution from the signal in the `x` column, assigning it to the `post` column, and modifies the signal column with the corrected value. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extended to the entire data range. The range can be specified in either eV or k.
-The command also declares the variable `J0` for each file, defined to be the value of the postedge at $$E = E_{0}$$.
+The `postedge` command estimates the postedge contribution from the signal in the `x` column, stores it in the `post` column, and updates the signal with the corrected values. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extrapolated across the entire data range. The range can be specified in either eV or k.
+The command also defines the variable `J0` for each file, defined to be the value of the postedge estimated at $$E = E_{0}$$.
 
 ```sh
 postedge <range> [--options]
@@ -45,11 +45,11 @@ postedge <range> [--options]
 |<span class="nowrap">`--divide` / `-d`</span>|Corrects the data by dividing the `x` column by the postedge.|
 |<span class="nowrap">`--subtract` / `-s`</span>|Corrects the data by subtracting the postedge from the `x` column.|
 |<span class="nowrap">`--energy` / `-e`</span>|Performs the polynomial regression on $$\mu(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
-|<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\mu(k)$$, in wavevector space If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
+|<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\mu(k)$$, in wavevector space. If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
 
 ## Background
 
-The `background` command extracts the background contribution from the signal in the `x` column, and stores it in the `bkg` column. This contribution is then subtracted from the signal. The command supports multiple methods for background estimation.
+The `background` command extracts the background contribution from the signal in the `x` column, and stores it in the `bkg` column. This background estimated is then subtracted from the signal, yielding the corrected data. The command supports multiple methods for background estimation.
 
 ```sh
 background <mode> [--options]
@@ -69,7 +69,7 @@ background constant [--options]
 
 ### BSpline
 
-Models the background using bsplines, automatically determining the optimal smoothing. Uses scipy.interpolate.UnivariateSpline. The range can be specified in eV or k.
+Models the background using B-splines, automatically determining the optimal smoothing. Uses `scipy.interpolate.UnivariateSpline`. The range can be specified in eV or k.
 
 ```sh
 background bspline <range> [--options]
@@ -81,7 +81,7 @@ background bspline <range> [--options]
 
 ### Fourier
 
-Models the background as low-frequency Fourier contributions. This method performs a continuous Fourier transform onto a limited R-space, and uses a Hann window to select only the lower frequencies, up to Rmax. Then performs the inverse transform to calculate the background.
+Models the background as low-frequency Fourier contributions. This method performs a continuous Fourier transform on the signal in k-space, filters out the high frequencies uses a Hann window (up to Rmax), and then performs the inverse transform to estimate the background.
 
 ```sh
 background fourier <Rmax> [--options]
@@ -114,7 +114,7 @@ background smoothing <range> [--options]
 preedge .. -80eV -l
 ```
 
-This snippet subtracts a linear preedge from the `x` column, selecting the region from $$-\infty$$ to -80eV relative to the $$E_{0}$$ determined in a previous `edgeenergy` step.
+This snippet subtracts a linear preedge from the `x` column, estimated over the region from $$-\infty$$ to -80eV relative to $$E_{0}$$ (determined in a previous `edgeenergy` step).
 
 ### PostEdge example
 
@@ -122,7 +122,7 @@ This snippet subtracts a linear preedge from the `x` column, selecting the regio
 postedge 3k .. -cde
 ```
 
-This snippet divides the data by a cubic polinomial, fitted over $$\mu(E)$$ that models the postedge of the `x` column, selecting the region from 3k to $$\infty$$
+This snippet divides the data by a cubic polinomial, fitted over $$\mu(E)$$ in the region from 3k to $$\infty$$, to model the postedge contribution of the `x` column.
 
 ### Background example
 

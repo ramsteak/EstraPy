@@ -6,6 +6,9 @@ permalink: /commands/
 
 # Commands
 
-EstraPy reads from an input file, containing the necessary instructions to perform
-the required operations. The commands follow a simple syntax, outlined on a per-command basis,
-in the relative sections below.
+EstraPy reads instructions from an input file, which defines the operations to perform.
+These operations include loading experimental data, applying transformations, generating plots, and exporting results.
+Each instruction is written as a command, which follows a simple and consistent syntax.
+
+Commands are executed in the order they appear in the file, and many commands support multiple options for customization.
+The syntax and usage of each command are detailed in the sections below.
