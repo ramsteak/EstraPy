@@ -17,7 +17,7 @@ from scipy.interpolate import interp1d
 from logging import getLogger
 from dataclasses import dataclass
 
-from ._context import Context, Column, AxisType
+from ._context import Context, Column, AxisType, FigureSettings, FigureRuntime
 from ._handler import CommandHandler, Token, CommandResult
 from ._misc import E_to_sk, parse_edgeenergy
 from ._numberunit import NumberUnit, parse_nu, Domain
@@ -77,6 +77,12 @@ class Args_Edge(NamedTuple):
     wplot: bool
     rplot: bool
 
+def norm(x:npt.NDArray, center:bool=False) -> npt.NDArray:
+    m,M = np.min(x), np.max(x)
+    if center:
+        return x / (max(abs(M), abs(m)))
+    else:
+        return (x-m)/(M-m)
 
 def find_E0_with_method(
     method: list[tuple[Operation, int | None]],
@@ -85,9 +91,17 @@ def find_E0_with_method(
     _x: npt.NDArray[np.floating],
     *, ax:None|Axes=None
 ) -> float:
-    h: list[tuple[str, Any]] = [("data", (_y, _x - _bounds[0]))]
-    _current_bound: tuple[float, float] = -np.inf, np.inf
-    bounds = 0, _bounds[1] - _bounds[0]
+    E0shift = (_bounds[1] + _bounds[0])/2
+
+    h: list[tuple[str, Any]] = [("data", (_y, _x - E0shift))]
+    _current_bound: tuple[float, float] = np.min(_x) - E0shift, np.max(_x) - E0shift # type: ignore
+    _norm_center = False
+
+    bounds = _bounds[0] - E0shift, _bounds[1] - E0shift
+
+    if ax is not None:
+        ax.axvspan(*bounds, alpha=0.1)
+        
 
     for action, arg in method:
         dtype, data = h[-1]
@@ -99,7 +113,7 @@ def find_E0_with_method(
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
                 assert arg is not None
-                d = arg * (bounds[1] - bounds[0])
+                d = arg * (bounds[1] - bounds[0]) / 2
                 a, b = bounds[0] - d, bounds[1] + d
 
                 idx = (x >= a) & (x <= b)
@@ -107,6 +121,9 @@ def find_E0_with_method(
                 idx = idx | pad[2:] | pad[:-2]
                 h.append(("data", (y[idx], x[idx])))
                 _current_bound = a,b
+
+                if ax:
+                    ax.plot(x[idx], norm(y[idx], _norm_center), label=f"c{arg}")
 
             case [Operation.POLYFIT, "data"]:
                 if arg is None:
@@ -119,7 +136,7 @@ def find_E0_with_method(
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, poly(_pX))
+                    ax.plot(_pX, norm(poly(_pX), _norm_center), label=f"p{arg}")
 
             case [Operation.SMOOTH, "data"]:
                 if arg is None:
@@ -131,7 +148,7 @@ def find_E0_with_method(
                 h.append(("data", (y, x)))
 
                 if ax:
-                    ax.plot(x, y)
+                    ax.plot(x, norm(y, _norm_center), label=f"s{arg}")
 
             case [Operation.DERIVATIVE, "data"]:
                 if arg is None:
@@ -142,9 +159,10 @@ def find_E0_with_method(
                 for _ in range(arg):
                     y = np.gradient(y, x)
                 h.append(("data", (y, x)))
+                _norm_center = True
 
                 if ax:
-                    ax.plot(x, y)
+                    ax.plot(x, norm(y, _norm_center), label=f"d{arg}")
 
             case [Operation.DERIVATIVE, "poly"]:
                 if arg is None:
@@ -157,7 +175,7 @@ def find_E0_with_method(
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, poly(_pX))
+                    ax.plot(_pX, norm(poly(_pX), _norm_center), label=f"p{arg}")
 
             case [Operation.INTERPOLATE, "data"]:
                 if arg is None:
@@ -165,11 +183,12 @@ def find_E0_with_method(
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                h.append(("interp", interp1d(x, y, arg, fill_value=np.nan)))  # type: ignore
+                interp = interp1d(x, y, arg, fill_value=np.nan) # type: ignore
+                h.append(("interp", interp))
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, poly(_pX))
+                    ax.plot(_pX, norm(interp(_pX), _norm_center), label=f"i{arg}")
 
             case [Operation.MAXIMUM, "data"]:
                 y, x = data  # type: ignore
@@ -178,7 +197,7 @@ def find_E0_with_method(
 
                 M = x[y.argmax()]
                 if ax: ax.axvline(M)
-                return M + _bounds[0]
+                return M + E0shift
 
             case [Operation.MINIMUM, "data"]:
                 y, x = data  # type: ignore
@@ -187,27 +206,29 @@ def find_E0_with_method(
 
                 m = x[y.argmin()]
                 if ax: ax.axvline(m)
-                return m + _bounds[0]
+                return m + E0shift
 
             case [Operation.MAXIMUM, "poly" | "interp"]:
                 p = data
                 res: OptimizeResult = minimize_scalar(-p, bounds=bounds)  # type: ignore
                 if ax: ax.axvline(res.x)
-                return res.x + _bounds[0]
+                return res.x + E0shift
 
             case [Operation.MINIMUM, "poly" | "interp"]:
                 p = data
                 res: OptimizeResult = minimize_scalar(p, bounds=bounds)  # type: ignore
                 if ax: ax.axvline(res.x)
-                return res.x + _bounds[0]
+                return res.x + E0shift
 
             case [Operation.ZERO, "data"]:
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
                 Z = x[np.abs(y).argmin()]
-                if ax: ax.axvline(Z)
-                return Z + _bounds[0]
+                if ax:
+                    ax.axvline(Z)
+                    ax.axhline(0, linestyle=":")
+                return Z + E0shift
 
             case [Operation.ZERO, "poly" | "interp"]:
                 p = data
@@ -224,15 +245,17 @@ def find_E0_with_method(
                     else:
                         raise ValueError("Cannot find root interval.")
                     res: RootResults = root_scalar(p, bracket=(_b0, _b1))  # type: ignore
-                if ax: ax.axvline(res.root)
-                return res.root + _bounds[0]
+                if ax:
+                    ax.axvline(res.root)
+                    ax.axhline(0, linestyle=":")
+                return res.root + E0shift
 
             case [Operation.HALFHEIGHT, "data"]:
                 raise NotImplementedError("This operation was not yet implemented.")
             case [Operation.AVERAGEINT, "data"]:
                 raise NotImplementedError("This operation was not yet implemented.")
             case [Operation.SET, _]:
-                return 0 + (_bounds[0] + _bounds[1])/2
+                return E0shift
             case [op, dt]:
                 raise RuntimeError(f"Invalid operation: {op} on {dt}")
     
@@ -344,18 +367,16 @@ class Align(CommandHandler):
                     x = data.get_col_("E")
 
                     if args.wplot:
-                        from .plot import FigureRuntime, AxisRuntime, FigureSettings
-                        fig,ax = plt.subplots()
-                        figurelist = context.options.other["figurelist"]
-                        figurelist:dict[int, FigureSettings]
-                        f = max(f for f in figurelist if f >= 999)+1 if figurelist else 1000
-
-                        figs = FigureSettings(f,(1,1))
-                        axr = AxisRuntime(ax)
-                        figr = FigureRuntime(figs, fig, {(1,1):axr}, False)
+                        fignum = context.figures.get_high_figurenum()
+                        figure = FigureRuntime.new(FigureSettings(fignum, (1,1)))
+                        context.figures.figureruntimes[fignum] = figure
+                        ax = figure.axes[(1,1)].axis
+                        ax.set_title(f"Reference E0 detection for {data.meta.name}")
+                        ax.set_xlabel("Energy shift")
+                    else: ax = None
 
                     try:
-                        rE0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x)
+                        rE0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x, ax=ax)
                     except ValueError:
                         log.error(f"{data.meta.name}: Cannot find reference E0 value with the specified method.")
                         continue
@@ -369,6 +390,9 @@ class Align(CommandHandler):
                         log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({rE0:.3f}eV)")
                     # If it is in the ±5% of the borders of the range, warning
                 
+                    if ax is not None:
+                        ax.legend()
+                        figure.show()
 
                     shift = rE0 - args.E0
 
@@ -462,8 +486,17 @@ class Edge(CommandHandler):
                         if E0s is None:
                             raise RuntimeError("E0 search interval was not provided.")
 
+                    if args.wplot:
+                        fignum = context.figures.get_high_figurenum()
+                        figure = FigureRuntime.new(FigureSettings(fignum, (1,1)))
+                        context.figures.figureruntimes[fignum] = figure
+                        ax = figure.axes[(1,1)].axis
+                        ax.set_title(f"E0 detection for {data.meta.name}")
+                        ax.set_xlabel("Energy shift")
+                    else: ax = None
+
                     try:
-                        E0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x) # type: ignore
+                        E0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x, ax=ax) # type: ignore
                     except ValueError:
                         log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
                         continue
@@ -477,7 +510,10 @@ class Edge(CommandHandler):
                         log.warning(f"{data.meta.name}: E0 value found very close to the specified range ({E0:.3f}eV)")
                     # If it is in the ±5% of the borders of the range, warning
                 
-
+                    if ax is not None:
+                        ax.legend()
+                        figure.show()
+                    
                     if data.meta.refE0:
                         relativeE0 = E0 - data.meta.refE0
                         log.info(

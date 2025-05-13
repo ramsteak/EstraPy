@@ -19,7 +19,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 
-from ._context import Context, Data
+from ._context import Context, Data, FigureRuntime, FigureSettings
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange
 
@@ -35,32 +35,6 @@ class Labels(NamedTuple):
 class ColorMap(NamedTuple):
     cmap: colors.Colormap
     num: int | None
-
-class FigureSettings(NamedTuple):
-    figurenum: int
-    subplot: tuple[int,int]
-
-@dataclass(slots=True)
-class FigureRuntime:
-    settings: FigureSettings
-    figure: Figure
-    axes: dict[tuple[int,int], AxisRuntime]
-    shown: bool = False
-
-    def show(self) -> None:
-        def on_close(event): self.figure.canvas.stop_event_loop()
-        self.figure.canvas.mpl_connect('close_event', on_close)
-        self.figure.show()
-        self.figure.canvas.start_event_loop(timeout=-1)
-        self.shown = True
-
-@dataclass(slots=True)
-class AxisRuntime:
-    axis: Axes
-    xlimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
-    ylimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
-    _lines: list[tuple[npt.NDArray, npt.NDArray]] = field(default_factory=list)
-
 
 class Args_Plot(NamedTuple):
     plot: ColKind | None
@@ -209,41 +183,36 @@ class Plot(CommandHandler):
             )
         else: labels = None
 
-        if "figurelist" not in context.options.other:
-            context.options.other["figurelist"] = dict[int, FigureSettings]()
-        figurelist = context.options.other["figurelist"]
-        figurelist:dict[int, FigureSettings]
 
         show = args.show
-
         if args.figure is None:
-            f = max(f for f in figurelist if f < 1000)+1 if figurelist else 1
-            figure = FigureSettings(f, (1,1))
-            figurelist[f] = figure
+            figsettings = FigureSettings(-1, (1,1))
+            context.figures.impl_figsettings.append(figsettings)
         else:
             m = FIGURE_SUBPLOT.match(args.figure)
             if m is None:
                 raise ValueError(f"Invalid figure specification: \"{args.figure}\"")
             match m.groups()[0:3]:
                 case str(_f),None,None:
-                    f,a,b = int(_f), 1, 1
+                    fignum,a,b = int(_f), 1, 1
                 case str(_f),None,None:
-                    f,a,b = int(_f), 1, 1
+                    fignum,a,b = int(_f), 1, 1
                 case str(_f),str(_a),str(_b):
-                    f,a,b = int(_f),int(_a),int(_b)
+                    fignum,a,b = int(_f),int(_a),int(_b)
                 case u:
                     raise ValueError(f"Invalid figure specification: \"{u}\"")
             
             if not show and m.group(4) == ";": show = True
             
-            figure = FigureSettings(f, (a,b))
+            figure = FigureSettings(fignum, (a,b))
 
-            if f not in figurelist:
-                figurelist[f] = figure
+            if fignum not in context.figures.expl_figsettings:
+                context.figures.expl_figsettings[fignum] = figure
             else:
-                _fig = figurelist[f]
-                at,bt = (max(a, _fig.subplot[0]),max(b, _fig.subplot[1]))
-                figurelist[f] = FigureSettings(f, (at,bt))
+                _prev_fig = context.figures.expl_figsettings[fignum]
+                # Update the figure size to the maximum subplot count
+                at,bt = (max(a, _prev_fig.subplot[0]),max(b, _prev_fig.subplot[1]))
+                context.figures.expl_figsettings[fignum] = FigureSettings(fignum, (at,bt))
 
 
 
@@ -265,37 +234,22 @@ class Plot(CommandHandler):
     def execute(args: Args_Plot, context: Context) -> CommandResult:
         log = getLogger("plot")
 
-        if "figurerun" not in context.options.other:
-            context.options.other["figurerun"] = dict[int, FigureRuntime]()
-        all_figures = context.options.other["figurerun"]
-        all_figures:dict[int, FigureRuntime]
-
-        figurelist = context.options.other["figurelist"]
-        figurelist:dict[int, FigureSettings]
-
-        if args.figure.figurenum not in all_figures:
-            _figsettings = figurelist[args.figure.figurenum]
-            _fig = plt.figure(args.figure.figurenum)
-            _subplots = figurelist[args.figure.figurenum].subplot
-            match _subplots:
-                case (1,1):
-                    _ax = {(1,1):AxisRuntime(_fig.subplots(1,1))}
-                case (1,_):
-                    _axs = _fig.subplots(*_subplots)
-                    _ax = {(1,c):AxisRuntime(_ax) for c,_ax in enumerate(_axs,1)}
-                case (_,1):
-                    _axs = _fig.subplots(*_subplots)
-                    _ax = {(r,1):AxisRuntime(_ax) for r,_ax in enumerate(_axs,1)}
-                case (_,_):
-                    _axss = _fig.subplots(*_subplots)
-                    _ax = {(r,c):AxisRuntime(_ax) for r,_axs in enumerate(_axss,1) for c,_ax in enumerate(_axs,1)}
-                case _: raise RuntimeError("Unknown error: #3409234")
-                
-
-            figure = FigureRuntime(_figsettings, _fig, _ax, False)
-            all_figures[args.figure.figurenum] = figure
+        figurenum = args.figure.figurenum
+        if figurenum == -1:
+            # The figure is in impl_figsettings. Get a nonallocated number.
+            figurenum = context.figures.get_impl_figurenum()
+            figsettings = FigureSettings(figurenum, (1,1))
+            figure = FigureRuntime.new(figsettings)
+            context.figures.figureruntimes[figurenum] = figure
         else:
-            figure = all_figures[args.figure.figurenum]
+            # The figure was explicitly allocated. Get the actual preexisting figure.
+            if figurenum not in context.figures.figureruntimes:
+                figsettings = context.figures.expl_figsettings[figurenum]
+                figure = FigureRuntime.new(figsettings)
+
+                context.figures.figureruntimes[figurenum] = figure
+            else:
+                figure = context.figures.figureruntimes[figurenum]
 
         fig, ax = figure.figure, figure.axes[args.figure.subplot]
 

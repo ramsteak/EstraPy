@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
 
-
+from matplotlib.figure import Figure
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 from pathlib import Path
 from typing import Any, NamedTuple, Callable
 from enum import Enum
 from dataclasses import dataclass, field
+from itertools import chain
 
-from ._numberunit import Domain, NumberUnitRange, Bound
+from ._numberunit import Domain, NumberUnitRange, Bound, NumberUnit
 
 @dataclass(slots=True, frozen=True)
 class CommandResult:
@@ -69,6 +74,72 @@ class DataColType(Enum):
     WINDOW = "win"
     MULTIEDGE = "mult"
     GLITCH = "gli"
+
+
+class FigureSettings(NamedTuple):
+    figurenum: int
+    subplot: tuple[int,int]
+
+@dataclass(slots=True)
+class AxisRuntime:
+    axis: Axes
+    xlimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
+    ylimits: tuple[NumberUnit | Bound | None, NumberUnit | Bound | None] = None, None
+    _lines: list[tuple[npt.NDArray, npt.NDArray]] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FigureRuntime:
+    settings: FigureSettings
+    figure: Figure
+    axes: dict[tuple[int,int], AxisRuntime]
+    shown: bool = False
+
+    def show(self) -> None:
+        def on_close(event): self.figure.canvas.stop_event_loop()
+        self.figure.canvas.mpl_connect('close_event', on_close)
+        self.figure.show()
+        self.figure.canvas.start_event_loop(timeout=-1)
+        self.shown = True
+    
+    @classmethod
+    def new(cls, settings:FigureSettings) -> FigureRuntime:
+        _fig = plt.figure(settings.figurenum)
+
+        match settings.subplot:
+            case (1,1):
+                _ax = {(1,1):AxisRuntime(_fig.subplots(1,1))}
+            case (1,_):
+                _axs = _fig.subplots(*settings.subplot)
+                _ax = {(1,c):AxisRuntime(_ax) for c,_ax in enumerate(_axs,1)}
+            case (_,1):
+                _axs = _fig.subplots(*settings.subplot)
+                _ax = {(r,1):AxisRuntime(_ax) for r,_ax in enumerate(_axs,1)}
+            case (_,_):
+                _axss = _fig.subplots(*settings.subplot)
+                _ax = {(r,c):AxisRuntime(_ax) for r,_axs in enumerate(_axss,1) for c,_ax in enumerate(_axs,1)}
+            case _: raise RuntimeError("Unknown error: #3409234")
+            
+
+        figure = FigureRuntime(settings, _fig, _ax, False)
+        return figure
+
+class Figures(NamedTuple):
+    impl_figsettings: list[FigureSettings]
+    expl_figsettings: dict[int, FigureSettings]
+    figureruntimes: dict[int, FigureRuntime]
+
+    def get_impl_figurenum(self) -> int:
+        # To be used for figures created without --fig flag
+        allfignums = chain(self.expl_figsettings, self.figureruntimes)
+        usrfignums = filter(lambda f:f <= 1000, allfignums)
+        return max(usrfignums, default=1)
+
+    def get_high_figurenum(self) -> int:
+        # To be used for figures created by commands. Figures will have fignum > 1000
+        allfignums = chain(self.expl_figsettings, self.figureruntimes)
+        usrfignums = filter(lambda f:f > 1000, allfignums)
+        return max(usrfignums, default=1000)
 
 
 ColumnType = AxisType | SignalType | DataColType | FourierType
@@ -259,6 +330,7 @@ class Context:
         self.vars: dict[str, Any] = {}
         self.commands: list[tuple[NamedTuple, CommandResult]] = []
         self.data = DataStore()
+        self.figures = Figures([], {},{})
 
 
 def range_to_index(data: Data, range: NumberUnitRange) -> pd.Series:

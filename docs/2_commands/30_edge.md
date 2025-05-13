@@ -29,6 +29,7 @@ align <method> [--options]
 |<span class="nowrap">`--E0` / `-E` `<energy>`</span>|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
 |<span class="nowrap">`--dE0` / `-d` `<value>`</span>|The range around which to search for the $$E_{0}$$.|
 |<span class="nowrap">`--search` / `-s` `<energy>`</span>|The energy around which to search for the $$E_{0}$$. If not specified, searches around `--E0`. The energy value follows the same syntax as `--E0`.|
+|<span class="nowrap">`--wplot`</span>|Plots each step of the $$E_{0}$$ detection.|
 
 ## EdgeEnergy
 
@@ -43,6 +44,7 @@ edgeenergy <method> [--options]
 |<span class="nowrap">`method`</span>|Defines the method used in the $$E_{0}$$ estimation. The method syntax is defined [below](#method)|
 |<span class="nowrap">`--E0` / `-E` `<energy>`</span>|The tabulated $$E_{0}$$ value for the analyzed edge. The energy can be specified either by the value, such as `14652eV`, or as an element edge, such as `Pd.K`. If needed, the tabulated edge can be shifted, e.g. `Pd.K+1.2eV`|
 |<span class="nowrap">`--dE0` / `-d` `<value>`</span>|The range around which to search for the $$E_{0}$$.|
+|<span class="nowrap">`--wplot`</span>|Plots each step of the $$E_{0}$$ detection.|
 
 ## Method
 
