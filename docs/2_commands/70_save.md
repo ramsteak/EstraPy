@@ -31,13 +31,13 @@ The result of this command is a file, with the specified name at the location re
 ## Aligned
 
 ```sh
-save <filename> aligned <column> --align <range>
+save <filename> aligned <column> --align <range> <spacing>
 ```
 
 |Argument|Explanation|
 |--|--|
 |<span class="nowrap">`column`</span>|The column is specified in the same manner as for plotting, specifying the x:y columns to be selected.|
-|<span class="nowrap">`--align` / `-a` `range`</span>|Contains the interpolation output range, with spacing. The bounds cannot be `..`, but `:.` and `.:` are allowed.|
+|<span class="nowrap">`--align` / `-a` `<range> <spacing>`</span>|Contains the interpolation output range, with spacing. The bounds cannot be `..`, but `:.` and `.:` are allowed. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 
 This command is similar to the `save batch` command, but instead of having pairs of columns, the required data is interpolated over the given range and spacing. The output file has the given x range as the first column, and the other columns are the interpolated y values. The header of each y column is the file name.
 

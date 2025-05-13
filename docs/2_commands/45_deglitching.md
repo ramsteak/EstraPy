@@ -33,6 +33,7 @@ The deglitch command presents a variety of options, allowing to combine the func
 
 |Argument|Explanation|
 |--|--|
+|`<range>`|The range considered to find the glitch. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`--column` / `-c` `<column>`</span>|Selects which column to process for glitch detection.|
 
 ### Finder options

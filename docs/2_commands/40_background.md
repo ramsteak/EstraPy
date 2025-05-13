@@ -20,7 +20,7 @@ preedge <range> [--options]
 
 |Argument|Explanation|
 |--|--|
-|`<range>`|The range to perform the regression onto. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for syntax explanation.|
+|`<range>`|The range considered to perform the regression. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`--constant` / `-C`</span>|Models the preedge as a polynomial of order 0 (a constant contribution)|
 |<span class="nowrap">`--linear` / `-l`</span>|Models the preedge as a polynomial of order 1 (a linear contribution)|
 |<span class="nowrap">`--quadratic` / `-q`</span>|Models the preedge as a polynomial of order 2|
@@ -38,6 +38,7 @@ postedge <range> [--options]
 
 |Argument|Explanation|
 |--|--|
+|`<range>`|The range considered to perform the regression. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`--constant` / `-C`</span>|Models the postedge as a polynomial of order 0 (a constant contribution).|
 |<span class="nowrap">`--linear` / `-l`</span>|Models the postedge as a polynomial of order 1 (a linear contribution).|
 |<span class="nowrap">`--quadratic` / `-q`</span>|Models the postedge as a polynomial of order 2.|
@@ -78,6 +79,7 @@ background bspline <range> [--options]
 
 |Argument|Explanation|
 |--|--|
+|`<range>`|The range considered to perform the fit. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 
 ### Fourier
@@ -90,6 +92,7 @@ background fourier <Rmax> [--options]
 
 |Argument|Explanation|
 |--|--|
+|<span class="nowrap">`<Rmax>`</span>|The upper bound of the range of the inverse fourier transform. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the syntax explanation.|
 |<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal three times.|
 
@@ -103,6 +106,7 @@ background smoothing <range> [--options]
 
 |Argument|Explanation|
 |--|--|
+|`<range>`|The range considered to perform the smoothing. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal once.|
 |<span class="nowrap">`--fraction` / `-f`</span>|The fraction of the total datapoints to use for the smoothing. Must be between 0 and 1. By default uses 30% of the datapoints (0.3)|

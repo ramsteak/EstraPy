@@ -18,8 +18,8 @@ plot [data] [--options]
 |<span class="nowrap">`--xlabel` `<text>`</span>|Sets the x-axis label. You can use $$\LaTeX$$ formatting with \$text\$|
 |<span class="nowrap">`--ylabel` `<text>`</span>|Sets the y-axis label. You can use $$\LaTeX$$ formatting with \$text\$|
 |<span class="nowrap">`--title` `<text>`</span>|Sets the title of the plot. You can use $$\LaTeX$$ formatting with \$text\$|
-|<span class="nowrap">`--xlim` `<range>`</span>|Sets the x plotting range. If `..`, calculates the limits based on the data.|
-|<span class="nowrap">`--ylim` `<range>`</span>|Sets the y plotting range. If `..`, calculates the limits based on the data.|
+|<span class="nowrap">`--xlim` `<range>`</span>|Sets the x plotting range.|
+|<span class="nowrap">`--ylim` `<range>`</span>|Sets the y plotting range.|
 |<span class="nowrap">`--vshift` `<value>`</span>|Draws each consecutive plot vertically shifted by the given amount, relative to the previous. Default is 0, does not shift.|
 |<span class="nowrap">`--colorby` `<value>`</span>|Chooses a variable to color the data by.|
 |<span class="nowrap">`--figure` `<figure>`</span>|Selects a specific figure to plot within. You can specify the figure number and the subplot position as such: `3:1.2` will plot the data in the figure number 3, in the subplot at position 1,2. By default creates a new figure.|

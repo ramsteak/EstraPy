@@ -14,6 +14,7 @@ EstraPy provides core data manipulation commands to prepare and reshape XAS data
 
 The `cut` command restricts the dataset to a given range, discarding all values outside the specified bounds.
 It modifies the entire data table, removing the values outside the specified range.
+See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.
 
 ```sh
 cut <range>
@@ -70,7 +71,7 @@ You can specify the range explicitly with units, and either provide a fixed inte
 
 |Argument|Explanation|
 |--|--|
-|<span class="nowrap">`<range>` </span>|The range to rebin within.|
+|<span class="nowrap">`<range>` </span>|The range to rebin within. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
 |<span class="nowrap">`<interval>`</span>|The spacing between output points. If the interval unit is n (e.g. 15n), is equivalent to `--number 15`|
 |<span class="nowrap">`--number` / `-n` `<value>`</span>|Number of output points to generate. Cannot be use with `interval`.|
 
