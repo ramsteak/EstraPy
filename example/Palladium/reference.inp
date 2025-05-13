@@ -1,0 +1,18 @@
+# version: 1.0.0
+% clear
+
+batchin -E energyc -I dif_ic0 dif_ic2
+
+filein data/Pd_01_0001.xy -b -t
+
+edge c2.s5.d2.i2.Z -E 24350 -d 2
+
+preedge .. -50 -l
+postedge 3k .. -cde
+
+plot E:x
+
+background fourier 1.1A -k2
+
+fourier 3k .. 6A 0.02A -a hann -k2 -w3
+

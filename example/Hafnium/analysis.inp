@@ -4,7 +4,7 @@
 
 batchin -E Energy_enc -I I0 I1 I2
 
-filein Hf/Hf40_50K_Hf_L3_0000.xdi -b -T -t
+filein data/Hf40_50K_Hf_L3_0000.xdi -b -T -t
 
 edge set -E 9561eV
 
@@ -12,7 +12,7 @@ preedge .. -80eV -l
 postedge 4k .. -cdk
 
 plot k:k${kp}.x    --fig 1:1.2
-background smoothing 0k .. -k${kp}
+background smoothing 0k .. -k${kp} --fraction 0.6
 
 fourier 3k 16k 6A 0.02A -a hann -k${kp} -w3
 

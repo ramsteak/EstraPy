@@ -5,7 +5,7 @@
 
 batchin -E BraggEnergy -I 21 2
 
-filein Fe/AD09_a_01.xdi -b -t
+filein data/AD09_a_01.xdi -b -t
 
 edge S -E 6540eV
 
@@ -50,7 +50,7 @@ plot --fig 1:2.1 --xlabel "$Distance\ [Å]$"
 plot --fig 1:2.1 --ylabel "$FT\{k^{${kpow}}\cdot\chi(k)\}\ [Å^{-${kpowp}}]$"
 plot --fig 1:2.1 --title  "$Fourier\ transform$"
 
-plot --fig 1:2.2 --xlabel "$Real\ part$"
-plot --fig 1:2.2 --ylabel "$Imaginary\ part$"
-plot --fig 1:2.2 --title  "$Winding\ diagram$"
+plot --fig 1:2.2 --xlabel "$Energy\ [eV]$"
+plot --fig 1:2.2 --ylabel "$Signal\ intensity$"
+plot --fig 1:2.2 --title  "$I_0\ intensity$"
 

@@ -3,9 +3,11 @@ from __future__ import annotations
 import numpy as np
 import numpy.typing as npt
 
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
 from scipy.signal import correlate
 from scipy.interpolate import interp1d
+from matplotlib import pyplot as plt
 
 from enum import Enum
 from typing import NamedTuple, Any
@@ -81,17 +83,14 @@ def find_E0_with_method(
     _bounds: tuple[float, float],
     _y: npt.NDArray[np.floating],
     _x: npt.NDArray[np.floating],
+    *, ax:None|Axes=None
 ) -> float:
     h: list[tuple[str, Any]] = [("data", (_y, _x - _bounds[0]))]
+    _current_bound: tuple[float, float] = -np.inf, np.inf
     bounds = 0, _bounds[1] - _bounds[0]
 
     for action, arg in method:
         dtype, data = h[-1]
-        # match dtype:
-        #     case "data":
-        #         plt.plot(data[1], data[0])
-        #     case "interp"|"poly":
-        #         plt.plot(np.linspace(0,bounds[1], 100), data(np.linspace(0,bounds[1], 100)))
 
         match action, dtype:
             case [Operation.CUT, "data"]:
@@ -107,6 +106,7 @@ def find_E0_with_method(
                 pad = np.pad(idx, (1, 1))
                 idx = idx | pad[2:] | pad[:-2]
                 h.append(("data", (y[idx], x[idx])))
+                _current_bound = a,b
 
             case [Operation.POLYFIT, "data"]:
                 if arg is None:
@@ -117,6 +117,10 @@ def find_E0_with_method(
                 poly = np.poly1d(np.polyfit(x, y, arg))
                 h.append(("poly", poly))
 
+                if ax:
+                    _pX = np.linspace(*_current_bound, 1001)
+                    ax.plot(_pX, poly(_pX))
+
             case [Operation.SMOOTH, "data"]:
                 if arg is None:
                     continue
@@ -125,6 +129,9 @@ def find_E0_with_method(
                 x: npt.NDArray[np.floating]
                 y = lowess(y, x, arg / len(x), it=0, return_sorted=False)
                 h.append(("data", (y, x)))
+
+                if ax:
+                    ax.plot(x, y)
 
             case [Operation.DERIVATIVE, "data"]:
                 if arg is None:
@@ -136,6 +143,9 @@ def find_E0_with_method(
                     y = np.gradient(y, x)
                 h.append(("data", (y, x)))
 
+                if ax:
+                    ax.plot(x, y)
+
             case [Operation.DERIVATIVE, "poly"]:
                 if arg is None:
                     continue
@@ -145,6 +155,10 @@ def find_E0_with_method(
                     poly = poly.deriv()
                 h.append(("poly", poly))
 
+                if ax:
+                    _pX = np.linspace(*_current_bound, 1001)
+                    ax.plot(_pX, poly(_pX))
+
             case [Operation.INTERPOLATE, "data"]:
                 if arg is None:
                     continue
@@ -153,33 +167,47 @@ def find_E0_with_method(
                 x: npt.NDArray[np.floating]
                 h.append(("interp", interp1d(x, y, arg, fill_value=np.nan)))  # type: ignore
 
+                if ax:
+                    _pX = np.linspace(*_current_bound, 1001)
+                    ax.plot(_pX, poly(_pX))
+
             case [Operation.MAXIMUM, "data"]:
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                return x[y.argmax()]
+
+                M = x[y.argmax()]
+                if ax: ax.axvline(M)
+                return M + _bounds[0]
 
             case [Operation.MINIMUM, "data"]:
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                return x[y.argmin()]
+
+                m = x[y.argmin()]
+                if ax: ax.axvline(m)
+                return m + _bounds[0]
 
             case [Operation.MAXIMUM, "poly" | "interp"]:
                 p = data
                 res: OptimizeResult = minimize_scalar(-p, bounds=bounds)  # type: ignore
+                if ax: ax.axvline(res.x)
                 return res.x + _bounds[0]
 
             case [Operation.MINIMUM, "poly" | "interp"]:
                 p = data
                 res: OptimizeResult = minimize_scalar(p, bounds=bounds)  # type: ignore
+                if ax: ax.axvline(res.x)
                 return res.x + _bounds[0]
 
             case [Operation.ZERO, "data"]:
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                return x[np.abs(y).argmin()] + _bounds[0]
+                Z = x[np.abs(y).argmin()]
+                if ax: ax.axvline(Z)
+                return Z + _bounds[0]
 
             case [Operation.ZERO, "poly" | "interp"]:
                 p = data
@@ -196,15 +224,17 @@ def find_E0_with_method(
                     else:
                         raise ValueError("Cannot find root interval.")
                     res: RootResults = root_scalar(p, bracket=(_b0, _b1))  # type: ignore
-
+                if ax: ax.axvline(res.root)
                 return res.root + _bounds[0]
 
             case [Operation.HALFHEIGHT, "data"]:
-                ...
+                raise NotImplementedError("This operation was not yet implemented.")
             case [Operation.AVERAGEINT, "data"]:
-                ...
+                raise NotImplementedError("This operation was not yet implemented.")
             case [Operation.SET, _]:
                 return 0 + (_bounds[0] + _bounds[1])/2
+            case [op, dt]:
+                raise RuntimeError(f"Invalid operation: {op} on {dt}")
     
     raise ValueError("Method must terminate with a final method.")
 
@@ -313,6 +343,17 @@ class Align(CommandHandler):
                     y = data.get_col_("ref")
                     x = data.get_col_("E")
 
+                    if args.wplot:
+                        from .plot import FigureRuntime, AxisRuntime, FigureSettings
+                        fig,ax = plt.subplots()
+                        figurelist = context.options.other["figurelist"]
+                        figurelist:dict[int, FigureSettings]
+                        f = max(f for f in figurelist if f >= 999)+1 if figurelist else 1000
+
+                        figs = FigureSettings(f,(1,1))
+                        axr = AxisRuntime(ax)
+                        figr = FigureRuntime(figs, fig, {(1,1):axr}, False)
+
                     try:
                         rE0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x)
                     except ValueError:
@@ -395,12 +436,6 @@ class Edge(CommandHandler):
                     ops = _method_aliases[ops]
                 method = Finder(parse_method_to_ops(ops), E0s, dE0)
 
-        # return Args_Align(
-        #     method,
-        #     E0,
-        #     args.wplot,
-        #     args.rplot,
-        # )
         return Args_Edge(
             method,
             args.wplot,
