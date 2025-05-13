@@ -94,7 +94,15 @@ EstraPy offers the following functions:
 
 All the step functions have been modified, so that `a` describes the total height of the curve,
 and `c` describes the distance from `b` where the curve evaluates to 10% (or 90%) of `a`.
-Furthermore, $$f(-\infty) = 0$$ and $$f(-\infty) = a$$.
+We can thus identify the following notable points:
+
+|$$x$$|$$\text{atan}(x)$$|$$\text{erf}(x)$$|$$\text{exp}(x)$$|
+|--|--|--|--|
+|$$-\infty$$|$$0$$   |$$0$$   |$$0$$   |
+|$$b-c$$    |$$0.1a$$|$$0.1a$$|$$0$$   |
+|$$b$$      |$$0.5a$$|$$0.5a$$|$$0$$   |
+|$$b+c$$    |$$0.9a$$|$$0.9a$$|$$0.9a$$|
+|$$\infty$$ |$$a$$   |$$a$$   |$$a$$   |
 
 The exact mathematical description of each function is described below.
 
