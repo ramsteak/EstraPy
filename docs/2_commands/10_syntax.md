@@ -3,6 +3,7 @@ title: General syntax
 parent: Commands
 nav_order: 10
 permalink: /commands/general-syntax/
+math: katex
 ---
 
 # General syntax
