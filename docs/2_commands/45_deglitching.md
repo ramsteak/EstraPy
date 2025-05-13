@@ -108,6 +108,6 @@ The exact mathematical description of each function is described below.
 
 |Function|Mathematical expression|
 |--|--|
-|`atan`|$$\dfrac{a}{\pi}\cdot\arctan{(\tan(0.4\pi)\cdot\dfrac{x-b}{c}) + 0.5a}$$|1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
-|`erf`|$$\dfrac{a}{2}\cdot(1+\text{erf}{(\text{erf}^{-1}{(0.8)\cdot\dfrac{x-b}{c}})})$$|$$0.1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
+|`atan`|$$\dfrac{a}{\pi}\cdot\arctan{(\tan(0.4\pi)\cdot\dfrac{x-b}{c}) + 0.5a}$$|
+|`erf`|$$\dfrac{a}{2}\cdot(1+\text{erf}{(\text{erf}^{-1}{(0.8)\cdot\dfrac{x-b}{c}})})$$|
 |`exp`|$$a\cdot(1 - \exp(\log(0.1)\cdot\frac{x-b}{c}))$$|
