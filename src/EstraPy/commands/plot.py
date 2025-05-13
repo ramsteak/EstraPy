@@ -45,7 +45,14 @@ class FigureRuntime:
     settings: FigureSettings
     figure: Figure
     axes: dict[tuple[int,int], AxisRuntime]
-    shown: bool
+    shown: bool = False
+
+    def show(self) -> None:
+        def on_close(event): self.figure.canvas.stop_event_loop()
+        self.figure.canvas.mpl_connect('close_event', on_close)
+        self.figure.show()
+        self.figure.canvas.start_event_loop(timeout=-1)
+        self.shown = True
 
 @dataclass(slots=True)
 class AxisRuntime:
@@ -61,6 +68,7 @@ class Args_Plot(NamedTuple):
     labels: Labels | None
     xlimits: NumberUnitRange | None
     ylimits: NumberUnitRange | None
+    vshift: float
     colorby: str
     colormap: ColorMap
     alpha: float
@@ -89,7 +97,7 @@ def weight_noavg(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
 
 def weight_one(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
     if d <= 0: return y
-    return (y - 1) * x ** d + 1
+    return (y - 1) * x ** d + 1 # type: ignore
 
 def smooth(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
     return lowess(y, x, d/len(x), it=0, is_sorted=False, return_sorted=False)
@@ -161,6 +169,7 @@ class Plot(CommandHandler):
         parser.add_argument("--title")
         parser.add_argument("--xlim", nargs=2)
         parser.add_argument("--ylim", nargs=2)
+        parser.add_argument("--vshift", type=float, default=0)
         parser.add_argument("--colorby")
         parser.add_argument("--figure", default=None)
         parser.add_argument("--color", nargs="+")
@@ -208,7 +217,7 @@ class Plot(CommandHandler):
         show = args.show
 
         if args.figure is None:
-            f = max(figurelist)+1 if figurelist else 1
+            f = max(f for f in figurelist if f < 1000)+1 if figurelist else 1
             figure = FigureSettings(f, (1,1))
             figurelist[f] = figure
         else:
@@ -244,6 +253,7 @@ class Plot(CommandHandler):
             labels,
             parse_range(*args.xlim) if args.xlim else None,
             parse_range(*args.ylim) if args.ylim else None,
+            args.vshift,
             args.colorby if args.colorby is not None else ".n",
             colormap,
             args.alpha,
@@ -290,11 +300,12 @@ class Plot(CommandHandler):
         fig, ax = figure.figure, figure.axes[args.figure.subplot]
 
         if args.plot is not None:
-            for data in context.data:
+            for i,data in enumerate(context.data):
                 x,y = get_column_(args.plot, data)
                 ax._lines.append((x,y))
-
-                ax.axis.plot(x, y, linewidth=args.linewidth, alpha=args.alpha)
+                shift = i * args.vshift
+                
+                ax.axis.plot(x, y + shift, linewidth=args.linewidth, alpha=args.alpha)
 
         if args.labels is not None:
             if args.labels.xlabel is not None: ax.axis.set_xlabel(args.labels.xlabel)
@@ -330,11 +341,12 @@ class Plot(CommandHandler):
             case _:...
 
         if args.show:
-            def on_close(event): fig.canvas.stop_event_loop()
-            fig.canvas.mpl_connect('close_event', on_close)
-            fig.show()
-            fig.canvas.start_event_loop(timeout=-1)
-            figure.shown = True
+            figure.show()
+            # def on_close(event): fig.canvas.stop_event_loop()
+            # fig.canvas.mpl_connect('close_event', on_close)
+            # fig.show()
+            # fig.canvas.start_event_loop(timeout=-1)
+            # figure.shown = True
 
         return CommandResult(True)
 
