@@ -20,6 +20,7 @@ preedge <range> [--options]
 
 |Argument|Explanation|
 |--|--|
+|`<range>`|The range to perform the regression onto. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for syntax explanation.|
 |<span class="nowrap">`--constant` / `-C`</span>|Models the preedge as a polynomial of order 0 (a constant contribution)|
 |<span class="nowrap">`--linear` / `-l`</span>|Models the preedge as a polynomial of order 1 (a linear contribution)|
 |<span class="nowrap">`--quadratic` / `-q`</span>|Models the preedge as a polynomial of order 2|
