@@ -16,7 +16,7 @@ EstraPy uses input files, written in a simple to read syntax, to perform analysi
 EstraPy is run by the command line, and executes the commands one by one.
 
 [Installation]({{ "/installation" | relative_url }}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[Examples]("https://github.com/ramsteak/EstraPy2/tree/main/example"){: .btn .fs-5 .mb-4 .mb-md-0 }
+[Examples](https://github.com/ramsteak/EstraPy2/tree/main/example){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
