@@ -9,6 +9,7 @@ math: katex
 # Edge detection
 
 $$E_{0}$$ estimation is a crucial step in XAS data analysis. It identifies the absorption edge position, which is essential for aligning spectra and calculating energy-dependent quantities like the photoelectron wavevector. EstraPy provides two commands for this taks:
+
 - `align`: estimates the reference $$E_{0}$$, relative to the `ref` column, and shifts the dataset to align to a target edge energy.
 - `edgeenergy`: estimates $$E_{0}$$ from the experimental section, relative to the `x` column, and computes relative energy (`e`) and wavevector (`k`).
 
