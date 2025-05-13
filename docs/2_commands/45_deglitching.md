@@ -98,8 +98,8 @@ Furthermore, $$f(-\infty) = 0$$ and $$f(-\infty) = a$$.
 
 The exact mathematical description of each function is described below.
 
-|Function|Mathematical expression|$$f{(-\infty)}$$|$$f(b-c)$$|$$f(b)$$|$$f(b+c)$$|$$f(\infty)$$|
-|--|--|--|--|--|--|--|
-|`atan`|$$\dfrac{a}{\pi}\cdot\arctan{(\tan(0.4\pi)\cdot\dfrac{x-b}{c}) + 0.5a}$$|$$0$$|$$0.1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
-|`erf`|$$\dfrac{a}{2}\cdot(1+\text{erf}{(\text{erf}^{-1}{(0.8)\cdot\dfrac{x-b}{c}})})$$|$$0$$|$$0.1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
-|`exp`|$$a\cdot(1 - \exp(\log(0.1)\cdot\frac{x-b}{c}))$$|$$0$$|$$0$$|$$0$$|$$0.9a$$|$$a$$|
+|Function|Mathematical expression|
+|--|--|
+|`atan`|$$\dfrac{a}{\pi}\cdot\arctan{(\tan(0.4\pi)\cdot\dfrac{x-b}{c}) + 0.5a}$$|1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
+|`erf`|$$\dfrac{a}{2}\cdot(1+\text{erf}{(\text{erf}^{-1}{(0.8)\cdot\dfrac{x-b}{c}})})$$|$$0.1a$$|$$0.5a$$|$$0.9a$$|$$a$$|
+|`exp`|$$a\cdot(1 - \exp(\log(0.1)\cdot\frac{x-b}{c}))$$|
