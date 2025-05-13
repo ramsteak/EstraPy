@@ -25,38 +25,53 @@ from ._parser import CommandParser
 class Finder:...
 
 @dataclass(slots=True, frozen=True)
-class Force(Finder):...
+class Finder_Force(Finder):...
 
 @dataclass(slots=True, frozen=True)
-class Median(Finder):
-    window: int
+class Finder_Variance(Finder):
+    width: int
+    pvalue: float
 
 @dataclass(slots=True, frozen=True)
-class Variance(Finder):
-    window: int
+class Finder_Smooth(Finder):
+    width: int
+    fraction: float
+    pvalue: float
 
 @dataclass(slots=True, frozen=True)
-class Smooth(Finder):
-    window: int
-
-@dataclass(slots=True, frozen=True)
-class Polynomial(Finder):
+class Finder_Polynomial(Finder):
+    width: int
     degree: int
+    pvalue: float
 
 @dataclass(slots=True, frozen=True)
-class Even(Finder):...
+class Finder_Even(Finder):
+    pvalue: float
 
 
 @dataclass(slots=True, frozen=True)
 class Method:
+    noise:bool
+
+@dataclass(slots=True, frozen=True)
+class Method_Remove(Method):
     ...
+
+@dataclass(slots=True, frozen=True)
+class Method_Base(Method):
+    ...
+
+@dataclass(slots=True, frozen=True)
+class Method_Smooth(Method):
+    fraction: float
+
+
 
 class Args_Deglitch(NamedTuple):
     bounds: NumberUnitRange
     column: str
     finder: Finder
     method: Method
-    pvalue: float
 
 
 class Deglitch(CommandHandler):
@@ -66,61 +81,83 @@ class Deglitch(CommandHandler):
             "deglitch", description="Removes and replaces glitched signals."
         )
         parser.add_argument("range", nargs=2)
-        parser.add_argument("finder", choices=["force", "median", "variance", "smooth", "polynomial", "even"], default="polynomial")
-        parser.add_argument("--window", "-w", type=int)
-        parser.add_argument("--degree", "-d", type=int)
         parser.add_argument("--column", "-c", default="I0")
-        parser.add_argument("--pvalue", "-p", type=float, default=1e-3)
+        # parser.add_argument("finder", choices=["force", "variance", "smooth", "polynomial", "even"], default="polynomial")
+        # parser.add_argument("--window", "-w", type=int)
+        # parser.add_argument("--degree", "-d", type=int)
+        # parser.add_argument("--column", "-c", default="I0")
+        # parser.add_argument("--pvalue", "-p", type=float, default=3)
+        subparsers = parser.add_subparsers(dest="finder")
+        force = subparsers.add_parser("force")
 
-        # method = parser.add_subparsers(dest="method")
-        # remove = method.add_parser("remove")
-        # interp = method.add_parser("interpolate")
+        variance = subparsers.add_parser("variance")
+        variance.add_argument("--width", "-w", type=int, default=10)
+        variance.add_argument("--pvalue", "-p", type=float, default=0.001)
+        
+        smooth = subparsers.add_parser("smooth")
+        smooth.add_argument("--fraction", "-f", type=float, default=0.3)
+        smooth.add_argument("--width", "-w", type=int, default=10)
+        smooth.add_argument("--pvalue", "-p", type=float, default=0.001)
+        
+        polynomial = subparsers.add_parser("polynomial")
+        polynomial.add_argument("--degree", "-d", type=int, default=1)
+        polynomial.add_argument("--width", "-w", type=int, default=10)
+        polynomial.add_argument("--pvalue", "-p", type=float, default=0.001)
+        
+        even = subparsers.add_parser("even")
+        even.add_argument("--pvalue", "-p", type=float, default=0.001)
+
+        for sp in subparsers._name_parser_map.values():
+            subparsers = sp.add_subparsers(dest="method")
+            remove = subparsers.add_parser("remove")
+            remove.add_argument("--noise", "-n", action="store_true")
+
+            base = subparsers.add_parser("base")
+            base.add_argument("--noise", "-n", action="store_true")
+
+            smooth = subparsers.add_parser("smooth")
+            smooth.add_argument("--noise", "-n", action="store_true")
+            smooth.add_argument("--fraction", "-f", type=float, default=0.05)
 
         args = parser.parse(tokens)
 
-        if args.range is not None:
-            _range = parse_range(*args.range)
-            if _range.domain == None:
-                _range = NumberUnitRange(_range.lower, _range.upper, _range.inter, Domain.REAL)
-            if _range.domain != Domain.REAL:
-                raise ValueError("Cannot deglitch on non-real domain.")
-        else:
-            _range = NumberUnitRange(NumberUnit(-np.inf, 0, "eV"), NumberUnit(np.inf, 0, "eV"), None, Domain.REAL)
+        _range = parse_range(*args.range)
+        if _range.domain == None:
+            _range = NumberUnitRange(_range.lower, _range.upper, _range.inter, Domain.REAL)
+        if _range.domain != Domain.REAL:
+            raise ValueError("Cannot deglitch on non-real domain.")
 
         match args.finder:
             case "force":
-                finder = Force()
-            case "median":
-                if args.window is None:
-                    raise ValueError("Median method requires a window size.")
-                if args.degree is not None: raise ValueError("--degree is not valid if method is median")
-                finder = Median(args.window)
+                finder = Finder_Force()
             case "variance":
-                if args.window is None:
-                    raise ValueError("Variance method requires a window size.")
-                if args.degree is not None: raise ValueError("--degree is not valid if method is variance")
-                finder = Variance(args.window)
+                finder = Finder_Variance(args.width, args.pvalue)
             case "smooth":
-                if args.window is None:
-                    raise ValueError("Smooth method requires a window size.")
-                if args.degree is not None: raise ValueError("--degree is not valid if method is smooth")
-                finder = Smooth(args.window)
+                finder = Finder_Smooth(args.width, args.fraction, args.pvalue)
             case "polynomial":
-                if args.degree is None:
-                    raise ValueError("Polynomial method requires a polynomial degree.")
-                if args.window is not None: raise ValueError("--window is not valid if method is polynomial")
-                finder = Polynomial(args.degree)
+                finder = Finder_Polynomial(args.width, args.degree, args.pvalue)
             case "even":
-                finder = Even()
+                finder = Finder_Even(args.pvalue)
             case f:
                 raise ValueError(f"Invalid finder: {f}")
+        
+        match args.method:
+            case "remove":
+                method = Method_Remove(args.noise)
+            case "base":
+                if args.column != "x":
+                    raise ValueError("Method base can only be used if column is x.")
+                method = Method_Base(args.noise)
+            case "smooth":
+                method = Method_Smooth(args.noise, args.fraction)
+            case f:
+                raise ValueError(f"Invalid method: {f}")
 
         return Args_Deglitch(
             _range,
             args.column,
             finder,
-            Method(),
-            args.pvalue
+            method
         )
 
     @staticmethod
@@ -139,40 +176,44 @@ class Deglitch(CommandHandler):
             X, I = data.get_col_("E"), data.get_col_(args.column)
             x,i = X[idx], I[idx]
             g = np.zeros_like(idx)
+            b:npt.NDArray[np.floating] | None = None
+            std = None
             
             match args.finder:
-                case Force(): glitch = idx
-                case Median(window):
-                    pass
-                case Variance(window):
-                    pass
-                case Smooth(window):
+                case Finder_Force():
+                    g[:] = idx
+                case Finder_Variance(width, pvalue):
+                    # Estimate the std as median of stds
+                    std = pd.Series(i,x).rolling(len(X) // width, center=True).std().median()
+                    u = norm.ppf(1-pvalue/2) * std
+
+                    g[idx] = np.abs(i) > u
+                case Finder_Smooth(width, fraction, pvalue):
                     # Assume I0 is represented by a low frequency trend
                     #    I0 = I0' + eps
                     # Model I0' as a severely smoothed I0
-                    s = lowess(i, x, window/len(x), it=0, return_sorted=False)
-                    y = i-s
+                    b = lowess(i, x, fraction, it=0, return_sorted=False)
+                    y = i-b
 
                     # Estimate the std as median of stds
-                    std = pd.Series(y,x).rolling(len(X) // 10, center=True).std().median()
-                    u = norm.ppf(1-args.pvalue/2) * std
+                    std = pd.Series(y,x).rolling(len(X) // width, center=True).std().median()
+                    u = norm.ppf(1-pvalue/2) * std
                     g[idx] = np.abs(y) > u
                     pass
-
-                case Polynomial(degree):
+                case Finder_Polynomial(width, degree, pvalue):
                     # Assume I0 is represented by:
                     #    I0 = P_n + eps
                     # Model the I0 trend as a n-polynomial
                     poly = np.poly1d(np.polyfit(x,i, degree))
-                    p = poly(x)
-                    y = i-p
+                    b = poly(x)
+                    y = i-b
                     # Estimate the std as median of stds
-                    std = pd.Series(y,x).rolling(len(X) // 10, center=True).std().median()
-                    u = norm.ppf(1-args.pvalue/2) * std
+                    std = pd.Series(y,x).rolling(len(X) // width, center=True).std().median()
+                    u = norm.ppf(1-pvalue/2) * std
 
                     g[idx] = np.abs(y) > u
                     pass
-                case Even():
+                case Finder_Even(pvalue):
                     # Determine the point difference between consecutive points
                     idxeven = np.indices(x.shape)[0] % 2 == 0
                     xe,ie = x[idxeven], i[idxeven]
@@ -184,11 +225,38 @@ class Deglitch(CommandHandler):
                     ii[~idxeven] = ieo
 
                     y = i - ii
+                    b = ii
                     # Estimate the std as median of stds
                     std = pd.Series(y,x).rolling(len(X) // 10, center=True).std().median()
-                    u = norm.ppf(1-args.pvalue/2) * std
+                    u = norm.ppf(1-pvalue/2) * std
                     g[idx] = np.abs(y) > u
-            pass
+            
+            match (args.method, b, std):
+                case Method_Remove(), _, _:
+                    data.datums[domain].df = data.datums[domain].df[idx]
+                case (Method_Base(noise), b, std):
+                    if b is None or std is None:
+                        raise RuntimeError("Method base requires estimation of the baseline and standard deviation.")
+                    if args.column != "x":
+                        raise RuntimeError("Method base can only be used if the column is x")
+                    newcol = I.copy()
+                    if noise: n = np.random.normal(0, std, g.sum())
+                    else: n = np.zeros(g.sum())
+                    
+                    newcol[g] = b[g[idx]]+n
+                    data.mod_col("x", newcol)
+                    pass
+                case (Method_Smooth(noise, fraction), _, _):
+                    x = data.get_col_("E", domain=domain)
+                    y = data.get_col_("x", domain=domain)
+                    s = lowess(y[~g],x[~g], it=0, frac=fraction, return_sorted=False, xvals=x)
+                    std = (y-s)[idx].std()
+                    if noise: n = np.random.normal(0, std, g.sum())
+                    else: n = np.zeros(g.sum())
+                    
+                    yn = y.copy()
+                    yn[g] = s[g]+n
+                    pass
             
 
         return CommandResult(True)
@@ -198,15 +266,24 @@ class Deglitch(CommandHandler):
         # TODO:
         raise NotImplementedError
 
-class Atan(NamedTuple):
+class ArcTangent(NamedTuple):
     a: float
     b: float
     c: float
     def calc(self, x:npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         s = np.tan(0.4 * np.pi)
         # c is defined to be the shift from b to be 10% - 90%
-        return self.a * (np.atan(s * (x-self.b)/self.c) / np.pi + 0.5)
+        return self.a * (np.atan(s * (x-self.b)/abs(self.c)) / np.pi + 0.5)
         # return self.a * (np.atan((x-self.b)/self.c) / np.pi + 0.5) # not reparametrized
+
+class HyperTangent(NamedTuple):
+    a: float
+    b: float
+    c: float
+    def calc(self, x:npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        s = np.atanh(0.9)
+        return self.a * (np.tanh(s * (x-self.b)/abs(self.c)) + 1) * 0.5
+
 
 class ErrorFunction(NamedTuple):
     a: float
@@ -215,7 +292,7 @@ class ErrorFunction(NamedTuple):
     def calc(self, x:npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         from scipy.special import erf, erfinv
         s = erfinv(0.8)
-        return self.a * (1 + erf(s * (x-self.b)/self.c)) * 0.5
+        return self.a * (1 + erf(s * (x-self.b)/abs(self.c))) * 0.5
 
 class Exponential(NamedTuple):
     a: float
@@ -223,14 +300,23 @@ class Exponential(NamedTuple):
     c: float
     def calc(self, x:npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
         y = np.zeros_like(x)
-        i = x > self.b
         s = np.log(0.1)
-        y[i] = self.a * (1 - np.exp(s * (x[i]-self.b)/self.c))
+        i = x > self.b
+
+        if self.c > 0:
+            y[i] = self.a * (1 - np.exp(s * (x[i]-self.b)/self.c))
+        elif self.c < 0:
+            y[i] = self.a
+            y[~i] = self.a * (np.exp(s * (x[~i]-self.b)/self.c))
+        else:
+            y[i] = 1
+
         return y
+
 
 class Args_MultiEdge(NamedTuple):
     axis: str
-    method: Atan|ErrorFunction|Exponential
+    method: ArcTangent|ErrorFunction|Exponential|HyperTangent
 
 class MultiEdge(CommandHandler):
     @staticmethod
@@ -254,6 +340,11 @@ class MultiEdge(CommandHandler):
         errfun.add_argument("a")
         errfun.add_argument("c")
 
+        tanhyp = subparsers.add_parser("tanh")
+        tanhyp.add_argument("b")
+        tanhyp.add_argument("a")
+        tanhyp.add_argument("c")
+
         expfun = subparsers.add_parser("exp")
         expfun.add_argument("b")
         expfun.add_argument("a")
@@ -266,11 +357,14 @@ class MultiEdge(CommandHandler):
         c = parse_nu(args.c).value
 
         match args.mode:
-            case "atan": mode = Atan(a, b, c)
+            case "atan": mode = ArcTangent(a, b, c)
             case "erf": mode = ErrorFunction(a, b, c)
             case "exp": mode = Exponential(a, b, c)
+            case "tanh": mode = HyperTangent(a, b, c)
+
+        axis = args.axis if args.axis is not None else "E"
         
-        return Args_MultiEdge(args.axis if args.axis is not None else "E",mode)
+        return Args_MultiEdge(axis,mode)
 
     @staticmethod
     def execute(args: Args_MultiEdge, context: Context) -> CommandResult:

@@ -90,19 +90,20 @@ EstraPy offers the following functions:
 |--|--|
 |<span class="nowrap">`atan <b> <a> <c>`|Models the excitation as an arctangent.|
 |<span class="nowrap">`erf <b> <a> <c>`|Models the excitation as an error-function.|
+|<span class="nowrap">`tanh <b> <a> <c>`|Models the excitation as an hyperbolic tangent.|
 |<span class="nowrap">`exp <b> <a> <c>`|Models the excitation as an exponential.|
 
 All the step functions have been modified, so that `a` describes the total height of the curve,
 and `c` describes the distance from `b` where the curve evaluates to 10% (or 90%) of `a`.
 We can thus identify the following notable points:
 
-|$$x$$|$$\text{atan}(x)$$|$$\text{erf}(x)$$|$$\text{exp}(x)$$|
-|:--:|:--:|:--:|:--:|
-|$$-\infty$$|$$0$$   |$$0$$   |$$0$$   |
-|$$b-c$$    |$$0.1a$$|$$0.1a$$|$$0$$   |
-|$$b$$      |$$0.5a$$|$$0.5a$$|$$0$$   |
-|$$b+c$$    |$$0.9a$$|$$0.9a$$|$$0.9a$$|
-|$$\infty$$ |$$a$$   |$$a$$   |$$a$$   |
+|$$x$$|$$\text{atan}(x)$$|$$\text{erf}(x)$$|$$\text{exp}(x)$$|$$\text{exp}(x)$$ `c`<0|$$\text{tanh}(x)$$|
+|:--:|:--:|:--:|:--:|:--:|:--:|
+|$$-\infty$$ |$$0$$    |$$0$$    |$$0$$    |$$0$$    |$$0$$|
+|$$b-\|c\|$$ |$$0.1a$$ |$$0.1a$$ |$$0$$    |$$0.1a$$ |$$0.1a$$|
+|$$b$$       |$$0.5a$$ |$$0.5a$$ |$$0$$    |$$a$$    |$$0.5a$$|
+|$$b+\|c\|$$ |$$0.9a$$ |$$0.9a$$ |$$0.9a$$ |$$a$$    |$$0.9a$$|
+|$$\infty$$  |$$a$$    |$$a$$    |$$a$$    |$$a$$    |$$a$$|
 
 The exact mathematical description of each function is described below.
 
