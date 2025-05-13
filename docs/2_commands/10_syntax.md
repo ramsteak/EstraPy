@@ -86,3 +86,17 @@ In order to specify a data range, you can either specify a fixed range with numb
 |<span class="nowrap">`.. ..`</span>|Resolves to $$-\infty$$ ~ $$\infty$$|
 |<span class="nowrap">`:. .:`</span>|External range, checks across all the files for the most extreme range.|
 |<span class="nowrap">`.: :.`</span>|Internal range, checks across all the files for the most conservative range.|
+
+For example:
+
+```sh
+rebin 0k :. 0.1k
+```
+
+Rebins the data with a spacing of 0.1Å⁻¹, starting from 0 and using the most conservative range.
+
+```sh
+preedge .. -80eV -k
+```
+
+Removes the preedge as calculated from $$-\infty$$ up to $$E_{0}$$ - 80eV.
