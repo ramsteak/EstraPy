@@ -177,11 +177,6 @@ def main():
     pass
 
     # At the end of the commands, check if there are any figures that are not shown.
-    if "figurerun" in context.options.other:
-        all_figures = context.options.other["figurerun"]
-        all_figures:dict[int, FigureRuntime]
-
-        figures = [fig for fig in all_figures.values() if not fig.shown]
-        if figures:
-            plt.show()
+    if any([not fig.shown for fig in context.figures.figureruntimes.values()]):
+        plt.show()
 
