@@ -7,6 +7,8 @@ batchin -E energyc -I dif_ic0 dif_ic1 dif_ic2 x_ch1_roi1..x_ch13_roi1
 
 filein data/*.xy -b -f -T
 
+deglitch 24.5keV 25.2keV polynomial --degree 1 smooth
+
 align c2.s5.d2.i2.Z -E 24350eV -d 2eV
 edge c2.s5.d2.i2.Z -E 24354eV -d 2eV
 
