@@ -66,3 +66,23 @@ plot --fig 1:1.2
 # Set the label for the x axis
      --xlabel "$Wavevector\ [Å^{-1}]$"
 ```
+
+## Number and unit specification
+
+Some commands share the same syntax for some arguments, such as ranges and numbers with units. Some commands can automatically infer the axis to use from the specified units.
+
+The units available in EstraPy are as follows:
+
+- `eV`: electronvolts (eV)
+- `k`: wavevector units (Å⁻¹)
+- `A`: distance units (Å)
+
+It also supports SI prefixes for these units, e.g. `15keV` is equivalent to `15000eV`.
+
+In order to specify a data range, you can either specify a fixed range with numbers, or you can freely combine together them with the following aliases:
+
+|Bound|Explanation|
+|--|--|
+|<span class="nowrap">`.. ..`</span>|Resolves to $$-\infty$$ ~ $$\infty$$|
+|<span class="nowrap">`:. .:`</span>|External range, checks across all the files for the most extreme range.|
+|<span class="nowrap">`.: :.`</span>|Internal range, checks across all the files for the most conservative range.|
