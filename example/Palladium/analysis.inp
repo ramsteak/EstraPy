@@ -28,7 +28,7 @@ fourier 3k 14k 6A 0.01A -a hann -k ${kpow} -w1
 plot E:mu --fig 1:1.1 --color red blue --colorby .fn
 
 plot k:k2.x_0 --fig 1:1.2 --color red blue --colorby .fn
-plot k:k2.bkg --fig 1:1.2 --color black --linestyle dotted --linewidth 0.5
+plot k:k2.bkg --fig 1:1.2 --color black --dotted --thin
 plot          --fig 1:1.2 --xlim 3k 12k
 plot          --fig 1:1.2 --ylim :. .:
 

@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from functools import partial
 from enum import Enum
 from logging import getLogger
-from typing import NamedTuple, Any, Callable
+from typing import NamedTuple, Any, Callable, Literal
 from matplotlib import pyplot as plt
 from matplotlib import colormaps
 from matplotlib import colors
@@ -47,7 +47,7 @@ class Args_Plot(NamedTuple):
     colormap: ColorMap
     alpha: float
     linewidth: float
-    linestyle: float
+    linestyle: str | tuple[Literal[0], tuple[int,...]]
     show: bool
 
 class ColKind(NamedTuple):
@@ -150,12 +150,25 @@ class Plot(CommandHandler):
         parser.add_argument("--figure", default=None)
         parser.add_argument("--color", nargs="+")
         parser.add_argument("--alpha", type=float, default=1.0)
-        parser.add_argument("--linewidth", type=float, default=1.0)
-        parser.add_argument("--linestyle", default="-")
         parser.add_argument("--show", action="store_true")
 
+        lwidth = parser.add_mutually_exclusive_group()
+        lwidth.add_argument("--linewidth", type=float, default=1.0)
+        lwidth.add_argument("--xxthick", action="store_const", const=8.0, dest="linewidth")
+        lwidth.add_argument("--xthick", action="store_const", const=4.0, dest="linewidth")
+        lwidth.add_argument("--thick", action="store_const", const=2.0, dest="linewidth")
         
+        lwidth.add_argument("--thin", action="store_const", const=0.5, dest="linewidth")
+        lwidth.add_argument("--xthin", action="store_const", const=0.25, dest="linewidth")
+        lwidth.add_argument("--xxthin", action="store_const", const=0.125, dest="linewidth")
 
+        lstyle = parser.add_mutually_exclusive_group()
+        lstyle.add_argument("--linestyle", default="solid")
+        lstyle.add_argument("--solid", action="store_const", const="solid", dest="linestyle")
+        lstyle.add_argument("--dotted", action="store_const", const="dotted", dest="linestyle")
+        lstyle.add_argument("--dashed", action="store_const", const="dashed", dest="linestyle")
+        lstyle.add_argument("--dashdot", action="store_const", const="dashdot", dest="linestyle")
+        
         args = parser.parse(tokens)
 
         plot = parse_column(args.data) if args.data is not None else None
@@ -179,6 +192,7 @@ class Plot(CommandHandler):
                 raise RuntimeError()
         colormap = ColorMap(cmap, cmapcount)
         
+        # Labels
         if any(l is not None for l in (args.xlabel, args.ylabel, args.title)):
             labels = Labels(
                 args.title,
@@ -187,7 +201,7 @@ class Plot(CommandHandler):
             )
         else: labels = None
 
-
+        # Figure, show
         show = args.show
         if args.figure is None:
             figsettings = FigureSettings(-1, (1,1))
@@ -218,7 +232,12 @@ class Plot(CommandHandler):
                 at,bt = (max(a, _prev_fig.subplot[0]),max(b, _prev_fig.subplot[1]))
                 context.figures.expl_figsettings[fignum] = FigureSettings(fignum, (at,bt))
 
-
+        # Line style
+        # Try parsing as a list of numbers separated by dots
+        try:
+            style = (0, tuple(int(n) for n in str(args.linestyle).split(".")))
+        except ValueError:
+            style = args.linestyle
 
         return Args_Plot(
             plot,
@@ -231,7 +250,7 @@ class Plot(CommandHandler):
             colormap,
             args.alpha,
             args.linewidth,
-            args.linestyle,
+            style,
             show
         )
 
