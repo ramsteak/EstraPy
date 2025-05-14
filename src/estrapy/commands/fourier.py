@@ -121,6 +121,26 @@ def finuft(
     from finufft import nufft1d3
     return nufft1d3(x, y, 2*r, eps=1e-9)
 
+def fft(
+    x: npt.NDArray[np.floating],
+    y: npt.NDArray[np.floating],
+    *,
+    correct_r: bool=False
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.complexfloating]]:
+    
+    # Ensure proper x spacing, below a tolerance of 1e-5
+    diff = np.diff(x)
+    if np.diff(diff).max()/diff.mean() > 1e-5: raise RuntimeError("X spacing is not consistent.")
+
+    # Automatic 2 zerofilling
+    n = int(np.exp2(np.ceil(np.log2(len(x)))+2))
+
+    r = np.fft.rfftfreq(n, diff.mean())
+    if correct_r:
+        r = r * np.pi
+    f = np.fft.rfft(y,n)
+    return r,f
+
 class Fourier(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Fourier:
@@ -200,9 +220,7 @@ class Fourier(CommandHandler):
             # and is estimated as 1
             kw = np.ones(x.shape, dtype=np.float64) if args.kweight == 0 else x ** args.kweight # type: ignore
             kw: npt.NDArray[np.floating]
-            if _y.mean() > 0.5: 
-                y = w * (_y - 1) * kw
-            else: y = w * _y * kw
+            y = w * _y * kw
 
             # Approximate 1/Nyquist frequency
             _min_dR = 2 * np.diff(x).mean()
@@ -220,7 +238,9 @@ class Fourier(CommandHandler):
                 case Method.FINUFT:
                     f = finuft(x, y+0j, R) # type: ignore
                 case Method.FFT:
-                    raise NotImplementedError("FFT not yet implemented.")
+                    _R,_f = fft(x, y, correct_r=True)
+                    selidx = (_R>=args.fbounds.lower.value)&(_R<=args.fbounds.upper.value)
+                    R,f = _R[selidx], _f[selidx]
 
             W = np.zeros_like(X)
             W[idx] = w
