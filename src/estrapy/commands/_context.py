@@ -68,6 +68,9 @@ class FourierType(Enum):
 
 
 class DataColType(Enum):
+    ALPHA = "a"
+    CHI = "x"
+    MU = "mu"
     PREEDGE = "pre"
     POSTEDGE = "post"
     BACKGROUND = "bkg"
