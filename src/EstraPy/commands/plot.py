@@ -47,6 +47,7 @@ class Args_Plot(NamedTuple):
     colormap: ColorMap
     alpha: float
     linewidth: float
+    linestyle: float
     show: bool
 
 class ColKind(NamedTuple):
@@ -101,16 +102,17 @@ def parse_column(p:str) -> ColKind:
 
     y_spec = y_specs.split(".")
     for ys in reversed(y_spec[:-1]):
+        factor = int(ys[1:]) if len(ys) > 1 else 1
         match ys[0]:
             case "r": op = lambda y,_: np.real(y)
             case "i": op = lambda y,_: np.imag(y)
             case "a": op = lambda y,_: np.abs(y)
             case "p": op = lambda y,_: np.unwrap(np.angle(y))
-            case "s": op = lambda y,x: partial(smooth,       d=int(ys[1:]))(y,x)
-            case "d": op = lambda y,x: partial(derivative,   d=int(ys[1:]))(y,x)
-            case "k": op = lambda y,x: partial(weight_one,   d=int(ys[1:]))(y,x)
-            case "w": op = lambda y,x: partial(weight,       d=int(ys[1:]))(y,x)
-            case "W": op = lambda y,x: partial(weight_noavg, d=int(ys[1:]))(y,x)
+            case "s": op = lambda y,x: partial(smooth,       d=factor)(y,x)
+            case "d": op = lambda y,x: partial(derivative,   d=factor)(y,x)
+            case "k": op = lambda y,x: partial(weight,       d=factor)(y,x)
+            case "w": op = lambda y,x: partial(weight_one,   d=factor)(y,x)
+            case "W": op = lambda y,x: partial(weight_noavg, d=factor)(y,x)
             case _: raise ValueError(f"Unknown x operation: {ys}")
         y_ops.append(op)
     ycol = y_spec[-1]
@@ -149,6 +151,7 @@ class Plot(CommandHandler):
         parser.add_argument("--color", nargs="+")
         parser.add_argument("--alpha", type=float, default=1.0)
         parser.add_argument("--linewidth", type=float, default=1.0)
+        parser.add_argument("--linestyle", default="-")
         parser.add_argument("--show", action="store_true")
 
         
@@ -166,7 +169,8 @@ class Plot(CommandHandler):
                 cmap = colormaps[_cmapname]
                 cmapcount = QUALITATIVE_CMAPS.get(_cmapname)
             case [str(_color)]:
-                cmap = colors.LinearSegmentedColormap.from_list("customcmap", [_color])
+                # Double up the color to have a constant colormap
+                cmap = colors.LinearSegmentedColormap.from_list("customcmap", [_color,_color])
                 cmapcount = None
             case list(_colorlist):
                 cmap = colors.LinearSegmentedColormap.from_list('customcmap', _colorlist)
@@ -227,6 +231,7 @@ class Plot(CommandHandler):
             colormap,
             args.alpha,
             args.linewidth,
+            args.linestyle,
             show
         )
 
@@ -254,12 +259,37 @@ class Plot(CommandHandler):
         fig, ax = figure.figure, figure.axes[args.figure.subplot]
 
         if args.plot is not None:
+            # Get coloring
+            _colorby = np.array([data.meta.get(args.colorby) for data in context.data])
+            qualitative = all(isinstance(_cb, (str, int)) for _cb in _colorby)
+            
+            match qualitative, args.colormap.num:
+                case True, None:
+                # Value is qualitative and colormap is quantitative
+                    uniquevals, inverse = np.unique(_colorby, return_inverse=True)
+                    ncats = len(uniquevals)
+                    catcolors = np.array([args.colormap.cmap(i/(ncats-1)) for i,_ in enumerate(uniquevals)])
+                    colors = catcolors[inverse]
+                case True, cmaplength:
+                # Value is qualitative and colormap is qualitative
+                    uniquevals, inverse = np.unique(_colorby, return_inverse=True)
+                    ncats = len(uniquevals)
+                    catcolors = np.array([args.colormap.cmap(i%ncats) for i,_ in enumerate(uniquevals)])
+                    colors = catcolors[inverse]
+                case False, _:
+                # Value is quantitative
+                    m,M = min(_colorby), max(_colorby)
+                    colors = args.colormap.cmap((_colorby-m)/(M-m))
+                    pass
+                    
+
             for i,data in enumerate(context.data):
-                x,y = get_column_(args.plot, data)
+                x,_y = get_column_(args.plot, data)
+                y = _y + i * args.vshift
+
                 ax._lines.append((x,y))
-                shift = i * args.vshift
                 
-                ax.axis.plot(x, y + shift, linewidth=args.linewidth, alpha=args.alpha)
+                ax.axis.plot(x, y, color = colors[i], linewidth=args.linewidth, alpha=args.alpha, linestyle=args.linestyle)
 
         if args.labels is not None:
             if args.labels.xlabel is not None: ax.axis.set_xlabel(args.labels.xlabel)
@@ -267,40 +297,95 @@ class Plot(CommandHandler):
             if args.labels.title is not None: ax.axis.set_title(args.labels.title)
 
 
+        # Update the stored limit definitions, if not `..`
         if args.xlimits is not None:
+            _al, _au = ax.xlimits
             match args.xlimits.lower:
-                case NumberUnit(_l, _, _) if _l != -np.inf:
-                    ax.xlimits = (args.xlimits.lower, ax.xlimits[1])
+                case NumberUnit(_l, _, _) if _l == -np.inf:...
+                case _: _al = args.xlimits.lower
             match args.xlimits.upper:
-                case NumberUnit(_u, _, _) if _u != np.inf:
-                    ax.xlimits = (ax.xlimits[0], args.xlimits.upper)
+                case NumberUnit(_u, _, _) if _u == np.inf:...
+                case _: _au = args.xlimits.upper
+            ax.xlimits = (_al, _au)
             
         if args.ylimits is not None:
+            _al, _au = ax.ylimits
             match args.ylimits.lower:
-                case NumberUnit(_l, _, _) if _l != -np.inf:
-                    ax.ylimits = (args.ylimits.lower, ax.ylimits[1])
+                case NumberUnit(_l, _, _) if _l == -np.inf:...
+                case _: _al = args.ylimits.lower
             match args.ylimits.upper:
-                case NumberUnit(_u, _, _) if _u != np.inf:
-                    ax.ylimits = (ax.ylimits[0], args.ylimits.upper)
+                case NumberUnit(_u, _, _) if _u == np.inf:...
+                case _: _au = args.ylimits.upper
+            ax.ylimits = (_al, _au)
         
+        # Act on the limit definitions, if the limit is not None or inf / -inf
         match ax.xlimits[0]:
-            case Bound.EXTERNAL:...
-            case Bound.INTERNAL:...
-            case NumberUnit(_l):...
+            case Bound.EXTERNAL:
+                _xlow = min([np.min(x) for x,_ in ax._lines])
+            case Bound.INTERNAL:
+                _xlow = max([np.min(x) for x,_ in ax._lines])
+            case NumberUnit(_l,_,_) if _l != -np.inf:
+                _xlow = _l
+            case _: _xlow = None
+        if _xlow is not None:
+            ax.axis.set_xlim(left = _xlow)
 
         match ax.xlimits[1]:
-            case _:...
+            case Bound.EXTERNAL:
+                _xhig = max([np.max(x) for x,_ in ax._lines])
+            case Bound.INTERNAL:
+                _xhig = min([np.max(x) for x,_ in ax._lines])
+            case NumberUnit(_l,_,_) if _l != np.inf:
+                _xhig = _l
+            case _: _xhig = None
+        if _xhig is not None:
+            ax.axis.set_xlim(right = _xhig)
+
+        _xlow,_xhig = ax.axis.get_xlim()
         
-        match ax.ylimits:
-            case _:...
+        match ax.ylimits[0]:
+            case Bound.EXTERNAL:
+                _ylow = min([np.min(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
+            case Bound.INTERNAL:
+                _ylow = max([np.min(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
+            case NumberUnit(_l,_,_) if _l != -np.inf:
+                _ylow = _l
+            case _: _ylow = None
+
+        match ax.ylimits[1]:
+            case Bound.EXTERNAL:
+                _yhig = max([np.max(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
+            case Bound.INTERNAL:
+                _yhig = min([np.max(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
+            case NumberUnit(_l,_,_) if _l != np.inf:
+                _yhig = _l
+            case _: _yhig = None
+        
+        match ax.ylimits[0], ax.ylimits[1]:
+            case Bound(), Bound():
+                # Expand both limits by 5%
+                _d = _yhig-_ylow # type: ignore
+                _yhig = _yhig + _d * 0.05 # type: ignore
+                _ylow = _ylow - _d * 0.05 # type: ignore
+            case Bound(), _:
+                # Expand lower limit by 5% relative to current upper ylim
+                _,_u = ax.axis.get_ylim()
+                _d = _u-_ylow # type: ignore
+                _ylow = _ylow - _d * 0.05 # type: ignore
+            case _, Bound():
+                # Expand upper limit by 5% relative to current lower ylim
+                _l,_ = ax.axis.get_ylim()
+                _d = _yhig-_l # type: ignore
+                _yhig = _yhig + _d * 0.05 # type: ignore
+
+        if _ylow is not None:
+            ax.axis.set_ylim(bottom = _ylow)
+        if _yhig is not None:
+            ax.axis.set_ylim(top = _yhig)
+        
 
         if args.show:
             figure.show()
-            # def on_close(event): fig.canvas.stop_event_loop()
-            # fig.canvas.mpl_connect('close_event', on_close)
-            # fig.show()
-            # fig.canvas.start_event_loop(timeout=-1)
-            # figure.shown = True
 
         return CommandResult(True)
 
