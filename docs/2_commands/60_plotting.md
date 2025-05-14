@@ -50,8 +50,8 @@ You can apply operations to both the x and y axes by chaining operators with a d
 |`p`|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|<span class="text-green-000">&#10003;</span>|Calculates the complex phase of the column.|
 |`s`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Smooths the column. The number identifies the window width.|
 |`d`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Calculates the n-th derivative of the column, with respect to the x axis.|
-|`w`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Weighs the y axis by the x axis with the specified power.|
-|`k`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Subtracts the constant value of 1, then weighs the y axis by the x axis, then adds 1.|
+|`k`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Weighs the y axis by the x axis with the specified power.|
+|`w`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Subtracts the constant value of 1, then weighs the y axis by the x axis, then adds 1.|
 |`W`|<span class="text-green-000">&#10003;</span>|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|Subtracts the average of the data, then weighs the y axis by the x axis, then adds back the average.|
 
 ### Examples
