@@ -21,12 +21,23 @@ plot [data] [--options]
 |<span class="nowrap">`--xlim` `<range>`</span>|Sets the x plotting range.|
 |<span class="nowrap">`--ylim` `<range>`</span>|Sets the y plotting range.|
 |<span class="nowrap">`--vshift` `<value>`</span>|Draws each consecutive plot vertically shifted by the given amount, relative to the previous. Default is 0, does not shift.|
-|<span class="nowrap">`--colorby` `<value>`</span>|Chooses a variable to color the data by.|
+|<span class="nowrap">`--colorby` `<value>`</span>|Chooses a variable to color the data by, such as `--colorby .fn` or `--colorby E0`. See the [metadata]( {{"/commands/file-input#Metadata" | relative_url }}) section for the default variable names.|
 |<span class="nowrap">`--figure` `<figure>`</span>|Selects a specific figure to plot within. You can specify the figure number and the subplot position as such: `3:1.2` will plot the data in the figure number 3, in the subplot at position 1,2. By default creates a new figure.|
-|<span class="nowrap">`--color` `<color>`</span>|Colors the spectra with the given color or colormap. The colormaps are defined by matplotlib. You can specify a linear colormap as a sequence of colors, such as `red blue`.|
+|<span class="nowrap">`--color` `<color>`</span>|Colors the spectra with the given color or colormap. The colormap names are defined by [matplotlib](https://matplotlib.org/stable/users/explain/colors/colormaps.html). You can specify a linear colormap as a sequence of colors, such as `--color red yellow green blue`.|
 |<span class="nowrap">`--alpha` `<value>`</span>|Specify the opacity of the plots. Must be between 0 (transparent) and 1(fully visible). Default is 1.|
-|<span class="nowrap">`--linewidth` `<value>`</span>|Specify the width of the spectra. Default is 1.|
 |<span class="nowrap">`--show`</span>|If set, immediately shows the selected figure, and waits for it to close. By default, all figures are shown at the end of the program.|
+|<span class="nowrap">`--linewidth` `<value>`</span>|Specify the width of the lines. Default is 1.|
+|<span class="nowrap">`--xxthick`</span>|Convenience method to set the line width. Equivalent to `--linewidth 8`|
+|<span class="nowrap">`--xthick`</span>|Convenience method to set the line width. Equivalent to `--linewidth 4`|
+|<span class="nowrap">`--thick`</span>|Convenience method to set the line width. Equivalent to `--linewidth 2`|
+|<span class="nowrap">`--thin`</span>|Convenience method to set the line width. Equivalent to `--linewidth 0.5`|
+|<span class="nowrap">`--xthin`</span>|Convenience method to set the line width. Equivalent to `--linewidth 0.25`|
+|<span class="nowrap">`--xxthin`</span>|Convenience method to set the line width. Equivalent to `--linewidth 0.125`|
+|<span class="nowrap">`--linestyle` `<value>`</span>|Specify the line style of the spectra. Default is `solid`. Can be either a named style(`solid`,`dotted`,`dashed`,`dashdot`) or a sequence of numbers separated by `.`, indicating the length of each drawn section.|
+|<span class="nowrap">`--solid`</span>|Convenience method to set the line style. Equivalent to `--linestyle solid`|
+|<span class="nowrap">`--dotted`</span>|Convenience method to set the line style. Equivalent to `--linestyle dotted`|
+|<span class="nowrap">`--dashed`</span>|Convenience method to set the line style. Equivalent to `--linestyle dashed`|
+|<span class="nowrap">`--dashdot`</span>|Convenience method to set the line style. Equivalent to `--linestyle dashdot`|
 
 ## Column
 
