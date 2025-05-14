@@ -62,7 +62,7 @@ After glitches are identified, a remover method is applied to correct or elimina
 |Remover|Description|Required arguments|
 |--|--|--|
 |`remove`|Removes the identified glitch from the data, without replacing it.|-|
-|`base`|Replaces glitches using a baseline estimated during the finder phase. Only works when `--column` is set to `x`, and the finder supports baseline estimation.|-|
+|`base`|Replaces glitches using a baseline estimated during the finder phase. Only works when `--column` is set to `a`, and the finder supports baseline estimation.|-|
 |`smooth`|Fits the non-glitched data using LOWESS regression, then interpolates over the glitch regions.|`--fraction`|
 
 |Argument|Explanation|

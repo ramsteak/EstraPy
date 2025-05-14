@@ -42,17 +42,17 @@ smooth [column] [axis] [--options]
 
 |Argument|Explanation|
 |--|--|
-|<span class="nowrap">`[column]`</span>|Column to smooth. Default is `x`.|
+|<span class="nowrap">`[column]`</span>|Column to smooth. Default is `a`.|
 |<span class="nowrap">`[axis]`</span>|Axis to use as the x-coordinate for the smoothing. Default is `E`.|
 |<span class="nowrap">`--window` / `-w` `<value>`</span>|Width of the window (in number of points) to use for the LOWESS smoothing.|
 
 ### Example
 
 ```sh
-smooth x E --window 15
+smooth a E --window 15
 ```
 
-Smooths the `x` column over the energy axis using a 15-point LOWESS window.
+Smooths the `a` column over the energy axis using a 15-point LOWESS window.
 
 ---
 

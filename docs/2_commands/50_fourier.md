@@ -22,7 +22,7 @@ fourier <range> <output> [--options]
 |Argument|Explanation|
 |--|--|
 |`<range>`|The range considered to perform the fourier transform. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
-|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\chi(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |<span class="nowrap">`--apodizer` / `-a` `<apodizer>`</span>|The apodizing window shape. By default, uses a Hann window. The available windows are listed in the [related section](#apodizer)|
 |<span class="nowrap">`--width` / `-w` `<value>`</span>|The width of the ramps of the window. See the [related section](#apodizer) for a visual explanation of this parameter.|
 |<span class="nowrap">`--method` `<method>`</span>|<div><p>Uses a different method to perform the fourier transform.</p><ul><li>`dft` is the default method, and uses matrix multiplication to calculate the transform</li><li>`finuft` uses the finufft.nufft1d3 method</li><li>`fft` uses the numpy rfft method, which requires the data to be uniformly spaced.</li></ul></div>|

@@ -11,13 +11,13 @@ math: katex
 $$E_{0}$$ estimation is a crucial step in XAS data analysis. It identifies the absorption edge position, which is essential for aligning spectra and calculating energy-dependent quantities like the photoelectron wavevector. EstraPy provides two commands for this taks:
 
 - `align`: estimates the reference $$E_{0}$$, relative to the `ref` column, and shifts the dataset to align to a target edge energy.
-- `edgeenergy`: estimates $$E_{0}$$ from the experimental section, relative to the `x` column, and computes relative energy (`e`) and wavevector (`k`).
+- `edgeenergy`: estimates $$E_{0}$$ from the experimental section, relative to the `a` column. Computes relative energy (`e`) and wavevector (`k`).
 
 The two commands share the same estimation logic, based on a customizable chain of processing operations called a *method*.
 
 ## Align
 
-The `align` command calculates the $$E_{0}$$ on the `ref` column, representing $$\mu_{ref}(E)$$, and shifts each spectrum in order to align the file to the correct $$E_{0}$$ value for the selected element.
+The `align` command calculates the $$E_{0}$$ on the `ref` column, representing $$\alpha_{ref}(E)$$, and shifts each spectrum in order to align the file to the correct $$E_{0}$$ value for the selected element.
 
 ```sh
 align <method> [--options]
@@ -33,7 +33,7 @@ align <method> [--options]
 
 ## EdgeEnergy
 
-The `edgeenergy` command calculates the $$E_{0}$$ on the `x` column, that is on $$\mu_{exp}(E)$$. Afterwards, the command also calculates the indices `e`, representing the relative energy from the determined $$E_{0}$$ value, and `k`, representing the wavevector. The `k` column also contains negative values, as this column is calculated with a symmetrical square root function. This is only for mathematical convenience.
+The `edgeenergy` command calculates the $$E_{0}$$ on the `a` column, that is on $$\alpha_{exp}(E)$$. Afterwards, the command also calculates the indices `e`, representing the relative energy from the determined $$E_{0}$$ value, and `k`, representing the wavevector. The `k` column also contains negative values, as this column is calculated with a symmetrical square root function. This is only for mathematical convenience.
 
 ```sh
 edgeenergy <method> [--options]

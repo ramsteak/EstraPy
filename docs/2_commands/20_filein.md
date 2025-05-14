@@ -31,11 +31,11 @@ The `batchin` command sets default arguments for successive `filein` commands, a
 |<span class="nowrap">`--qvector` / `-q` `[column]`</span>|Imports the given axis column as a q wavevector. If no column is specified, uses the column given by `--xaxiscolumn`.|
 |<span class="nowrap">`--shift` `<float>`</span>|Shifts the x axis index by the specified amount.|
 |<span class="nowrap">`--intensities` / `-I` `<column> [column] [column] [column]`</span>|Imports the specified columns as intensities, importing between 1 and 4 columns. TThese correspond to $$I_0$$, $$I_1$$, $$I_2$$, $$I_f$$, imported as the columns `I0` `I1` `I2` `If` respectively. If `--intensities` is not specified, the columns are inferred from the other signal options.|
-|<span class="nowrap">`--transmission` / `-t` `[column] [column]`</span>|Calculates the signal $$\mu_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, importing it as the column `x`.|
-|<span class="nowrap">`--fluorescence` / `-f` `[column] [column]`</span>|Calculates the signal $$\mu_{exp}$$ as $$\dfrac{I_f}{I_0}$$, importing it as the column `x`.|
-|<span class="nowrap">`--intensity` / `-i` `<column>`</span>|Reads the signal $$\mu_{exp}$$ directly, importing it as the column `x`.|
-|<span class="nowrap">`--reftransmittance` / `-T` `[column] [column]`</span>|Calculates the reference signal $$\mu_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, importing it as the column `ref`.|
-|<span class="nowrap">`--refabsorption` / `-A` `<column>`</span>|Imports the reference signal $$\mu_{ref}$$ directly, importing it as the column `ref`.|
+|<span class="nowrap">`--transmission` / `-t` `[column] [column]`</span>|Calculates the signal $$\alpha_{exp}$$ as $$\log_{10}{\dfrac{I_0}{I_1}}$$, importing it as the column `a`.|
+|<span class="nowrap">`--fluorescence` / `-f` `[column] [column]`</span>|Calculates the signal $$\alpha_{exp}$$ as $$\dfrac{I_f}{I_0}$$, importing it as the column `a`.|
+|<span class="nowrap">`--intensity` / `-i` `<column>`</span>|Reads the signal $$\alpha_{exp}$$ directly, importing it as the column `a`.|
+|<span class="nowrap">`--reftransmittance` / `-T` `[column] [column]`</span>|Calculates the reference signal $$\alpha_{ref}$$ as $$\log_{10}{\dfrac{I_1}{I_2}}$$, importing it as the column `ref`.|
+|<span class="nowrap">`--refabsorption` / `-A` `<column>`</span>|Imports the reference signal $$\alpha_{ref}$$ directly, importing it as the column `ref`.|
 |<span class="nowrap">`--var` `<name> <value>`</span>|Adds the given variable to the file metadata, useful in other commands. The automatic variable definition is defined in the [metadata](#metadata) section. The value can be an auto-defined variable, such as .h1.1, which will be resolved to the imported value.|
 
 ### Columns
@@ -76,9 +76,9 @@ This snippet reads all the `.xy` files from the `data` folder, using the defined
 
 |Argument|Resulting column|Explanation|
 |--|--|--|
-|<span class="nowrap">`-I dif_ic0 .. .. ..`</span>|$$I_0$$: `I0`|Imports the $$I_0$$ intensity|
-|<span class="nowrap">`-I .. dif_ic1 .. ..`</span>|$$I_1$$: `I1`|Imports the $$I_1$$ intensity|
-|<span class="nowrap">`-I .. .. dif_ic2 ..`</span>|$$I_2$$: `I2`|Imports the $$I_2$$ reference intensity|
-|<span class="nowrap">`-I .. .. .. x_ch1_roi1..x_ch13_roi1`</span>| $$I_f$$: `If` |Imports the $$I_f$$ fluorescence intensity|
-|<span class="nowrap">`-f`|$$\mu(E)$$: `x`</span>|Calculates the experimental fluorescence signal, as $$\dfrac{I_f}{I_0}$$ |
-|<span class="nowrap">`-T`|$$\mu_{ref}(E)$$: `ref`</span>|Calculates the experimental reference transmission signal, as $$\log_{10}{\dfrac{I_0}{I_1}}$$|
+|<span class="nowrap">`-I dif_ic0 .. .. ..`</span>|$$I_0$$: `I0`|Imports the $$I_0$$ intensity from the  `dif_ic0` column.|
+|<span class="nowrap">`-I .. dif_ic1 .. ..`</span>|$$I_1$$: `I1`|Imports the $$I_1$$ intensity from the `dif_ic1` column.|
+|<span class="nowrap">`-I .. .. dif_ic2 ..`</span>|$$I_2$$: `I2`|Imports the $$I_2$$ reference intensity from the `dif_ic2` column.|
+|<span class="nowrap">`-I .. .. .. x_ch1_roi1..x_ch13_roi1`</span>|$$I_f$$: `If`|Imports the $$I_f$$ fluorescence intensity as the sum of the columns from x_ch1_roi1 to x_ch13_roi1.|
+|<span class="nowrap">`-f`</span>|$$\alpha(E)$$: `a`|Calculates the experimental fluorescence signal, as $$\alpha(E)=\dfrac{I_f}{I_0}$$ |
+|<span class="nowrap">`-T`</span>|$$\alpha_{ref}(E)$$: `ref`|Calculates the experimental reference transmission signal, as $$\alpha_{ref}(E)=\log_{10}{\dfrac{I_0}{I_1}}$$|

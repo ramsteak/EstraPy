@@ -12,7 +12,7 @@ XAS analysis requires removing background contributions and normalizing the sign
 
 ## PreEdge
 
-The `preedge` command estimates the preedge contribution from the signal in the `x` column, stores it in the `pre` column, and updates the signal with the corrected values. The preedge is modelled as a polynomial of degree n, usually linear, in the given range, and extrapolates the estimate across the entire data range. The range can be specified in either eV or k.
+The `preedge` command estimates the preedge contribution from the signal in the `a` column, stores it in the `pre` column, and updates the signal with the corrected values. The preedge is modelled as a polynomial of degree n, usually linear, in the given range, and extrapolates the estimate across the entire data range. The range can be specified in either eV or k.
 
 ```sh
 preedge <range> [--options]
@@ -29,7 +29,7 @@ preedge <range> [--options]
 
 ## PostEdge
 
-The `postedge` command estimates the postedge contribution from the signal in the `x` column, stores it in the `post` column, and updates the signal with the corrected values. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extrapolated across the entire data range. The range can be specified in either eV or k.
+The `postedge` command estimates the postedge contribution from the signal in the `a` column and stores it in the `post` column. It then creates the `mu` and `x` columns, which represent the XANES ($$\mu$$) and EXAFS ($$\chi$$)signal intensities respectively. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extrapolated across the entire data range. The range can be specified in either eV or k.
 The command also defines the variable `J0` for each file, defined to be the value of the postedge estimated at $$E = E_{0}$$.
 
 ```sh
@@ -44,14 +44,14 @@ postedge <range> [--options]
 |<span class="nowrap">`--quadratic` / `-q`</span>|Models the postedge as a polynomial of order 2.|
 |<span class="nowrap">`--cubic` / `-c`</span>|Models the postedge as a polynomial of order 3.|
 |<span class="nowrap">`--polynomial` / `-p` `<degree>`</span>|Models the postedge as a polynomial of order `degree`.|
-|<span class="nowrap">`--divide` / `-d`</span>|Corrects the data by dividing the `x` column by the postedge.|
-|<span class="nowrap">`--subtract` / `-s`</span>|Corrects the data by subtracting the postedge from the `x` column.|
-|<span class="nowrap">`--energy` / `-e`</span>|Performs the polynomial regression on $$\mu(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
-|<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\mu(k)$$, in wavevector space. If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
+|<span class="nowrap">`--divide` / `-d`</span>|Corrects the data by dividing the `a` column by the postedge.|
+|<span class="nowrap">`--subtract` / `-s`</span>|Corrects the data by subtracting the postedge from the `a` column.|
+|<span class="nowrap">`--energy` / `-e`</span>|Performs the polynomial regression on $$\alpha_(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
+|<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\alpha_(k)$$, in wavevector space. If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
 
 ## Background
 
-The `background` command extracts the background contribution from the signal in the `x` column, and stores it in the `bkg` column. This background estimated is then subtracted from the signal, yielding the corrected data. The command supports multiple methods for background estimation.
+The `background` command removes spurious contribution to the EXAFS signal. It extracts the background contribution from the signal in the `x` column, and stores it in the `bkg` column. This background is then subtracted from the signal, yielding the corrected data back on the `x` column. The command supports multiple methods for background estimation.
 
 ```sh
 background <mode> [--options]
@@ -80,7 +80,7 @@ background bspline <range> [--options]
 |Argument|Explanation|
 |--|--|
 |`<range>`|The range considered to perform the fit. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
-|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\chi(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 
 ### Fourier
 
@@ -93,7 +93,7 @@ background fourier <Rmax> [--options]
 |Argument|Explanation|
 |--|--|
 |<span class="nowrap">`<Rmax>`</span>|The upper bound of the range of the inverse fourier transform. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the syntax explanation.|
-|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\chi(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal three times.|
 
 ### Smoothing
@@ -107,7 +107,7 @@ background smoothing <range> [--options]
 |Argument|Explanation|
 |--|--|
 |`<range>`|The range considered to perform the smoothing. See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit-specification" | relative_url }}) for the range syntax explanation.|
-|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\mu(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
+|<span class="nowrap">`--kweight` / `-k` `<value>`</span>|Performs the operation on data weighed by the specified factor: $$k^{n}\cdot\chi(k)$$. By default, does not weigh the data (equal to a kweight of 0).|
 |<span class="nowrap">`--iterations` / `-i`</span>|The number of times to iterate the method. By default, applies the background removal once.|
 |<span class="nowrap">`--fraction` / `-f`</span>|The fraction of the total datapoints to use for the smoothing. Must be between 0 and 1. By default uses 30% of the datapoints (0.3)|
 
@@ -119,7 +119,7 @@ background smoothing <range> [--options]
 preedge .. -80eV -l
 ```
 
-This snippet subtracts a linear preedge from the `x` column, estimated over the region from $$-\infty$$ to -80eV relative to $$E_{0}$$ (determined in a previous `edgeenergy` step).
+This snippet subtracts a linear preedge from the `a` column, estimated over the region from $$-\infty$$ to -80eV relative to $$E_{0}$$ (determined in a previous `edgeenergy` step).
 
 ### PostEdge example
 
@@ -127,7 +127,7 @@ This snippet subtracts a linear preedge from the `x` column, estimated over the 
 postedge 3k .. -cde
 ```
 
-This snippet divides the data by a cubic polinomial, fitted over $$\mu(E)$$ in the region from 3k to $$\infty$$, to model the postedge contribution of the `x` column.
+This snippet divides the data by a cubic polinomial, fitted over $$\alpha(E)$$ in the region from 3k to $$\infty$$, to model the postedge contribution of the `a` column, resulting in the `mu` column, representing the XANES spectrum, and the `x` column, representing the EXAFS spectrum.
 
 ### Background example
 

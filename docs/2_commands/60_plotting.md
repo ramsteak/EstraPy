@@ -36,7 +36,7 @@ When plotting, you can specify the data columns and apply transformations direct
 axis:column
 ```
 
-where `axis` represents the x axis, such as `E`, `e`, `k` or `R`, and `column` represents the y values, such as `x`, `pre` and `I0`.
+where `axis` represents the x axis, such as `E`, `e`, `k` or `R`, and `column` represents the y values, such as `a`, `mu`, `x`, `pre` and `I0`.
 
 ### Transformations
 
