@@ -144,7 +144,7 @@ class PostEdge(CommandHandler):
             log.debug(f"{data.meta.name}: Fitting postedge of order {args.degree} in the region {range.lower.value:0.3f}{range.lower.unit} ~ {range.upper.value:0.3f}{range.upper.unit}") # type: ignore
 
             X = data.get_col_(coltype=args.fitaxis)
-            Y = data.get_col_("x")
+            Y = data.get_col_("a")
             x, y = X[idx], Y[idx]
             poly = np.poly1d(np.polyfit(x, y, args.degree)) # type: ignore
             P = poly(X)
@@ -157,10 +157,15 @@ class PostEdge(CommandHandler):
             data.add_col("post", P, Column(None, None, DataColType.POSTEDGE), Domain.REAL)
 
             match args.action:
-                case RemovalOperation.SUBTRACT: Y1 = (Y - P) / J0
-                case RemovalOperation.DIVIDE: Y1 = Y / P
-            
-            data.mod_col("x", Y1)
+                case RemovalOperation.SUBTRACT:
+                    Y1 = (Y - P) / J0
+                    data.add_col("mu", Y1+1, Column(None, None, DataColType.MU), Domain.REAL)
+                    data.add_col("x", Y1, Column(None, None, DataColType.CHI), Domain.REAL)
+
+                case RemovalOperation.DIVIDE:
+                    Y1 = Y / P
+                    data.add_col("mu", Y1, Column(None, None, DataColType.MU), Domain.REAL)
+                    data.add_col("x", Y1-1, Column(None, None, DataColType.CHI), Domain.REAL)
 
         return CommandResult(True)
 

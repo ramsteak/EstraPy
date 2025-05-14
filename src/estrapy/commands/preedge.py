@@ -92,7 +92,7 @@ class PreEdge(CommandHandler):
             idx = range_to_index(data, range)
             log.debug(f"{data.meta.name}: Fitting preedge of order {args.degree} in the region {range.lower.value:0.3f}{range.lower.unit} ~ {range.upper.value:0.3f}{range.upper.unit}") # type: ignore
 
-            X,Y = data.get_col_("e"), data.get_col_("x")
+            X,Y = data.get_col_("e"), data.get_col_("a")
             x, y = X[idx], Y[idx]
             poly = np.poly1d(np.polyfit(x, y, args.degree)) # type: ignore
             P = poly(X)
@@ -101,7 +101,7 @@ class PreEdge(CommandHandler):
 
             data.meta.run["preedge"] = poly, AxisType.RELENERGY
             data.add_col("pre", P, Column(None, None, DataColType.PREEDGE), Domain.REAL)
-            data.mod_col("x", Y - P)
+            data.mod_col("a", Y - P)
             pass
 
         return CommandResult(True)

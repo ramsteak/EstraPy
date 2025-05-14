@@ -137,12 +137,12 @@ class Background(CommandHandler):
                 for data in context.data:
                     X,Y = data.get_col_("k", domain=domain), data.get_col_("x", domain=domain)
                     idx = range_to_index_(data, bounds)
-                    x, _y = X[idx], Y[idx] -1
+                    x, _y = X[idx], Y[idx]
                     y = _y * x ** kweight
 
                     s = bspline_method(x,y)
                     S = Y.copy()
-                    S[idx] = s / x ** kweight +1
+                    S[idx] = s / x ** kweight
 
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
@@ -151,7 +151,7 @@ class Background(CommandHandler):
                 for data in context.data:
                     X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
                     idx = X>=0
-                    x, _y = X[idx], Y[idx] -1
+                    x, _y = X[idx], Y[idx]
                     y = _y * x ** kweight
                     eps = 0.3
                     w = get_flattop_window(x, (x.max() - x.min())/8, Apodizer.HANN, None, 0, (-eps, +eps)) # type: ignore
@@ -167,7 +167,7 @@ class Background(CommandHandler):
                     s = sum(bkgs)
 
                     S = Y.copy()
-                    S[idx] = s / x ** kweight +1
+                    S[idx] = s / x ** kweight
 
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
@@ -183,12 +183,12 @@ class Background(CommandHandler):
                 for data in context.data:
                     X,Y = data.get_col_("k", domain=domain), data.get_col_("x", domain=domain)
                     idx = range_to_index_(data, bounds)
-                    x,_y = X[idx], Y[idx] -1
+                    x,_y = X[idx], Y[idx]
                     y = _y * x ** kweight
 
                     s = lowess(y, x, fraction, iterations, return_sorted=False)
                     S = Y.copy()
-                    S[idx] = s / x ** kweight +1
+                    S[idx] = s / x ** kweight
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
             case _:

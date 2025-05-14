@@ -202,13 +202,13 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
         match stype:
             case SignalType.INTENSITY:
                 scolumn = dat.get_col(scols[0])
-                dat.add_col("x", scolumn, Column(None, None, SignalType.INTENSITY), signaldomain)
+                dat.add_col("a", scolumn, Column(None, None, SignalType.INTENSITY), signaldomain)
             case SignalType.TRANSMITTANCE:
                 scolumn = np.log10(dat.get_col(scols[0]) / dat.get_col(scols[1]))
-                dat.add_col("x", scolumn, Column(None, None, SignalType.TRANSMITTANCE), signaldomain)
+                dat.add_col("a", scolumn, Column(None, None, SignalType.TRANSMITTANCE), signaldomain)
             case SignalType.FLUORESCENCE:
                 scolumn = dat.get_col(scols[0]) / dat.get_col(scols[1])
-                dat.add_col("x", scolumn, Column(None, None, SignalType.FLUORESCENCE), signaldomain)
+                dat.add_col("a", scolumn, Column(None, None, SignalType.FLUORESCENCE), signaldomain)
 
     if args.refsigtype is not None:
         rtype, rcols = args.refsigtype

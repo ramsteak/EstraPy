@@ -145,8 +145,8 @@ class Deglitch(CommandHandler):
             case "remove":
                 method = Method_Remove(args.noise)
             case "base":
-                if args.column != "x":
-                    raise ValueError("Method base can only be used if column is x.")
+                if args.column != "a":
+                    raise ValueError("Method base can only be used if column is a.")
                 method = Method_Base(args.noise)
             case "smooth":
                 method = Method_Smooth(args.noise, args.fraction)
@@ -237,18 +237,18 @@ class Deglitch(CommandHandler):
                 case (Method_Base(noise), b, std):
                     if b is None or std is None:
                         raise RuntimeError("Method base requires estimation of the baseline and standard deviation.")
-                    if args.column != "x":
-                        raise RuntimeError("Method base can only be used if the column is x")
+                    if args.column != "a":
+                        raise RuntimeError("Method base can only be used if the column is a")
                     newcol = I.copy()
                     if noise: n = np.random.normal(0, std, g.sum())
                     else: n = np.zeros(g.sum())
                     
                     newcol[g] = b[g[idx]]+n
-                    data.mod_col("x", newcol)
+                    data.mod_col("a", newcol)
                     pass
                 case (Method_Smooth(noise, fraction), _, _):
                     x = data.get_col_("E", domain=domain)
-                    y = data.get_col_("x", domain=domain)
+                    y = data.get_col_("a", domain=domain)
                     s = lowess(y[~g],x[~g], it=0, frac=fraction, return_sorted=False, xvals=x)
                     std = (y-s)[idx].std()
                     if noise: n = np.random.normal(0, std, g.sum())
@@ -372,7 +372,7 @@ class MultiEdge(CommandHandler):
 
         for data in context.data:
             X = data.get_col_(args.axis, domain=Domain.REAL)
-            Y = data.get_col_("x", domain=Domain.REAL)
+            Y = data.get_col_("a", domain=Domain.REAL)
 
             E = args.method.calc(X)
             # TODO: idea --iplot interactive plot:
@@ -382,7 +382,7 @@ class MultiEdge(CommandHandler):
             # ogni cambio. Alla fine, stampa la linea del comando finale.
 
             data.datums[Domain.REAL].add_col(E, Column(None, None, DataColType.MULTIEDGE), "mult", False)
-            data.datums[Domain.REAL].mod_col("x", Y-E)
+            data.datums[Domain.REAL].mod_col("a", Y-E)
 
         return CommandResult(True)
 

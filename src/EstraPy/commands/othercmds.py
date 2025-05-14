@@ -60,7 +60,7 @@ class Smooth(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Smooth:
         parser = CommandParser("smooth", description="Smooths the data.")
-        parser.add_argument("data", nargs="?", default="x")
+        parser.add_argument("data", nargs="?", default="a")
         parser.add_argument("xaxis", nargs="?", default="E")
         parser.add_argument("--window", "-w", default=5, type=int, help="The smoothing window.")
 

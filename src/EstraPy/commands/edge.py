@@ -409,7 +409,7 @@ class Align(CommandHandler):
             case Across():
                 raise NotImplementedError()
                 # rXs = [data.get_col_("E") for data in context.data]
-                # rYs = [data.get_col_("x") for data in context.data]
+                # rYs = [data.get_col_("a") for data in context.data]
                 # rdYs = [np.gradient(Y,X) for X,Y in zip(rXs, rYs)]
                 
 
@@ -479,7 +479,7 @@ class Edge(CommandHandler):
             match args.method:
                 case Finder(ops, E0s, dE0):
                     x = data.get_col_("E")
-                    y = data.get_col_("x")
+                    y = data.get_col_("a")
 
                     if E0s is None:
                         E0s = data.meta.refE0
