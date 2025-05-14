@@ -18,38 +18,45 @@ postedge 3k .. -cde
 save xE.dat batch E:x
 save {.fn}_norm.dat columns E x
 
-plot E:x   --fig 1:1.1
-plot k:x   --fig 1:1.2
+background fourier 0.9A -k ${kpow} 
 
-background fourier 1.1A -k ${kpow}
+fourier 3k 14k 6A 0.01A -a hann -k ${kpow} -w1
 
-plot k:bkg --fig 1:1.2 --xlim 3k .. --ylim 0.9 1.1
+# ------------------------------------------------------------------------------
+# Plotting
 
-fourier 3k 12k 6A 0.01A -a hann -k ${kpow} -w1
-phase correct
+plot E:mu --fig 1:1.1 --color red blue --colorby .fn
 
-plot R:a.f --fig 1:2.1
-plot R:r.f --fig 1:2.1 --linewidth 0.2
-plot R:i.f --fig 1:2.1 --linewidth 0.2
-plot r.f:i.f --fig 1:2.2
+plot k:k2.x_0 --fig 1:1.2 --color red blue --colorby .fn
+plot k:k2.bkg --fig 1:1.2 --color black --linestyle dotted --linewidth 0.5
+plot          --fig 1:1.2 --xlim 3k 12k
+plot          --fig 1:1.2 --ylim :. .:
 
-save k.dat aligned k:x --align 0k :. 0.1k
+plot k:k2.x   --fig 1:2.1 --color red blue --colorby .fn --vshift 1
+plot          --fig 1:2.1 --xlim 3k 12k
+plot          --fig 1:2.1 --ylim :. .:
+
+plot R:a.f    --fig 1:2.2 --color red blue --colorby .fn
+plot R:r.f    --fig 1:2.2 --color red blue --colorby .fn --linewidth 0.2 --linestyle dotted
+plot R:i.f    --fig 1:2.2 --color red blue --colorby .fn --linewidth 0.2 --linestyle dotted
+plot          --fig 1:2.2 --xlim 0A 6A
+plot          --fig 1:2.2 --ylim :. .:
 
 # ------------------------------------------------------------------------------
 # Set all labels and titles
 
 plot --fig 1:1.1 --xlabel "$Energy\ [eV]$"
 plot --fig 1:1.1 --ylabel "$Signal\ intensity$"
-plot --fig 1:1.1 --title  "$\chi^{exp}(E)$"
+plot --fig 1:1.1 --title  "$\mu_{exp}(E)$"
 
 plot --fig 1:1.2 --xlabel "$Wavevector\ [Å^{-1}]$"
 plot --fig 1:1.2 --ylabel "$Signal\ intensity$"
-plot --fig 1:1.2 --title  "$\chi^{exp}(k)$"
+plot --fig 1:1.2 --title  "$\chi_{exp}(k)$"
 
-plot --fig 1:2.1 --xlabel "$Distance\ [Å]$"
-plot --fig 1:2.1 --ylabel "$FT\{k^{${kpow}}\cdot\chi(k)\}\ [Å^{-${kpowp}}]$"
-plot --fig 1:2.1 --title  "$Fourier\ transform$"
+plot --fig 1:2.1 --xlabel "$Wavevector\ [Å^{-1}]$"
+plot --fig 1:2.1 --ylabel "$Signal\ intensity$"
+plot --fig 1:2.1 --title  "$\chi(k)$"
 
-plot --fig 1:2.2 --xlabel "$Real\ part$"
-plot --fig 1:2.2 --ylabel "$Imaginary\ part$"
-plot --fig 1:2.2 --title  "$Winding\ diagram$"
+plot --fig 1:2.2 --xlabel "$Distance\ [Å]$"
+plot --fig 1:2.2 --ylabel "$FT\{k^{${kpow}}\cdot\chi(k)\}\ [Å^{-${kpowp}}]$"
+plot --fig 1:2.2 --title  "$Fourier\ transform$"
