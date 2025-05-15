@@ -25,14 +25,10 @@ $ estrapy --version
 EstraPy 1.0.0
 ```
 
-## About the project
-
-EstraPy is &copy; 2024-{{ "now" | date: "%Y" }} by [Marco Stecca](https://github.com/ramsteak).
-
-### License
+## License
 
 EstraPy is distributed by an [MIT license](https://github.com/ramsteak/EstraPy/blob/main/LICENSE).
 
-### Contributing
+## Contributing
 
 To report issues with the program, you can create a new [issue](https://github.com/ramsteak/EstraPy/issues) in the github section. Be sure to upload both your input file and the relevant data files, along with the output log file.
