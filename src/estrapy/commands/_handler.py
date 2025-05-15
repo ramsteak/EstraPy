@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from shlex import split
-from typing import NamedTuple, Any
+from typing import NamedTuple
 
 from ._parser import Token
 from ._context import Context, CommandResult

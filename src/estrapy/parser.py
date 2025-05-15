@@ -35,8 +35,6 @@ def parse_directives(input: str) -> Directives:
     # Directives are prefixed by %, and follow the version. Only empty lines can
     # be between directives or version, and all directives must be at the top of
     # the file.
-    directives: list[str] = []
-    varreplacement: dict[str, str] = {}
 
     clear = False
     noplot = False
@@ -51,8 +49,10 @@ def parse_directives(input: str) -> Directives:
             break
         
         directive = line.removeprefix("%").strip()
-        if directive == "clear": clear = True
-        if directive == "noplot": noplot = True
+        if directive == "clear":
+            clear = True
+        if directive == "noplot":
+            noplot = True
 
         if directive.startswith("define "):
             vname, vval = directive.removeprefix("define ").split(" ", maxsplit=1)

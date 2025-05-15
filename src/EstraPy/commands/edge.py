@@ -5,15 +5,12 @@ import numpy.typing as npt
 
 # from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
-from scipy.signal import correlate
 from scipy.interpolate import interp1d
-from matplotlib import pyplot as plt
 
 from enum import Enum
 from typing import NamedTuple, Any
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy.optimize import minimize_scalar, OptimizeResult, root_scalar, RootResults
-from scipy.interpolate import interp1d
 from logging import getLogger
 from dataclasses import dataclass
 

@@ -5,16 +5,14 @@ import numpy.typing as npt
 import pandas as pd
 import re
 
-from enum import Enum
-from typing import NamedTuple, Iterable
+from typing import NamedTuple
 from logging import getLogger
 from dataclasses import dataclass
 from scipy.interpolate import interp1d
 from pathlib import Path
 
 
-from ._context import Context, AxisType, DataColType, Column, Domain, range_to_index, MetaData
-from ._format import sup, exp
+from ._context import Context, MetaData
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 
@@ -34,10 +32,14 @@ def save_df_to_dat(filename:str|Path, df:pd.DataFrame,*, index:bool=False, head:
         sci = ((x != 0)&(np.abs(np.log(np.abs(x + np.finfo(x.dtype).eps))) >= 4)).any()
         sgn = (x < 0).any()
         match bool(sci),bool(sgn):
-            case False, False: fmt = decformat
-            case False, True : fmt = sdecformat
-            case True , False: fmt = sciformat
-            case True , True : fmt = ssciformat
+            case False, False:
+                fmt = decformat
+            case False, True :
+                fmt = sdecformat
+            case True , False:
+                fmt = sciformat
+            case True , True :
+                fmt = ssciformat
         return fmt(x)
 
     if index:
@@ -50,7 +52,8 @@ def save_df_to_dat(filename:str|Path, df:pd.DataFrame,*, index:bool=False, head:
     stacked = np.column_stack(columns)
 
     with open(filename, mode) as fw:
-        if head: fw.write(head + "\n")
+        if head:
+            fw.write(head + "\n")
         fw.write(f"#L {"".join(headers).rstrip()}\n")
         fw.writelines(f"   {"".join(l).rstrip()}\n" for l in stacked)
 
@@ -65,19 +68,26 @@ def get_var_headers(meta:MetaData) -> str:
         line = int(_line) - 1
         pos = int(_pos) - 1
 
-        while len(_head) <= line: _head.append([])
-        while len(_head[line]) <= pos: _head[line].append("")
+        while len(_head) <= line:
+            _head.append([])
+        while len(_head[line]) <= pos:
+            _head[line].append("")
         _head[line][pos] = str(val)
     
-    head = [" ".join(l) for l in _head]
+    head = [" ".join(line) for line in _head]
 
-    if ".st" in meta: head.append(f"#V signal {meta.get(".st")}")
-    if ".rt" in meta: head.append(f"#V reference {meta.get(".rt")}")
-    if "E0" in meta: head.append(f"#V E0 {meta.get("E0")}")
-    if "rE0" in meta: head.append(f"#V refE0 {meta.get("rE0")}")
+    if ".st" in meta:
+        head.append(f"#V signal {meta.get(".st")}")
+    if ".rt" in meta:
+        head.append(f"#V reference {meta.get(".rt")}")
+    if "E0" in meta:
+        head.append(f"#V E0 {meta.get("E0")}")
+    if "rE0" in meta:
+        head.append(f"#V refE0 {meta.get("rE0")}")
 
     for vname, v in meta.vars.items():
-        if vname.startswith("."): continue
+        if vname.startswith("."):
+            continue
         head.append(f"#V {vname} {v}")
     
     return "\n".join(head)
@@ -126,19 +136,23 @@ class Save(CommandHandler):
         match args.mode:
             case "batch":
                 col = parse_column(args.column)
-                if col.xcol is None: raise ValueError("No x column specified.")
+                if col.xcol is None:
+                    raise ValueError("No x column specified.")
                 mode = Batch(args.filename, col)
                 
             case "aligned":
                 col = parse_column(args.column)
-                if col.xcol is None: raise ValueError("No x column specified.")
+                if col.xcol is None:
+                    raise ValueError("No x column specified.")
 
                 if col.xop:
                     raise ValueError("The output x column cannot be modified.")
                 
                 bounds = parse_range(*args.align)
-                if bounds.lower.value == -np.inf: raise ValueError("Alignment range cannot be ..")
-                if bounds.upper.value == np.inf: raise ValueError("Alignment range cannot be ..")
+                if bounds.lower.value == -np.inf:
+                    raise ValueError("Alignment range cannot be ..")
+                if bounds.upper.value == np.inf:
+                    raise ValueError("Alignment range cannot be ..")
                     
                 mode = Aligned(args.filename, bounds, col)
             case "columns":
@@ -166,7 +180,8 @@ class Save(CommandHandler):
                 save_df_to_dat(outfile, df, index=False)
             case Aligned(fname, align, column):
                 outfile = context.paths.outputdir / fname
-                if column.xcol is None: raise RuntimeError("No x column specified.")
+                if column.xcol is None:
+                    raise RuntimeError("No x column specified.")
                 domain = context.data.data[0]._get_col_domain(column.xcol)
                 if domain != align.domain:
                     raise RuntimeError("Invalid range selection: range does not match given abscissa.")
@@ -178,7 +193,8 @@ class Save(CommandHandler):
                         newx = np.arange(bounds.lower.value, bounds.upper.value, i)
                     case int(n):
                         newx = np.linspace(bounds.lower.value, bounds.upper.value, n)
-                    case _: raise RuntimeError("Unknown error. #23794618")
+                    case _:
+                        raise RuntimeError("Unknown error. #23794618")
                 
                 out:list[pd.Series] = []
                 x = pd.Index(newx, name = column.xcol)

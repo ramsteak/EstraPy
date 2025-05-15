@@ -12,7 +12,6 @@ from . import __version__
 from .commands._context import Paths, Context, Options
 from .parser import parse_version, parse_directives, parse_commands
 
-from .commands.plot import FigureRuntime
 from matplotlib import pyplot as plt
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)

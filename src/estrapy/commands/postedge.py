@@ -101,16 +101,22 @@ class PostEdge(CommandHandler):
 
         # Match bounds and fitaxis
         match args.fitaxis:
-            case "e": fitaxis = AxisType.RELENERGY
-            case "k": fitaxis = AxisType.KVECTOR
+            case "e":
+                fitaxis = AxisType.RELENERGY
+            case "k":
+                fitaxis = AxisType.KVECTOR
             case None:
                 match range.lower:
-                    case NumberUnit(_, _, "eV"): fitaxis = AxisType.RELENERGY
-                    case NumberUnit(_, _, "k"): fitaxis = AxisType.KVECTOR
+                    case NumberUnit(_, _, "eV"):
+                        fitaxis = AxisType.RELENERGY
+                    case NumberUnit(_, _, "k"):
+                        fitaxis = AxisType.KVECTOR
                     case _:
                         match range.upper:
-                            case NumberUnit(_, _, "eV"): fitaxis = AxisType.RELENERGY
-                            case NumberUnit(_, _, "k"): fitaxis = AxisType.KVECTOR
+                            case NumberUnit(_, _, "eV"):
+                                fitaxis = AxisType.RELENERGY
+                            case NumberUnit(_, _, "k"):
+                                fitaxis = AxisType.KVECTOR
                             case _:
                                 raise ValueError("Neither bound has units specified. Specify the fit axis explicitly.")
 

@@ -8,7 +8,7 @@ from matplotlib.figure import Figure
 from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from pathlib import Path
-from typing import Any, NamedTuple, Callable
+from typing import Any, NamedTuple
 from enum import Enum
 from dataclasses import dataclass, field
 from itertools import chain
@@ -264,7 +264,7 @@ class Data:
         _ds = [domain for domain, datum in self.datums.items() if colname in datum.cols]
         if len(_ds) == 0: raise KeyError(f"column {colname} was not found")
         elif len(_ds) == 1: return _ds[0]
-        else: raise KeyError(f"Multiple matching columns.")
+        else: raise KeyError("Multiple matching columns.")
 
     def _get_all_cols(self) -> list[tuple[str, Column, Domain]]:
         return [(colname, coltype, domain)

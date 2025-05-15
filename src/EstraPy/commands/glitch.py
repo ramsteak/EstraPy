@@ -4,18 +4,16 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from enum import Enum
 from logging import getLogger
 from typing import NamedTuple
 from dataclasses import dataclass
-from matplotlib import pyplot as plt
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy.stats import norm
 from scipy.interpolate import interp1d
 
-from ._numberunit import NumberUnitRange, NumberUnit, parse_range, actualize_range, parse_nu
+from ._numberunit import NumberUnitRange, parse_range, actualize_range, parse_nu
 
-from ._context import Context, Column, FourierType, Domain, range_to_index, DataColType
+from ._context import Context, Column, Domain, range_to_index, DataColType
 from ._handler import CommandHandler, Token, CommandResult
 
 from ._parser import CommandParser
