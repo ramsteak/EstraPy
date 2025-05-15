@@ -65,25 +65,29 @@ def main():
     match args.inputfile, args.outputdir:
         case ("-", _o):
             # Interactive
-            raise NotImplementedError("Interactive mode is not implemented.")
+            print("Interactive mode is not implemented.")
+            exit(-1)
 
         case (None, None):
             # Search the current directory for input files
-            raise NotImplementedError("Automatic discovery mode is not implemented.")
+            print("Automatic discovery mode is not implemented.")
+            exit(-1)
 
         case (_i, None):
             inputfile = Path(_i)
             outputdir = inputfile.parent / inputfile.name.removesuffix(inputfile.suffix)
 
         case (None, _o):
-            raise RuntimeError("Impossible input combination.")
+            print("Impossible input combination.")
+            exit(-1)
 
         case (_i, _o):
             inputfile = Path(_i)
             outputdir = Path(_o)
 
     if not inputfile.exists():
-        raise FileNotFoundError("The specified file does not exist.")
+        print("The specified file does not exist.")
+        exit(-1)
 
     outputdir.mkdir(exist_ok=True)
     logfile = outputdir / (inputfile.name.removesuffix(inputfile.suffix) + ".log")
