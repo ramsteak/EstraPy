@@ -2,7 +2,7 @@
 title: Home
 layout: home
 nav_order: 1
-description: "EstraPy is a synchrotron analysis tool, built in Python 3."
+description: "EstraPy is a synchrotron data analysis tool, built in Python 3."
 permalink: /
 ---
 
