@@ -4,24 +4,18 @@ import re
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-import threading
 
-from dataclasses import dataclass, field
 from functools import partial
-from enum import Enum
 from logging import getLogger
-from typing import NamedTuple, Any, Callable, Literal
-from matplotlib import pyplot as plt
+from typing import NamedTuple, Callable, Literal
 from matplotlib import colormaps
 from matplotlib import colors
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
-from matplotlib.figure import Figure
-from matplotlib.axes import Axes
 
 from ._context import Context, Data, FigureRuntime, FigureSettings
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, Bound, parse_nu, parse_range, NumberUnitRange
+from ._numberunit import NumberUnit, Bound, parse_range, NumberUnitRange
 
 from ._parser import CommandParser
 
@@ -293,7 +287,7 @@ class Plot(CommandHandler):
                 # Value is qualitative and colormap is qualitative
                     uniquevals, inverse = np.unique(_colorby, return_inverse=True)
                     ncats = len(uniquevals)
-                    catcolors = np.array([args.colormap.cmap(i%ncats) for i,_ in enumerate(uniquevals)])
+                    catcolors = np.array([args.colormap.cmap(i%cmaplength) for i,_ in enumerate(uniquevals)])
                     colors = catcolors[inverse]
                 case False, _:
                 # Value is quantitative
@@ -311,9 +305,12 @@ class Plot(CommandHandler):
                 ax.axis.plot(x, y, color = colors[i], linewidth=args.linewidth, alpha=args.alpha, linestyle=args.linestyle)
 
         if args.labels is not None:
-            if args.labels.xlabel is not None: ax.axis.set_xlabel(args.labels.xlabel)
-            if args.labels.ylabel is not None: ax.axis.set_ylabel(args.labels.ylabel)
-            if args.labels.title is not None: ax.axis.set_title(args.labels.title)
+            if args.labels.xlabel is not None:
+                ax.axis.set_xlabel(args.labels.xlabel)
+            if args.labels.ylabel is not None:
+                ax.axis.set_ylabel(args.labels.ylabel)
+            if args.labels.title is not None:
+                ax.axis.set_title(args.labels.title)
 
 
         # Update the stored limit definitions, if not `..`
@@ -321,20 +318,24 @@ class Plot(CommandHandler):
             _al, _au = ax.xlimits
             match args.xlimits.lower:
                 case NumberUnit(_l, _, _) if _l == -np.inf:...
-                case _: _al = args.xlimits.lower
+                case _:
+                    _al = args.xlimits.lower
             match args.xlimits.upper:
                 case NumberUnit(_u, _, _) if _u == np.inf:...
-                case _: _au = args.xlimits.upper
+                case _:
+                    _au = args.xlimits.upper
             ax.xlimits = (_al, _au)
             
         if args.ylimits is not None:
             _al, _au = ax.ylimits
             match args.ylimits.lower:
                 case NumberUnit(_l, _, _) if _l == -np.inf:...
-                case _: _al = args.ylimits.lower
+                case _:
+                    _al = args.ylimits.lower
             match args.ylimits.upper:
                 case NumberUnit(_u, _, _) if _u == np.inf:...
-                case _: _au = args.ylimits.upper
+                case _:
+                    _au = args.ylimits.upper
             ax.ylimits = (_al, _au)
         
         # Act on the limit definitions, if the limit is not None or inf / -inf
@@ -345,7 +346,8 @@ class Plot(CommandHandler):
                 _xlow = max([np.min(x) for x,_ in ax._lines])
             case NumberUnit(_l,_,_) if _l != -np.inf:
                 _xlow = _l
-            case _: _xlow = None
+            case _:
+                _xlow = None
         if _xlow is not None:
             ax.axis.set_xlim(left = _xlow)
 
@@ -356,7 +358,8 @@ class Plot(CommandHandler):
                 _xhig = min([np.max(x) for x,_ in ax._lines])
             case NumberUnit(_l,_,_) if _l != np.inf:
                 _xhig = _l
-            case _: _xhig = None
+            case _:
+                _xhig = None
         if _xhig is not None:
             ax.axis.set_xlim(right = _xhig)
 
@@ -369,7 +372,8 @@ class Plot(CommandHandler):
                 _ylow = max([np.min(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
             case NumberUnit(_l,_,_) if _l != -np.inf:
                 _ylow = _l
-            case _: _ylow = None
+            case _:
+                _ylow = None
 
         match ax.ylimits[1]:
             case Bound.EXTERNAL:
@@ -378,7 +382,8 @@ class Plot(CommandHandler):
                 _yhig = min([np.max(y[(x>=_xlow)&(x<=_xhig)]) for x,y in ax._lines])
             case NumberUnit(_l,_,_) if _l != np.inf:
                 _yhig = _l
-            case _: _yhig = None
+            case _:
+                _yhig = None
         
         match ax.ylimits[0], ax.ylimits[1]:
             case Bound(), Bound():
