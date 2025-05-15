@@ -26,7 +26,7 @@ EstraPy is &copy; 2024-{{ "now" | date: "%Y" }} by [Marco Stecca](https://github
 
 ### License
 
-Just the Docs is distributed by an [MIT license](https://github.com/ramsteak/EstraPy/blob/main/LICENSE).
+EstraPy is distributed by an [MIT license](https://github.com/ramsteak/EstraPy/blob/main/LICENSE).
 
 ### Contributing
 

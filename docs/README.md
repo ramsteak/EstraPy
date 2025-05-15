@@ -1,3 +1,0 @@
-# EstraPy
-
-Test documentation
