@@ -162,7 +162,8 @@ class Rebin(CommandHandler):
             df = data.datums[domain]
             df.df = df.df.groupby(dig).mean().loc[1:len(newx),:]
             df.df.loc[:,axis] = newx[df.df.index-1]
-            
+        
+        # TODO: log
         return CommandResult(True)
 
     @staticmethod

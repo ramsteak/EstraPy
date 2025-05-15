@@ -229,32 +229,36 @@ class Deglitch(CommandHandler):
                     u = norm.ppf(1-pvalue/2) * std
                     g[idx] = np.abs(y) > u
             
-            match (args.method, b, std):
-                case Method_Remove(), _, _:
-                    data.datums[domain].df = data.datums[domain].df[idx]
-                case (Method_Base(noise), b, std):
-                    if b is None or std is None:
-                        raise RuntimeError("Method base requires estimation of the baseline and standard deviation.")
-                    if args.column != "a":
-                        raise RuntimeError("Method base can only be used if the column is a")
-                    newcol = I.copy()
-                    if noise: n = np.random.normal(0, std, g.sum())
-                    else: n = np.zeros(g.sum())
-                    
-                    newcol[g] = b[g[idx]]+n
-                    data.mod_col("a", newcol)
-                    pass
-                case (Method_Smooth(noise, fraction), _, _):
-                    x = data.get_col_("E", domain=domain)
-                    y = data.get_col_("a", domain=domain)
-                    s = lowess(y[~g],x[~g], it=0, frac=fraction, return_sorted=False, xvals=x)
-                    std = (y-s)[idx].std()
-                    if noise: n = np.random.normal(0, std, g.sum())
-                    else: n = np.zeros(g.sum())
-                    
-                    yn = y.copy()
-                    yn[g] = s[g]+n
-                    pass
+            if (_sum:=sum(g)) > 1:
+                log.debug(f"{data.meta.name}: Found glitch in the region {range.lower.value}{range.lower.unit} ~ {range.upper.value}{range.upper.unit} of width {_sum} points.")
+
+                match (args.method, b, std):
+                    case Method_Remove(), _, _:
+                        data.datums[domain].df = data.datums[domain].df[idx]
+                        log.debug(f"{data.meta.name}: Removed glitched region.")
+                    case (Method_Base(noise), b, std):
+                        if b is None or std is None:
+                            raise RuntimeError("Method base requires estimation of the baseline and standard deviation.")
+                        if args.column != "a":
+                            raise RuntimeError("Method base can only be used if the column is a")
+                        newcol = I.copy()
+                        if noise: n = np.random.normal(0, std, g.sum())
+                        else: n = np.zeros(g.sum())
+                        
+                        newcol[g] = b[g[idx]]+n
+                        data.mod_col("a", newcol)
+                        log.debug(f"{data.meta.name}: Removed glitch, replaced with baseline data.")
+                    case (Method_Smooth(noise, fraction), _, _):
+                        x = data.get_col_("E", domain=domain)
+                        y = data.get_col_("a", domain=domain)
+                        s = lowess(y[~g],x[~g], it=0, frac=fraction, return_sorted=False, xvals=x)
+                        std = (y-s)[idx].std()
+                        if noise: n = np.random.normal(0, std, g.sum())
+                        else: n = np.zeros(g.sum())
+                        
+                        yn = y.copy()
+                        yn[g] = s[g]+n
+                        log.debug(f"{data.meta.name}: Removed glitch, replaced with smoothed data.")
             
 
         return CommandResult(True)
@@ -382,6 +386,12 @@ class MultiEdge(CommandHandler):
             data.datums[Domain.REAL].add_col(E, Column(None, None, DataColType.MULTIEDGE), "mult", False)
             data.datums[Domain.REAL].mod_col("a", Y-E)
 
+            match args.method:
+                case ArcTangent(a, b, c): msg = f"atan({b}, {a}, {c})"
+                case ErrorFunction(a, b, c): msg = f"erf({b}, {a}, {c})"
+                case Exponential(a, b, c): msg = f"exp({b}, {a}, {c})"
+                case HyperTangent(a, b, c): msg = f"tanh({b}, {a}, {c})"
+            log.debug(f"{data.meta.name}: Removed multiple excitation contribution as {msg}")
         return CommandResult(True)
 
     @staticmethod

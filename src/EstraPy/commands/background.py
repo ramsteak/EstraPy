@@ -125,6 +125,7 @@ class Background(CommandHandler):
                     S = np.full_like(X, value)
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
+                    log.debug(f"{data.meta.name}: Removed background as constant with value {value}.")
             
             case BSpline(kweight, _range):
                 domain = _range.domain or Domain.REAL
@@ -146,6 +147,8 @@ class Background(CommandHandler):
 
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
+                    log.debug(f"{data.meta.name}: Removed background as B-Spline contribution, with k-weight {kweight}.")
+
             
             case Fourier(kweight, Rmax, iterations):
                 for data in context.data:
@@ -171,6 +174,7 @@ class Background(CommandHandler):
 
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
+                    log.debug(f"{data.meta.name}: Removed background as Fourier contribution, up to {Rmax}A, with k-weight {kweight}.")
             
             case Smoothing(kweight, _range, fraction, iterations):
                 domain = _range.domain or Domain.REAL
@@ -191,6 +195,7 @@ class Background(CommandHandler):
                     S[idx] = s / x ** kweight
                     data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
                     data.mod_col("x", Y-S)
+                    log.debug(f"{data.meta.name}: Removed background as smoothed contribution, with k-weight {kweight}.")
             case _:
                 raise NotImplementedError("Method not implemented")
 

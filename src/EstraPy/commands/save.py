@@ -172,12 +172,14 @@ class Save(CommandHandler):
                 cols:list[pd.Series] = []
                 for data in context.data:
                     x,y = get_column_(column, data)
-                    X = pd.Series(x, name=f"{column.xcol}_{data.meta.name}")
+                    X = pd.Series(x, name=f"{column.xdef}_{data.meta.name}")
                     cols.append(X)
-                    Y = pd.Series(y, name=f"{column.ycol}_{data.meta.name}")
+                    Y = pd.Series(y, name=f"{column.ydef}_{data.meta.name}")
                     cols.append(Y)
                 df = pd.concat(cols, axis=1)
                 save_df_to_dat(outfile, df, index=False)
+                log.info(f"Saved data batch to {outfile} as {column.xdef}:{column.ydef}.")
+
             case Aligned(fname, align, column):
                 outfile = context.paths.outputdir / fname
                 if column.xcol is None:
@@ -204,7 +206,9 @@ class Save(CommandHandler):
                     out.append(pd.Series(y, x, name=data.meta.name))
                 df = pd.concat(out, axis=1)
                 save_df_to_dat(outfile, df, index=True)
-                    
+                
+                log.info(f"Saved aligned data to {outfile} as {column.xdef}:{column.ydef}.")
+
 
             case Each(fname, columns):
                 outnames:dict[str,int] = {}
@@ -226,6 +230,8 @@ class Save(CommandHandler):
                     df = pd.concat(cols, axis=1)
                     head = get_var_headers(data.meta)
                     save_df_to_dat(outfile, df, index=False, head=head)
+                    
+                    log.info(f"{data.meta.name}: Saved file to {outfile} with columns {" ".join(c.ydef for c in columns)}.")
     
         return CommandResult(True)
 

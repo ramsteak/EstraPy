@@ -91,6 +91,7 @@ class Phase(CommandHandler):
                     data.mod_col("f", corrected)
                     data.add_col("pcorr", P, Column(None, None, FourierType.PHASE), Domain.FOURIER)
                     data.meta.run["phasecorrect"] = phase
+                    log.debug(f"{data.meta.name}: Removed linear phase contribution.")
 
             case PhaseAction.ALIGN:
                 for dataidx, data in enumerate(context.data):
@@ -104,6 +105,7 @@ class Phase(CommandHandler):
                     dot = np.vdot(firstdata, f)
                     c = dot / np.abs(dot)
                     data.mod_col("f", f * c.conj())
+                    log.debug(f"{data.meta.name}: Aligned all spectra to minimize distance to first.")
 
 
         return CommandResult(True)
