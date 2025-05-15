@@ -16,6 +16,7 @@ Alternatively, clone the github repository and build from source:
 
 ```sh
 gh repo clone ramsteak/EstraPy
+cd ./EstraPy
 python -m build
 ```
 
