@@ -1,11 +1,11 @@
-title: EstraPy2
-description: Documentation for the XANESE/EXAFS analysis tool EstraPy2
+title: EstraPy
+description: Documentation for the XANESE/EXAFS analysis tool EstraPy
 theme: just-the-docs
 
-url: https://ramsteak.github.io/EstraPy2/
+url: https://ramsteak.github.io/EstraPy/
 
 aux_links:
-  GitHub: https://github.com/ramsteak/EstraPy2
+  GitHub: https://github.com/ramsteak/EstraPy
 
 color_scheme: dark
 

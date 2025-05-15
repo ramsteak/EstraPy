@@ -16,7 +16,7 @@ EstraPy uses input files, written in a simple to read syntax, to perform analysi
 EstraPy is run by the command line, and executes the commands one by one.
 
 [Installation]({{ "/installation" | relative_url }}){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
-[Examples](https://github.com/ramsteak/EstraPy2/tree/main/example){: .btn .fs-5 .mb-4 .mb-md-0 }
+[Examples](https://github.com/ramsteak/EstraPy/tree/main/example){: .btn .fs-5 .mb-4 .mb-md-0 }
 
 ---
 
@@ -26,8 +26,8 @@ EstraPy is &copy; 2024-{{ "now" | date: "%Y" }} by [Marco Stecca](https://github
 
 ### License
 
-Just the Docs is distributed by an [MIT license](https://github.com/ramsteak/EstraPy2/blob/main/LICENSE).
+Just the Docs is distributed by an [MIT license](https://github.com/ramsteak/EstraPy/blob/main/LICENSE).
 
 ### Contributing
 
-To report issues with the program, you can create a new [issue](https://github.com/ramsteak/EstraPy2/issues) in the github section. Be sure to upload both your input file and the relevant data files, along with the output log file.
+To report issues with the program, you can create a new [issue](https://github.com/ramsteak/EstraPy/issues) in the github section. Be sure to upload both your input file and the relevant data files, along with the output log file.

@@ -1,3 +1,3 @@
-# EstraPy2
+# EstraPy
 
 Test documentation
