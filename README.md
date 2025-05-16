@@ -1,7 +1,7 @@
 # EstraPy
 
 EstraPy is a synchrotron analysis tool, built in Python 3.
-It uses input files, written in a simple to read syntax, to perform analysis of synchrotron data files. The program supports the import, main data handling, plotting and output data.
+It uses input files, written in a simple to read syntax, to perform analysis of synchrotron data files. The program supports the import, main data handling, plotting and output data. The documentation is available [here](https://ramsteak.github.io/EstraPy/).
 EstraPy is run by the command line, and executes the commands one by one.
 
 To download the latest release of EstraPy, navigate to the [releases](https://github.com/ramsteak/EstraPy/releases) section of the [repository](https://github.com/ramsteak/EstraPy/) and download the latest release. Install with your python package manager, such as:
