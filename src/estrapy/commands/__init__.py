@@ -1,5 +1,5 @@
 from .edge import Align, Edge
-from .filein import FileIn, BatchIn
+from .filein import FileIn, BatchIn, FileTest
 from .fourier import Fourier
 from .preedge import PreEdge
 from .postedge import PostEdge
@@ -9,6 +9,7 @@ from .background import Background
 from .othercmds import Cut, Smooth, Rebin
 from .glitch import Deglitch, MultiEdge
 from .save import Save
+from .pca import PCA
 
 from ._handler import CommandHandler
 
@@ -29,4 +30,6 @@ commands: dict[str, CommandHandler] = {
     "deglitch": Deglitch(),
     "multiedge": MultiEdge(),
     "save": Save(),
+    "test": FileTest(),
+    "pca": PCA(),
 }

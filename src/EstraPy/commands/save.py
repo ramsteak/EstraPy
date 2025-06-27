@@ -23,10 +23,10 @@ from .plot import ColKind, parse_column, get_column_
 
 def save_df_to_dat(filename:str|Path, df:pd.DataFrame,*, index:bool=False, head:str|None=None, mode:str="wt"):
     colwidth = 16
-    decformat = np.vectorize(lambda x:format(x, "<10.6f").ljust(colwidth))
-    sdecformat = np.vectorize(lambda x:format(x, "<+10.6f").ljust(colwidth))
-    sciformat = np.vectorize(lambda x:format(x, "<10.6e").ljust(colwidth))
-    ssciformat = np.vectorize(lambda x:format(x, "<+10.6e").ljust(colwidth))
+    decformat = np.vectorize(lambda x,cw=colwidth:format(x, "<10.6f").ljust(cw))
+    sdecformat = np.vectorize(lambda x,cw=colwidth:format(x, "<+10.6f").ljust(cw))
+    sciformat = np.vectorize(lambda x,cw=colwidth:format(x, "<10.6e").ljust(cw))
+    ssciformat = np.vectorize(lambda x,cw=colwidth:format(x, "<+10.6e").ljust(cw))
 
     def formatcol(x:npt.NDArray) -> npt.NDArray[np.str_]:
         sci = ((x != 0)&(np.abs(np.log(np.abs(x + np.finfo(x.dtype).eps))) >= 4)).any()

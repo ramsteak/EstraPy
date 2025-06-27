@@ -101,7 +101,8 @@ class Rebin(CommandHandler):
         parser.add_argument("--number", "-n", nargs="?", type=int)
 
         args = parser.parse(tokens)
-
+        # TODO: range must be inclusive
+        # Ensure all points are satisfied
         if args.number is not None:
             region = parse_range(*args.region, number=args.number)
         else:
@@ -170,3 +171,5 @@ class Rebin(CommandHandler):
     def undo(args: NamedTuple, context: Context) -> CommandResult:
         # TODO:
         raise NotImplementedError
+
+

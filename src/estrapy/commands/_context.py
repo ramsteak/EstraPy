@@ -292,12 +292,16 @@ class Data:
     def get_col_(self, colname:str|None = ..., *, coltype: ColumnType = ..., domain: Domain = ...) -> npt.NDArray: # type: ignore
         return self.get_col(colname, coltype=coltype, domain=domain).to_numpy()
     
-    def get_xy(self, xname:str, yname:str) -> pd.Series:
+    def get_xy_(self, xname:str, yname:str) -> tuple[npt.NDArray, npt.NDArray]:
         xd = self._get_col_domain(xname)
         yd = self._get_col_domain(yname)
         if xd != yd: raise KeyError("X and Y columns are on different domains.")
 
-        return pd.Series(self.get_col_(yname), self.get_col_(xname), name=yname)
+        return self.get_col_(xname, domain = xd), self.get_col_(yname, domain = xd)
+
+    def get_xy(self, xname:str, yname:str) -> pd.Series:
+        x,y = self.get_xy_(xname, yname)
+        return pd.Series(y, x, name=yname)
 
 
 class DataStore:

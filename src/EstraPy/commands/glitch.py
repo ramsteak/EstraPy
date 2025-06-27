@@ -234,7 +234,7 @@ class Deglitch(CommandHandler):
 
                 match (args.method, b, std):
                     case Method_Remove(), _, _:
-                        data.datums[domain].df = data.datums[domain].df[idx]
+                        data.datums[domain].df = data.datums[domain].df[~idx]
                         log.debug(f"{data.meta.name}: Removed glitched region.")
                     case (Method_Base(noise), b, std):
                         if b is None or std is None:

@@ -6,6 +6,9 @@ import numpy.typing as npt
 # from matplotlib import pyplot as plt
 from matplotlib.axes import Axes
 from scipy.interpolate import interp1d
+from matplotlib import pyplot as plt
+
+
 
 from enum import Enum
 from typing import NamedTuple, Any
@@ -16,7 +19,7 @@ from dataclasses import dataclass
 
 from ._context import Context, Column, AxisType, FigureSettings, FigureRuntime
 from ._handler import CommandHandler, Token, CommandResult
-from ._misc import E_to_sk, parse_edgeenergy
+from ._misc import E_to_sk, parse_edgeenergy, nderivative
 from ._numberunit import NumberUnit, parse_nu, Domain
 from ._parser import CommandParser
 
@@ -56,7 +59,10 @@ class Finder(Method):
     dE0: float
 
 @dataclass(slots=True, frozen=True)
-class Across(Method):...
+class Across(Method):
+    resolution: int
+    dE0: float
+    # corrshift: int
 
 
 class Args_Align(NamedTuple):
@@ -65,21 +71,20 @@ class Args_Align(NamedTuple):
     E0: float
 
     wplot: bool
-    rplot: bool
 
 
 class Args_Edge(NamedTuple):
     method: Method
 
     wplot: bool
-    rplot: bool
 
-def norm(x:npt.NDArray, center:bool=False) -> npt.NDArray:
+def _get_norm(x:npt.NDArray, shiftcenter:bool=False) -> tuple[float, float]:
     m,M = np.min(x), np.max(x)
-    if center:
-        return x / (max(abs(M), abs(m)))
-    else:
-        return (x-m)/(M-m)
+    if shiftcenter: return m, M-m
+    else:           return 0, max(abs(M), abs(m))
+
+def norm(x:npt.NDArray, center:float, factor:float) -> npt.NDArray:
+    return (x-center) / factor
 
 def find_E0_with_method(
     method: list[tuple[Operation, int | None]],
@@ -92,7 +97,8 @@ def find_E0_with_method(
 
     h: list[tuple[str, Any]] = [("data", (_y, _x - E0shift))]
     _current_bound: tuple[float, float] = np.min(_x) - E0shift, np.max(_x) - E0shift # type: ignore
-    _norm_center = False
+    _deriv_order = 0
+    _norm_factor:dict[int, tuple[float, float]] = {}
 
     bounds = _bounds[0] - E0shift, _bounds[1] - E0shift
 
@@ -120,7 +126,10 @@ def find_E0_with_method(
                 _current_bound = a,b
 
                 if ax:
-                    ax.plot(x[idx], norm(y[idx], _norm_center), label=f"c{arg}")
+                    if _deriv_order not in _norm_factor:
+                        _norm_factor[_deriv_order] = _get_norm(y[idx], _deriv_order == 0)
+                    
+                    ax.plot(x[idx], norm(y[idx], *_norm_factor[_deriv_order]), label=f"c{arg}")
 
             case [Operation.POLYFIT, "data"]:
                 if arg is None:
@@ -133,7 +142,7 @@ def find_E0_with_method(
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, norm(poly(_pX), _norm_center), label=f"p{arg}")
+                    ax.plot(_pX, norm(poly(_pX), *_norm_factor[_deriv_order]), label=f"p{arg}")
 
             case [Operation.SMOOTH, "data"]:
                 if arg is None:
@@ -145,7 +154,7 @@ def find_E0_with_method(
                 h.append(("data", (y, x)))
 
                 if ax:
-                    ax.plot(x, norm(y, _norm_center), label=f"s{arg}")
+                    ax.plot(x, norm(y, *_norm_factor[_deriv_order]), label=f"s{arg}")
 
             case [Operation.DERIVATIVE, "data"]:
                 if arg is None:
@@ -153,26 +162,31 @@ def find_E0_with_method(
                 y, x = data  # type: ignore
                 y: npt.NDArray[np.floating]
                 x: npt.NDArray[np.floating]
-                for _ in range(arg):
-                    y = np.gradient(y, x)
+                y = nderivative(y, arg, x) # type: ignore
+                _deriv_order += arg
                 h.append(("data", (y, x)))
-                _norm_center = True
 
                 if ax:
-                    ax.plot(x, norm(y, _norm_center), label=f"d{arg}")
+                    if _deriv_order not in _norm_factor:
+                        _norm_factor[_deriv_order] = _get_norm(y, _deriv_order == 0)
+                    ax.plot(x, norm(y, *_norm_factor[_deriv_order]), label=f"d{arg}")
 
             case [Operation.DERIVATIVE, "poly"]:
                 if arg is None:
                     continue
                 poly = data
                 poly: np.poly1d
-                for _ in range(arg):
-                    poly = poly.deriv()
+                poly = poly.deriv(arg)
+                _deriv_order += arg
+
                 h.append(("poly", poly))
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, norm(poly(_pX), _norm_center), label=f"p{arg}")
+                    if _deriv_order not in _norm_factor:
+                        _norm_factor[_deriv_order] = _get_norm(poly(_pX), _deriv_order == 0)
+
+                    ax.plot(_pX, norm(poly(_pX), *_norm_factor[_deriv_order]), label=f"p{arg}")
 
             case [Operation.INTERPOLATE, "data"]:
                 if arg is None:
@@ -185,7 +199,7 @@ def find_E0_with_method(
 
                 if ax:
                     _pX = np.linspace(*_current_bound, 1001)
-                    ax.plot(_pX, norm(interp(_pX), _norm_center), label=f"i{arg}")
+                    ax.plot(_pX, norm(interp(_pX), *_norm_factor[_deriv_order]), label=f"i{arg}")
 
             case [Operation.MAXIMUM, "data"]:
                 y, x = data  # type: ignore
@@ -317,40 +331,60 @@ class Align(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Align:
         parser = CommandParser("align", description="Aligns the reference data to a standard or a reference E0 value.")
-        parser.add_argument("method", help="Uses the specified method to find the E0.")
-        parser.add_argument("--E0", "-E", type=parse_edgeenergy, required=True, help="Sets the E0 value for the edge.")
-        parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
-        parser.add_argument("--search","-s",type=parse_edgeenergy,help="Searches around this value. If not set, searches around E0")
-        parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
-        parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
+        subparser = parser.add_subparsers(dest="method")
+        at = subparser.add_parser("at")
+        at.add_argument("operations", help="The series of operations to find the E0.")
+        at.add_argument("--E0", "-E", type=parse_edgeenergy, required=True, help="Sets the E0 value for the edge.")
+        at.add_argument("--dE0", "-d", help="Interval search width.", required=True)
+        at.add_argument("--search","-s",type=parse_edgeenergy,help="Searches around this value. If not set, searches around E0")
+        at.add_argument("--wplot", action="store_true", help="Plots the result of the edge search.")
+
+        shift = subparser.add_parser("shift")
+        shift.add_argument("--dE0", "-d", help="Interval search width.", required=True)
+        shift.add_argument("--resolution", default=30, type=int, help="The resolution multiplier.")
+        shift.add_argument("--wplot", action="store_true", help="Plots the result of the edge search.")
+
+
+        # parser.add_argument("method", help="Uses the specified method to find the E0.")
+        # parser.add_argument("--E0", "-E", type=parse_edgeenergy, required=True, help="Sets the E0 value for the edge.")
+        # parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
+        # parser.add_argument("--search","-s",type=parse_edgeenergy,help="Searches around this value. If not set, searches around E0")
+        # parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
+        # parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
+        # parser.add_argument("--resolution", default=30, type=int)
+
 
         args = parser.parse(tokens)
 
-        E0 = args.E0
-        search = args.search if args.search is not None else E0
-
-        if args.dE0 is not None:
-            _dE0 = args.dE0
-            _dE0: NumberUnit
-            if _dE0.unit != "eV":
-                raise ValueError(f'Unit mismatch: unit "{_dE0.unit}" is not compatible with eV.')
-            dE0 = _dE0.value
-        else:
-            dE0 = 5.0
-
         match args.method:
-            case "across":
-                method = Across()
-            case str(ops):
-                if ops in _method_aliases:
-                    ops = _method_aliases[ops]
-                method = Finder(parse_method_to_ops(ops),search, dE0)
+            case "at":
+                E0 = args.E0
+                search = args.search if args.search is not None else E0
+                dE0 = parse_nu(args.dE0)
+                if dE0.unit != "eV":
+                    raise ValueError(f'Unit mismatch: unit "{dE0.unit}" is not compatible with eV.')
+                dE0 = dE0.value
+
+                if args.operations in _method_aliases:
+                    ops = _method_aliases[args.operations]
+                else: ops = args.operations
+                
+                method = Finder(parse_method_to_ops(ops), search, dE0)
+
+            case "shift":
+                dE0 = parse_nu(args.dE0)
+                if dE0.unit != "eV":
+                    raise ValueError(f'Unit mismatch: unit "{dE0.unit}" is not compatible with eV.')
+                dE0 = dE0.value
+                method = Across(args.resolution, dE0)
+                E0 = None
+
+            case _: raise ValueError("Unknown method")
 
         return Args_Align(
             method,
             E0,
             args.wplot,
-            args.rplot,
         )
 
     @staticmethod
@@ -365,6 +399,7 @@ class Align(CommandHandler):
 
                     if args.wplot:
                         fignum = context.figures.get_high_figurenum()
+                        # TODO: remove FigureRuntime and FigureSettings
                         figure = FigureRuntime.new(FigureSettings(fignum, (1,1)))
                         context.figures.figureruntimes[fignum] = figure
                         ax = figure.axes[(1,1)].axis
@@ -403,23 +438,52 @@ class Align(CommandHandler):
                     if data.meta.E0 is not None:
                         data.meta.E0 = data.meta.E0 - shift
 
-            case Across():
-                raise NotImplementedError()
-                # rXs = [data.get_col_("E") for data in context.data]
-                # rYs = [data.get_col_("a") for data in context.data]
-                # rdYs = [np.gradient(Y,X) for X,Y in zip(rXs, rYs)]
+            case Across(resolution, dE0):
+                rXY = [data.get_xy_("E", "ref") for data in context.data]
+
+                # Get common interpolation X axis
+                m, M = max(np.min(rX) for rX,_ in rXY), min(np.max(rX) for rX,_ in rXY)
+                dx = np.median(np.concat([np.diff(rX) for rX,_ in rXY]))
+                newdx = dx/resolution
+                cX = np.arange(m, M, newdx)
+
+                # Interpolate the gradients onto the common grid
+                drXY = [(rX, np.gradient(rY)) for rX, rY in rXY]
+                dYs = [interp1d(rX, drY, "cubic")(cX) / np.std(drY) for rX, drY in drXY]
+
+                # Calculate the point shift from the dE0
+                corrshift = int(np.ceil(dE0 / newdx))
+                corrs = [np.correlate(dY, dYs[0][corrshift:-corrshift], "valid") for dY in dYs]
+                cx = np.linspace(-newdx * corrshift, newdx * corrshift, len(corrs[0]))
+
+                shifts = np.array([np.poly1d(np.polyfit(cx, corr, 2)).deriv().roots[0] for corr in corrs])
+                shifts = shifts - np.mean(shifts)
+
+                for data, shift in zip(context.data, shifts):
+                    data.mod_col("E", data.get_col_("E") - shift)
+                    data.meta.refE0 = args.E0
+
+                if args.wplot:
+                    fignum = context.figures.get_high_figurenum()
+                    fig = plt.figure(fignum)
+                    ax11 = fig.add_subplot(2,2,1)
+                    ax11.hist(shifts, bins=30)
+
+                    ax12 = fig.add_subplot(2,2,2)
+                    for c in corrs:
+                        ax12.plot(cx, c)
+                    
+                    ax21 = fig.add_subplot(2,2,3)
+                    ax21.plot(shifts)
+
+                    ax21 = fig.add_subplot(2,2,4)
+                    for rX, rY in rXY:
+                        plt.plot(rX, rY, color="blue")
+                    for rX, rY in rXY:
+                        plt.plot(rX, rY, color="red", alpha=0.5, linewidth=1)
+                    
+
                 
-
-                # m,M = max(rX.min() for rX in rXs), min(rX.max() for rX in rXs)
-                # dx = np.mean([np.diff(rX) for rX in rXs])
-                # D = M - m
-                # X = np.arange(m + D*0.05, M - D*0.6, dx/100)
-
-                # dYs = [interp1d(rX, rdY)(X) for rX,rdY in zip(rXs, rdYs)]
-                # dYs = [(Y)/np.std(Y) for Y in dYs]
-
-                # c = correlate(dYs[0], dYs[1][400:-400], "valid")
-                # pass
         return CommandResult(True)
 
     @staticmethod
@@ -432,11 +496,10 @@ class Edge(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Edge:
         parser = CommandParser("edgeenergy", description="Aligns the reference data to a standard or a reference E0 value.")
-        parser.add_argument("method", help="Uses the specified method to find the E0.")
+        parser.add_argument("operations", help="Uses the specified method to find the E0.")
         parser.add_argument("--E0", "-E", type=parse_edgeenergy, help="Searches around this value. If not set, searches around reference E0.")
         parser.add_argument("--dE0", "-d", type=parse_nu, help="Interval search width.")
         parser.add_argument("--wplot", action="store_true", help="Plots the result of each edge search.")
-        parser.add_argument("--rplot", action="store_true", help="Plots the result of all edge searches together.")
 
         args = parser.parse(tokens)
 
@@ -451,7 +514,7 @@ class Edge(CommandHandler):
         else:
             dE0 = 5.0
 
-        match args.method:
+        match args.operations:
             case str(ops):
                 if ops in _method_aliases:
                     ops = _method_aliases[ops]
@@ -460,7 +523,6 @@ class Edge(CommandHandler):
         return Args_Edge(
             method,
             args.wplot,
-            args.rplot,
         )
 
     @staticmethod
@@ -496,6 +558,9 @@ class Edge(CommandHandler):
                         E0 = find_E0_with_method(ops, (E0s - dE0, E0s + dE0), y, x, ax=ax) # type: ignore
                     except ValueError:
                         log.error(f"{data.meta.name}: Cannot find E0 value with the specified method.")
+                        if ax is not None:
+                            ax.legend()
+                            figure.show()
                         continue
 
                     # Check where the value falls. If it is outside the range, error
@@ -514,7 +579,7 @@ class Edge(CommandHandler):
                     if data.meta.refE0:
                         relativeE0 = E0 - data.meta.refE0
                         log.info(
-                            f"{data.meta.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV)"
+                            f"{data.meta.name}: Found E0 value at {E0:.3f}eV ({relativeE0:+.3f}eV from reference)"
                         )
                     else:
                         log.info(f"{data.meta.name}: Found E0 value at {E0:.3f}eV")

@@ -15,7 +15,7 @@ All EstraPy input files must follow a consistent syntax. When an input file is i
 The first line of every input file must declare the EstraPy version it was written for. If the file requires a newer version than the one installed, the program will prompt you to update. If the file uses an older version, the program will attempt to upgrade the input file to the current syntax.
 
 ```sh
-# version: 1.0.0
+# version: 1.0.1
 ```
 
 ## Directives

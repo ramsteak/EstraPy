@@ -16,6 +16,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 from ._context import Context, Data, FigureRuntime, FigureSettings
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import NumberUnit, Bound, parse_range, NumberUnitRange
+from ._misc import nderivative
 
 from ._parser import CommandParser
 
@@ -53,7 +54,7 @@ class ColKind(NamedTuple):
     ydef: str
 
 def derivative(y:npt.NDArray, x:npt.NDArray, d:int=1) -> npt.NDArray:
-    raise NotImplementedError()
+    return nderivative(y, d, x) # type: ignore
 
 def weight(y:npt.NDArray, x:npt.NDArray, d:int=0) -> npt.NDArray:
     if d <= 0: return y
@@ -102,11 +103,11 @@ def parse_column(p:str) -> ColKind:
             case "i": op = lambda y,_: np.imag(y)
             case "a": op = lambda y,_: np.abs(y)
             case "p": op = lambda y,_: np.unwrap(np.angle(y))
-            case "s": op = lambda y,x: partial(smooth,       d=factor)(y,x)
-            case "d": op = lambda y,x: partial(derivative,   d=factor)(y,x)
-            case "k": op = lambda y,x: partial(weight,       d=factor)(y,x)
-            case "w": op = lambda y,x: partial(weight_one,   d=factor)(y,x)
-            case "W": op = lambda y,x: partial(weight_noavg, d=factor)(y,x)
+            case "s": op = lambda y,x,f=factor: partial(smooth,       d=f)(y,x)
+            case "d": op = lambda y,x,f=factor: partial(derivative,   d=f)(y,x)
+            case "k": op = lambda y,x,f=factor: partial(weight,       d=f)(y,x)
+            case "w": op = lambda y,x,f=factor: partial(weight_one,   d=f)(y,x)
+            case "W": op = lambda y,x,f=factor: partial(weight_noavg, d=f)(y,x)
             case _: raise ValueError(f"Unknown x operation: {ys}")
         y_ops.append(op)
     ycol = y_spec[-1]
@@ -116,10 +117,12 @@ def parse_column(p:str) -> ColKind:
 def get_column_(col:ColKind, data:Data) -> tuple[npt.NDArray, npt.NDArray]:
     domain = data._get_col_domain(col.ycol)
     x = data.get_col_(col.xcol, domain=domain)
-    for op in col.xop: x = op(x)
+    for op in col.xop:
+        x = op(x)
 
     y = data.get_col_(col.ycol, domain=domain)
-    for op in col.yop: y = op(y,x)
+    for op in col.yop:
+        y = op(y,x)
 
     return x,y
 
@@ -292,7 +295,10 @@ class Plot(CommandHandler):
                 case False, _:
                 # Value is quantitative
                     m,M = min(_colorby), max(_colorby)
-                    colors = args.colormap.cmap((_colorby-m)/(M-m))
+                    if np.isclose(m-M, 0):
+                        colors = args.colormap.cmap(np.zeros_like(_colorby))
+                    else:
+                        colors = args.colormap.cmap((_colorby-m)/(M-m))
                     pass
                     
 
