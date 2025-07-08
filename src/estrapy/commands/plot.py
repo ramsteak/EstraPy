@@ -35,6 +35,7 @@ class Args_Plot(NamedTuple):
     plot: ColKind | None
     figure: FigureSettings
     labels: Labels | None
+    suptitle: str
     xlimits: NumberUnitRange | None
     ylimits: NumberUnitRange | None
     vshift: float
@@ -43,6 +44,7 @@ class Args_Plot(NamedTuple):
     alpha: float
     linewidth: float
     linestyle: str | tuple[Literal[0], tuple[int,...]]
+    legend: bool
     show: bool
 
 class ColKind(NamedTuple):
@@ -140,6 +142,7 @@ class Plot(CommandHandler):
         parser.add_argument("--xlabel")
         parser.add_argument("--ylabel")
         parser.add_argument("--title")
+        parser.add_argument("--suptitle")
         parser.add_argument("--xlim", nargs=2)
         parser.add_argument("--ylim", nargs=2)
         parser.add_argument("--vshift", type=float, default=0)
@@ -148,6 +151,7 @@ class Plot(CommandHandler):
         parser.add_argument("--color", nargs="+")
         parser.add_argument("--alpha", type=float, default=1.0)
         parser.add_argument("--show", action="store_true")
+        parser.add_argument("--legend", action="store_true")
 
         lwidth = parser.add_mutually_exclusive_group()
         lwidth.add_argument("--linewidth", type=float, default=1.0)
@@ -240,6 +244,7 @@ class Plot(CommandHandler):
             plot,
             figure,
             labels,
+            args.suptitle,
             parse_range(*args.xlim) if args.xlim else None,
             parse_range(*args.ylim) if args.ylim else None,
             args.vshift,
@@ -248,6 +253,7 @@ class Plot(CommandHandler):
             args.alpha,
             args.linewidth,
             style,
+            args.legend,
             show
         )
 
@@ -277,7 +283,7 @@ class Plot(CommandHandler):
         if args.plot is not None:
             # Get coloring
             _colorby = np.array([data.meta.get(args.colorby) for data in context.data])
-            qualitative = all(isinstance(_cb, (str, int)) for _cb in _colorby)
+            qualitative = np.issubdtype(_colorby.dtype, np.integer) or np.issubdtype(_colorby.dtype, np.str_)
             
             match qualitative, args.colormap.num:
                 case True, None:
@@ -308,7 +314,15 @@ class Plot(CommandHandler):
 
                 ax._lines.append((x,y))
                 
-                ax.axis.plot(x, y, color = colors[i], linewidth=args.linewidth, alpha=args.alpha, linestyle=args.linestyle)
+                ax.axis.plot(x, y, color=colors[i],
+                             linewidth=args.linewidth,
+                             linestyle=args.linestyle,
+                             alpha=args.alpha,
+                             label=data.meta.name
+                            )
+
+        if args.suptitle is not None:
+            fig.suptitle(args.suptitle)
 
         if args.labels is not None:
             if args.labels.xlabel is not None:
@@ -412,6 +426,9 @@ class Plot(CommandHandler):
             ax.axis.set_ylim(bottom = _ylow)
         if _yhig is not None:
             ax.axis.set_ylim(top = _yhig)
+        
+        if args.legend:
+            ax.axis.legend()
         
 
         if args.show:
