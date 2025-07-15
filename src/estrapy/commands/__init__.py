@@ -10,6 +10,7 @@ from .othercmds import Cut, Smooth, Rebin, Normalize
 from .glitch import Deglitch, MultiEdge
 from .save import Save
 from .pca import PCA
+from .average import Average
 
 from ._handler import CommandHandler
 
@@ -32,4 +33,6 @@ commands: dict[str, CommandHandler] = {
     "save": Save(),
     "test": FileTest(),
     "pca": PCA(),
+    "average": Average(),
+    "normalize": Normalize(),
 }

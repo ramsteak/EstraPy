@@ -169,8 +169,10 @@ class MetaData:
         return False
 
 
-    def get(self, varname:str) -> str | int | float:
+    def get(self, varname:str, *, default:Any=...) -> str | int | float:
         if varname not in self:
+            if default is not ...:
+                return default
             raise RuntimeError(f"Variable {varname} is not defined.")
         match varname:
             case ".st" if self.signaltype is not None:
@@ -219,7 +221,7 @@ class Datum:
         if self.default_axis is None: raise KeyError("No default axis specified.")
         return self.df[self.default_axis]
 
-    def add_col(self, values:npt.NDArray[np.floating | np.complexfloating] | pd.Series, coltype: Column, colname: str, unique:bool=True) -> str:
+    def add_col(self, values:npt.NDArray[np.floating | np.complexfloating] | pd.Series, coltype: Column, colname: str, *, unique:bool=True) -> str:
         if colname in self.cols:
             if unique:
                 raise NameError("A column with the given name already exists.")
