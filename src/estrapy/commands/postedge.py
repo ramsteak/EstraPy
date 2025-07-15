@@ -164,14 +164,16 @@ class PostEdge(CommandHandler):
 
             match args.action:
                 case RemovalOperation.SUBTRACT:
-                    Y1 = (Y - P) / J0
-                    data.add_col("mu", Y1+1, Column(None, None, DataColType.MU), Domain.REAL)
-                    data.add_col("x", Y1, Column(None, None, DataColType.CHI), Domain.REAL)
+                    Y1 = (Y - P) + J0
+                    data.mod_col("a", Y1)
+                    # data.add_col("mu", Y1+1, Column(None, None, DataColType.MU), Domain.REAL)
+                    # data.add_col("x", Y1, Column(None, None, DataColType.CHI), Domain.REAL)
 
                 case RemovalOperation.DIVIDE:
-                    Y1 = Y / P
-                    data.add_col("mu", Y1, Column(None, None, DataColType.MU), Domain.REAL)
-                    data.add_col("x", Y1-1, Column(None, None, DataColType.CHI), Domain.REAL)
+                    Y1 = Y / P * J0
+                    data.mod_col("a", Y1)
+                    # data.add_col("mu", Y1, Column(None, None, DataColType.MU), Domain.REAL)
+                    # data.add_col("x", Y1-1, Column(None, None, DataColType.CHI), Domain.REAL)
 
         return CommandResult(True)
 

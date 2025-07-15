@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import NamedTuple
 from statsmodels.nonparametric.smoothers_lowess import lowess
 
-from ._context import Context, Domain, range_to_index
+from ._context import Context, Domain, range_to_index, DataColType, Column
 from ._handler import CommandHandler, Token, CommandResult
 from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 from ._parser import CommandParser
@@ -173,3 +173,33 @@ class Rebin(CommandHandler):
         raise NotImplementedError
 
 
+
+class Args_Normalize(NamedTuple):
+    var: str
+
+class Normalize(CommandHandler):
+    @staticmethod
+    def parse(tokens: list[Token], context: Context) -> Args_Normalize:
+        parser = CommandParser("normalize", description="Normalizes XAS signal to calculate XANES and EXAFS data.")
+        parser.add_argument("var")
+        args = parser.parse(tokens)
+
+        return Args_Normalize(args.var)
+
+    @staticmethod
+    def execute(args: Args_Normalize, context: Context) -> CommandResult:
+        log = getLogger("normalize")
+
+        for data in context.data:
+            norm = data.meta.get(args.var)
+            a = data.get_col_("a")
+
+            data.add_col("mu", a / norm, Column(None, None, DataColType.MU), Domain.REAL)
+            data.add_col("x", a / norm - 1, Column(None, None, DataColType.CHI), Domain.REAL)
+
+        return CommandResult(True)
+
+    @staticmethod
+    def undo(args: NamedTuple, context: Context) -> CommandResult:
+        # TODO:
+        raise NotImplementedError
