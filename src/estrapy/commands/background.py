@@ -34,6 +34,7 @@ class BSpline(Method):
 @dataclass(slots=True, frozen=True)
 class Fourier(Method):
     Rmax: float
+    range: NumberUnitRange
     iter: int
 
 @dataclass(slots=True, frozen=True)
@@ -78,6 +79,7 @@ class Background(CommandHandler):
 
         fourier = subparsers.add_parser("fourier")
         fourier.add_argument("Rmax")
+        fourier.add_argument("--range", nargs=2)
         fourier.add_argument("--kweight", "-k", default=0, type=float)
         fourier.add_argument("--iterations", "-i", type=int, default=3)
 
@@ -97,19 +99,25 @@ class Background(CommandHandler):
                 method = Constant(args.kweight, args.value)
             case "bspline":
                 range = parse_range(*args.range)
-                if range.domain != Domain.REAL:
-                    raise ValueError("Background must be fitted to the real domain.")
+                if range.domain != Domain.RECIPROCAL:
+                    raise ValueError("Background must be fitted to the reciprocal domain.")
                 method = BSpline(args.kweight, range)
             case "fourier":
                 rmax = parse_nu(args.Rmax)
                 if rmax.unit is None:
                     rmax = NumberUnit(rmax.value, rmax.sign, "A")
                 if rmax.unit != "A": raise ValueError("The max distance must be in angstrom.")
-                method = Fourier(args.kweight, rmax.value, args.iterations)
+                if args.range is not None:
+                    range = parse_range(*args.range)
+                    if range.domain != Domain.RECIPROCAL:
+                        raise ValueError("Background must be fitted to the reciprocal domain.")
+                else:
+                    range = NumberUnitRange(NumberUnit(0, 0, "k"), NumberUnit(np.inf, 0, "k"), None, Domain.RECIPROCAL)
+                method = Fourier(args.kweight, rmax.value, range, args.iterations)
             case "smoothing":
                 range = parse_range(*args.range)
-                if range.domain != Domain.REAL:
-                    raise ValueError("Background must be fitted to the real domain.")
+                if range.domain != Domain.RECIPROCAL:
+                    raise ValueError("Background must be fitted to the reciprocal domain.")
                 method = Smoothing(args.kweight, range, args.fraction, args.iterations)
 
         return Args_Background(method)
@@ -121,16 +129,16 @@ class Background(CommandHandler):
         match args.method:
             case Constant(kweight, value):
                 for data in context.data:
-                    X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
+                    X,Y = data.get_col_("k", domain=Domain.RECIPROCAL), data.get_col_("x", domain=Domain.RECIPROCAL)
                     S = np.full_like(X, value)
-                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.RECIPROCAL)
                     data.mod_col("x", Y-S)
                     log.debug(f"{data.meta.name}: Removed background as constant with value {value}.")
             
             case BSpline(kweight, _range):
-                domain = _range.domain or Domain.REAL
-                if domain != Domain.REAL:
-                    raise RuntimeError("Cannot fit postedge to a different domain.")
+                domain = _range.domain or Domain.RECIPROCAL
+                if domain != Domain.RECIPROCAL:
+                    raise RuntimeError("Cannot fit background to a different domain.")
         
                 _axes = [data.get_col_("k") for data in context.data]
                 bounds = actualize_range(_range, _axes, "k")
@@ -145,15 +153,22 @@ class Background(CommandHandler):
                     S = Y.copy()
                     S[idx] = s / x ** kweight
 
-                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.RECIPROCAL)
                     data.mod_col("x", Y-S)
                     log.debug(f"{data.meta.name}: Removed background as B-Spline contribution, with k-weight {kweight}.")
 
             
-            case Fourier(kweight, Rmax, iterations):
+            case Fourier(kweight, Rmax, _range, iterations):
+                domain = _range.domain or Domain.RECIPROCAL
+                if domain != Domain.RECIPROCAL:
+                    raise RuntimeError("Cannot fit background to a different domain.")
+        
+                _axes = [data.get_col_("k") for data in context.data]
+                bounds = actualize_range(_range, _axes, "k")
+
                 for data in context.data:
-                    X,Y = data.get_col_("k", domain=Domain.REAL), data.get_col_("x", domain=Domain.REAL)
-                    idx = X>=0
+                    X,Y = data.get_col_("k", domain=Domain.RECIPROCAL), data.get_col_("x", domain=Domain.RECIPROCAL)
+                    idx = range_to_index_(data, bounds)
                     x, _y = X[idx], Y[idx]
                     y = _y * x ** kweight
                     eps = 0.3
@@ -163,22 +178,22 @@ class Background(CommandHandler):
                     W = get_flattop_window(r, Rmax/2, Apodizer.HANN, None, 0, (Rmax, -Rmax))
 
                     bkgs:list[npt.NDArray[np.floating]] = []
-                    bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
+                    bkgs.append(np.reciprocal(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
                     
                     for _ in range(iterations):
-                        bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
+                        bkgs.append(np.reciprocal(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
                     s = sum(bkgs)
 
                     S = Y.copy()
                     S[idx] = s / x ** kweight
 
-                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.RECIPROCAL)
                     data.mod_col("x", Y-S)
                     log.debug(f"{data.meta.name}: Removed background as Fourier contribution, up to {Rmax}A, with k-weight {kweight}.")
             
             case Smoothing(kweight, _range, fraction, iterations):
-                domain = _range.domain or Domain.REAL
-                if domain != Domain.REAL:
+                domain = _range.domain or Domain.RECIPROCAL
+                if domain != Domain.RECIPROCAL:
                     raise RuntimeError("Cannot fit postedge to a different domain.")
         
                 _axes = [data.get_col_("k") for data in context.data]
@@ -193,7 +208,7 @@ class Background(CommandHandler):
                     s = lowess(y, x, fraction, iterations, return_sorted=False)
                     S = Y.copy()
                     S[idx] = s / x ** kweight
-                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.REAL)
+                    data.add_col("bkg", S, Column(None, None, DataColType.BACKGROUND), Domain.RECIPROCAL)
                     data.mod_col("x", Y-S)
                     log.debug(f"{data.meta.name}: Removed background as smoothed contribution, with k-weight {kweight}.")
             case _:
