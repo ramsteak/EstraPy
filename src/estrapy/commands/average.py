@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 
 from logging import getLogger
 from typing import NamedTuple, Iterable, TypeVar
 from functools import reduce
-from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy.interpolate import interp1d
 
-from ._context import Context, Domain, range_to_index, Data, DataStore, MetaData, SignalType, AxisType
+from ._context import Context, Data, DataStore, MetaData, SignalType, AxisType
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import NumberUnit, parse_range, NumberUnitRange, actualize_range
 from ._parser import CommandParser
 
 _T = TypeVar("_T")
@@ -30,16 +27,18 @@ def eqor(s:Iterable[_T], *, default:_T = ...) -> _T:
 
 class Args_Average(NamedTuple):
     groupvars: list[str]
+    axis: str | None
 
 class Average(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Average:
         parser = CommandParser("average", description="Averages data.")
-        parser.add_argument("--by", nargs="+")
+        parser.add_argument("--by", "-b", nargs="+")
+        parser.add_argument("--axis", "-a")
 
         args = parser.parse(tokens)
 
-        return Args_Average(groupvars=args.by or [])
+        return Args_Average(groupvars=args.by or [], axis=args.axis)
 
     @staticmethod
     def execute(args: Args_Average, context: Context) -> CommandResult:
@@ -94,17 +93,26 @@ class Average(CommandHandler):
                 for colname, colkind in firstdata.cols.items():
                     if isinstance(colkind.axis, AxisType):
                         outdata.add_col(colname, firstdata.df[colname], colkind, domain=datum)
-                daxisname, daxis = firstdata.default_axis, firstdata.get_default_axis()
+                
+                if args.axis is None:
+                    daxisname, daxis = firstdata.default_axis, firstdata.get_default_axis()
+                else:
+                    daxisname, daxis = args.axis, firstdata.df[args.axis]
+
                 for colname, colkind in firstdata.cols.items():
                     # Skip the columns that are already present
                     if colname in outdata.datums[datum].cols: continue
                     # For each column, get all other columns
-                    newcol = np.mean(
-                        [interp1d(*data.get_xy_(daxisname, colname), # type: ignore
+                    interp:list[np.ndarray] = [interp1d(*data.get_xy_(daxisname, colname), # type: ignore
                                   kind="cubic",
                                   fill_value="extrapolate")(daxis) # type: ignore
-                        for data in datas], axis=0)
+                        for data in datas]
+                    newcol = np.mean(interp, axis=0)
+                    varcol = np.var(interp, axis=0)
+                    stdcol = np.std(interp, axis=0)
                     outdata.add_col(colname, newcol, colkind, domain=datum)
+                    outdata.add_col("v"+colname, varcol, colkind, domain=datum)
+                    outdata.add_col("s"+colname, stdcol, colkind, domain=datum)
             newdata.add_data(outdata)
         
         context.data = newdata
