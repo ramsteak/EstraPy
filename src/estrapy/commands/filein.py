@@ -20,21 +20,26 @@ from ._parser import CommandParser, InputFileParsingException
 def _read_file_m1(file: Path) -> tuple[CommandResult, pd.DataFrame, dict[str, str | int | float]]:
     # Expect the data file to start with a "#"
     filecontent = file.read_text()
-    if filecontent[0] != "#":
-        raise FileParsingException
-
     lines = filecontent.splitlines()
-    # Gets the index of the first line that does not start with #
-    id_firstdataline = (
-        i for i, line in enumerate(lines) if not line.lstrip().startswith("#")
-    ).__next__()
 
-    metadatalines = [line.split() for line in lines[: id_firstdataline - 1]]
-    headers = lines[id_firstdataline - 1].split()[1:]
+    if filecontent[0] == "#":
+        # raise FileParsingException("Invalid file specification. Missing header.")
 
-    firstdataline = lines[id_firstdataline]
+        # Gets the index of the first line that does not start with #
+        id_firstdataline = (
+            i for i, line in enumerate(lines) if not line.lstrip().startswith("#")
+        ).__next__()
+
+        metadatalines = [line.split() for line in lines[: id_firstdataline - 1]]
+        headers = lines[id_firstdataline - 1].split()[1:]
+    else:
+        id_firstdataline = 0
+        metadatalines = []
+        headers = None
+
     
     # Check if comma -> ,\s+
+    firstdataline = lines[id_firstdataline]
     if "," in firstdataline:
         if "." in firstdataline:
             # Assume , is column separator and . is decimal separator
@@ -47,20 +52,23 @@ def _read_file_m1(file: Path) -> tuple[CommandResult, pd.DataFrame, dict[str, st
             StringIO("\n".join(lines[id_firstdataline:])), sep=sep, header=None, engine=engine,
         )
     except pd.errors.ParserError:
-        raise FileParsingException
+        raise FileParsingException("File parsing error.")
 
-    datalen, headlen = len(data.columns), len(headers)
-
-    if datalen < headlen:
-        headers = headers[:datalen]
-        warn = f"Header and data length mismatch: {headlen} {datalen}. Header was cut to match."
-    elif datalen > headlen:
-        headers.extend(f"col{i+1}" for i in range(headlen, datalen))
-        warn = f"Header and data length mismatch: {headlen} {datalen}. Header was extended to match."
+    if headers is not None:
+        datalen, headlen = len(data.columns), len(headers)
+        if datalen < headlen:
+            headers = headers[:datalen]
+            warn = f"Header and data length mismatch: {headlen} {datalen}. Header was cut to match."
+        elif datalen > headlen:
+            headers.extend(f"col{i+1}" for i in range(headlen, datalen))
+            warn = f"Header and data length mismatch: {headlen} {datalen}. Header was extended to match."
+        else:
+            warn = None
+        data.columns = headers
     else:
+        datalen = len(data.columns)
+        data.columns = [f"col{i+1}" for i in range(datalen)]
         warn = None
-
-    data.columns = headers
 
     # --- Parse metadata -------------------------------------------------------
     metavars: dict[str, str | int | float] = {}
@@ -185,26 +193,26 @@ def read_file(file: Path, args: Args_FileIn) -> Data:
     xcolumn = filedat.iloc[:, xaxiscol]
     match args.axis:
         case AxisType.INDEX:
-            signaldomain = Domain.REAL
+            signaldomain = Domain.RECIPROCAL
         case AxisType.ENERGY:
-            dat.add_col("E", xcolumn, Column("eV", False, AxisType.ENERGY), Domain.REAL)
-            signaldomain = Domain.REAL
+            dat.add_col("E", xcolumn, Column("eV", False, AxisType.ENERGY), Domain.RECIPROCAL)
+            signaldomain = Domain.RECIPROCAL
             dat.datums[signaldomain].set_default_axis("E")
         case AxisType.RELENERGY:
-            dat.add_col("e", xcolumn, Column("eV", True, AxisType.RELENERGY), Domain.REAL)
-            signaldomain = Domain.REAL
+            dat.add_col("e", xcolumn, Column("eV", True, AxisType.RELENERGY), Domain.RECIPROCAL)
+            signaldomain = Domain.RECIPROCAL
             dat.datums[signaldomain].set_default_axis("e")
         case AxisType.KVECTOR:
-            dat.add_col("k", xcolumn, Column("k", None, AxisType.KVECTOR), Domain.REAL)
-            signaldomain = Domain.REAL
+            dat.add_col("k", xcolumn, Column("k", None, AxisType.KVECTOR), Domain.RECIPROCAL)
+            signaldomain = Domain.RECIPROCAL
             dat.datums[signaldomain].set_default_axis("k")
         case AxisType.DISTANCE:
             dat.add_col("R", xcolumn, Column("A", None, AxisType.DISTANCE), Domain.FOURIER)
             signaldomain = Domain.FOURIER
             dat.datums[signaldomain].set_default_axis("R")
         case AxisType.QVECTOR:
-            dat.add_col("q", xcolumn, Column("q", None, AxisType.QVECTOR), Domain.REAL)
-            signaldomain = Domain.REAL
+            dat.add_col("q", xcolumn, Column("q", None, AxisType.QVECTOR), Domain.RECIPROCAL)
+            signaldomain = Domain.RECIPROCAL
             dat.datums[signaldomain].set_default_axis("q")
     
     # Import the intensities
