@@ -121,9 +121,9 @@ class Deglitch(CommandHandler):
 
         _range = parse_range(*args.range)
         if _range.domain == None:
-            _range = NumberUnitRange(_range.lower, _range.upper, _range.inter, Domain.REAL)
-        if _range.domain != Domain.REAL:
-            raise ValueError("Cannot deglitch on non-real domain.")
+            _range = NumberUnitRange(_range.lower, _range.upper, _range.inter, Domain.RECIPROCAL)
+        if _range.domain != Domain.RECIPROCAL:
+            raise ValueError("Cannot deglitch on non-reciprocal domain.")
 
         match args.finder:
             case "force":
@@ -162,8 +162,8 @@ class Deglitch(CommandHandler):
     def execute(args: Args_Deglitch, context: Context) -> CommandResult:
         log = getLogger("deglitch")
 
-        domain = args.bounds.domain or Domain.REAL
-        if domain != Domain.REAL:
+        domain = args.bounds.domain or Domain.RECIPROCAL
+        if domain != Domain.RECIPROCAL:
             raise RuntimeError("Cannot fit preedge to a different domain.")
         
         _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
@@ -318,6 +318,7 @@ class Exponential(NamedTuple):
 
 class Args_MultiEdge(NamedTuple):
     axis: str
+    raw: bool
     method: ArcTangent|ErrorFunction|Exponential|HyperTangent
 
 class MultiEdge(CommandHandler):
@@ -329,28 +330,19 @@ class MultiEdge(CommandHandler):
         parser.add_argument("--energy", "-E", dest="axis", const="E", action="store_const")
         parser.add_argument("--relenergy", "-e", dest="axis", const="e", action="store_const")
         parser.add_argument("--kvector", "-k", dest="axis", const="k", action="store_const")
+        parser.add_argument("--raw", "-r", action="store_true")
 
         subparsers = parser.add_subparsers(dest="mode")
 
         arctan = subparsers.add_parser("atan")
-        arctan.add_argument("b")
-        arctan.add_argument("a")
-        arctan.add_argument("c")
-
         errfun = subparsers.add_parser("erf")
-        errfun.add_argument("b")
-        errfun.add_argument("a")
-        errfun.add_argument("c")
-
         tanhyp = subparsers.add_parser("tanh")
-        tanhyp.add_argument("b")
-        tanhyp.add_argument("a")
-        tanhyp.add_argument("c")
-
         expfun = subparsers.add_parser("exp")
-        expfun.add_argument("b")
-        expfun.add_argument("a")
-        expfun.add_argument("c")
+
+        for _parser in [arctan, errfun, tanhyp, expfun]:
+            _parser.add_argument("b")
+            _parser.add_argument("a")
+            _parser.add_argument("c")
 
         args = parser.parse(tokens)
 
@@ -366,15 +358,14 @@ class MultiEdge(CommandHandler):
 
         axis = args.axis if args.axis is not None else "E"
         
-        return Args_MultiEdge(axis,mode)
+        return Args_MultiEdge(axis, args.raw, mode)
 
     @staticmethod
     def execute(args: Args_MultiEdge, context: Context) -> CommandResult:
         log = getLogger("multiedge")
 
         for data in context.data:
-            X = data.get_col_(args.axis, domain=Domain.REAL)
-            Y = data.get_col_("a", domain=Domain.REAL)
+            X = data.get_col_(args.axis, domain=Domain.RECIPROCAL)
 
             E = args.method.calc(X)
             # TODO: idea --iplot interactive plot:
@@ -383,8 +374,32 @@ class MultiEdge(CommandHandler):
             # dati nel file, per ottimizzare il residuo, che viene plottato ad
             # ogni cambio. Alla fine, stampa la linea del comando finale.
 
-            data.datums[Domain.REAL].add_col(E, Column(None, None, DataColType.MULTIEDGE), "mult", False)
-            data.datums[Domain.REAL].mod_col("a", Y-E)
+            data.datums[Domain.RECIPROCAL].add_col(E, Column(None, None, DataColType.MULTIEDGE), "mult", unique=False)
+            
+            if args.raw:
+                a = data.get_col_("a")
+                data.datums[Domain.RECIPROCAL].mod_col("a", a-E)
+
+                if "mu" in data.datums[Domain.RECIPROCAL].cols and "x" in data.datums[Domain.RECIPROCAL].cols:
+                    J0 = data.meta.get("J0")
+                    if not isinstance(J0, float):
+                        raise RuntimeError("AAhkfbwefdjisjndba")
+                    mu = data.get_col_("mu")
+                    chi = data.get_col_("x")
+                    data.datums[Domain.RECIPROCAL].mod_col("mu", mu-E/J0)
+                    data.datums[Domain.RECIPROCAL].mod_col("x", chi-E/J0)
+            else:
+                # if raw is not given, assume norm was called, so J0, mu and chi exist
+                J0 = data.meta.get("J0")
+                if not isinstance(J0, float):
+                    raise RuntimeError("AAhkfbwefdjisjndba")
+                a = data.get_col_("a")
+                mu = data.get_col_("mu")
+                chi = data.get_col_("x")
+
+                data.datums[Domain.RECIPROCAL].mod_col("a", a-E*J0)
+                data.datums[Domain.RECIPROCAL].mod_col("mu", mu-E)
+                data.datums[Domain.RECIPROCAL].mod_col("x", chi-E)
 
             match args.method:
                 case ArcTangent(a, b, c): msg = f"atan({b}, {a}, {c})"

@@ -39,7 +39,7 @@ class Args_Plot(NamedTuple):
     xlimits: NumberUnitRange | None
     ylimits: NumberUnitRange | None
     vshift: float
-    colorby: str
+    colorby: str | None
     colormap: ColorMap
     alpha: float
     linewidth: float
@@ -206,6 +206,7 @@ class Plot(CommandHandler):
         show = args.show
         if args.figure is None:
             figsettings = FigureSettings(-1, (1,1))
+            figure = figsettings
             context.figures.impl_figsettings.append(figsettings)
         else:
             m = FIGURE_SUBPLOT.match(args.figure)
@@ -248,7 +249,7 @@ class Plot(CommandHandler):
             parse_range(*args.xlim) if args.xlim else None,
             parse_range(*args.ylim) if args.ylim else None,
             args.vshift,
-            args.colorby if args.colorby is not None else ".n",
+            args.colorby,
             colormap,
             args.alpha,
             args.linewidth,
@@ -282,7 +283,10 @@ class Plot(CommandHandler):
 
         if args.plot is not None:
             # Get coloring
-            _colorby = np.array([data.meta.get(args.colorby) for data in context.data])
+            if args.colorby is None:
+                _colorby = np.array(range(len(context.data.data))) + len(ax._lines) + 1
+            else:
+                _colorby = np.array([data.meta.get(args.colorby) for data in context.data])
             qualitative = np.issubdtype(_colorby.dtype, np.integer) or np.issubdtype(_colorby.dtype, np.str_)
             
             match qualitative, args.colormap.num:
@@ -290,7 +294,7 @@ class Plot(CommandHandler):
                 # Value is qualitative and colormap is quantitative
                     uniquevals, inverse = np.unique(_colorby, return_inverse=True)
                     ncats = len(uniquevals)
-                    catcolors = np.array([args.colormap.cmap(i/(ncats-1)) for i,_ in enumerate(uniquevals)])
+                    catcolors = np.array([args.colormap.cmap(i/(max(ncats-1,1))) for i,_ in enumerate(uniquevals)])
                     colors = catcolors[inverse]
                 case True, cmaplength:
                 # Value is qualitative and colormap is qualitative
