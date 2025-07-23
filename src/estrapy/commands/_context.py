@@ -136,7 +136,7 @@ class Figures(NamedTuple):
         # To be used for figures created without --fig flag
         allfignums = chain(self.expl_figsettings, self.figureruntimes)
         usrfignums = filter(lambda f:f <= 1000, allfignums)
-        return max(usrfignums, default=1)
+        return max(usrfignums, default=1) +1
 
     def get_high_figurenum(self) -> int:
         # To be used for figures created by commands. Figures will have fignum > 1000
