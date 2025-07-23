@@ -32,7 +32,7 @@ class Cut(CommandHandler):
     def execute(args: Args_Cut, context: Context) -> CommandResult:
         log = getLogger("cut")
 
-        domain = args.bounds.domain or Domain.REAL
+        domain = args.bounds.domain or Domain.RECIPROCAL
         _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
         range = actualize_range(args.bounds, _axes, "eV")
         
@@ -175,27 +175,32 @@ class Rebin(CommandHandler):
 
 
 class Args_Normalize(NamedTuple):
-    var: str
+    var: str | None
+    val: float
 
 class Normalize(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_Normalize:
         parser = CommandParser("normalize", description="Normalizes XAS signal to calculate XANES and EXAFS data.")
-        parser.add_argument("var")
+        parser.add_argument("var", default="J0")
+        parser.add_argument("--value", "-v")
         args = parser.parse(tokens)
 
-        return Args_Normalize(args.var)
+        if args.value is not None:
+            args.var = None
+        return Args_Normalize(args.var, args.value)
 
     @staticmethod
     def execute(args: Args_Normalize, context: Context) -> CommandResult:
         log = getLogger("normalize")
 
         for data in context.data:
-            norm = data.meta.get(args.var)
+            norm = data.meta.get(args.var) if args.var is not None else args.val
+
             a = data.get_col_("a")
 
-            data.add_col("mu", a / norm, Column(None, None, DataColType.MU), Domain.REAL)
-            data.add_col("x", a / norm - 1, Column(None, None, DataColType.CHI), Domain.REAL)
+            data.add_col("mu", a / norm, Column(None, None, DataColType.MU), Domain.RECIPROCAL)
+            data.add_col("x", a / norm - 1, Column(None, None, DataColType.CHI), Domain.RECIPROCAL)
 
         return CommandResult(True)
 
