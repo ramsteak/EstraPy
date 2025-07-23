@@ -587,8 +587,8 @@ class Edge(CommandHandler):
                     data.meta.E0 = E0
                 case _: raise RuntimeError("Invalid state: #23578423")
             
-            data.add_col("e", np.array(x - E0), Column("eV", True, AxisType.RELENERGY), Domain.REAL)
-            data.add_col("k", E_to_sk(x, E0), Column("k", None, AxisType.KVECTOR), Domain.REAL)
+            data.add_col("e", np.array(x - E0), Column("eV", True, AxisType.RELENERGY), Domain.RECIPROCAL)
+            data.add_col("k", E_to_sk(x, E0), Column("k", None, AxisType.KVECTOR), Domain.RECIPROCAL)
 
         return CommandResult(True)
 

@@ -200,8 +200,8 @@ class Fourier(CommandHandler):
             case _: raise RuntimeError("Invalid R axis specification.")
         interval = R[1] - R[0]
 
-        domain = args.bounds.domain or Domain.REAL
-        if domain != Domain.REAL:
+        domain = args.bounds.domain or Domain.RECIPROCAL
+        if domain != Domain.RECIPROCAL:
             raise RuntimeError("Cannot fit postedge to a different domain.")
         _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
         range = actualize_range(args.bounds, _axes, "eV")
@@ -245,7 +245,7 @@ class Fourier(CommandHandler):
             W = np.zeros_like(X)
             W[idx] = w
 
-            data.add_col("win", W, Column(None, None, DataColType.WINDOW), Domain.REAL)
+            data.add_col("win", W, Column(None, None, DataColType.WINDOW), Domain.RECIPROCAL)
 
             data.add_col("R", R, Column("A", None, AxisType.DISTANCE), Domain.FOURIER)
             data.datums[Domain.FOURIER].set_default_axis("R")

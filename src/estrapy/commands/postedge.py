@@ -95,7 +95,7 @@ class PostEdge(CommandHandler):
         args = parser.parse(tokens)
 
         range = parse_range(*args.range)
-        if range.domain != Domain.REAL:
+        if range.domain != Domain.RECIPROCAL:
             raise ValueError("Invalid fit domain: the postedge can only be calculated in energy or wavevector.")
 
 
@@ -136,8 +136,8 @@ class PostEdge(CommandHandler):
     def execute(args: Args_PostEdge, context: Context) -> CommandResult:
         log = getLogger("postedge")
 
-        domain = args.bounds.domain or Domain.REAL
-        if domain != Domain.REAL:
+        domain = args.bounds.domain or Domain.RECIPROCAL
+        if domain != Domain.RECIPROCAL:
             raise RuntimeError("Cannot fit postedge to a different domain.")
         
         _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
@@ -160,20 +160,20 @@ class PostEdge(CommandHandler):
             data.meta.run["postedge"] = (poly, args.fitaxis, args.action)
             J0 = poly(0)
             data.meta.vars["J0"] = J0
-            data.add_col("post", P, Column(None, None, DataColType.POSTEDGE), Domain.REAL)
+            data.add_col("post", P, Column(None, None, DataColType.POSTEDGE), Domain.RECIPROCAL)
 
             match args.action:
                 case RemovalOperation.SUBTRACT:
                     Y1 = (Y - P) + J0
                     data.mod_col("a", Y1)
-                    # data.add_col("mu", Y1+1, Column(None, None, DataColType.MU), Domain.REAL)
-                    # data.add_col("x", Y1, Column(None, None, DataColType.CHI), Domain.REAL)
+                    # data.add_col("mu", Y1+1, Column(None, None, DataColType.MU), Domain.RECIPROCAL)
+                    # data.add_col("x", Y1, Column(None, None, DataColType.CHI), Domain.RECIPROCAL)
 
                 case RemovalOperation.DIVIDE:
                     Y1 = Y / P * J0
                     data.mod_col("a", Y1)
-                    # data.add_col("mu", Y1, Column(None, None, DataColType.MU), Domain.REAL)
-                    # data.add_col("x", Y1-1, Column(None, None, DataColType.CHI), Domain.REAL)
+                    # data.add_col("mu", Y1, Column(None, None, DataColType.MU), Domain.RECIPROCAL)
+                    # data.add_col("x", Y1-1, Column(None, None, DataColType.CHI), Domain.RECIPROCAL)
 
         return CommandResult(True)
 

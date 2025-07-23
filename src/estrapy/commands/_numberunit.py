@@ -24,7 +24,7 @@ NUMBER_UNIT = re.compile(_NUMBER_UNIT)
 
 
 class Domain(Enum):
-    REAL = "real"
+    RECIPROCAL = "reciprocal"
     FOURIER = "fourier"
     PCA = "pca"
 
@@ -62,9 +62,9 @@ def parse_nu(val: str) -> NumberUnit:
 def get_unit_domain(v:NumberUnit) -> Domain | None:
     if v.unit is None: return None
     return {
-        "eV": Domain.REAL,
-        "k": Domain.REAL,
-        "q": Domain.REAL,
+        "eV": Domain.RECIPROCAL,
+        "k": Domain.RECIPROCAL,
+        "q": Domain.RECIPROCAL,
         "A": Domain.FOURIER
     }.get(v.unit)
 

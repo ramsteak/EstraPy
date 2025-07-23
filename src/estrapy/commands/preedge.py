@@ -70,7 +70,7 @@ class PreEdge(CommandHandler):
         args = parser.parse(tokens)
 
         range = parse_range(*args.range)
-        if range.domain != Domain.REAL:
+        if range.domain != Domain.RECIPROCAL:
             raise ValueError("Invalid fit domain: the preedge can only be calculated in energy or wavevector.")
 
         return Args_PreEdge(range, args.degree)
@@ -79,8 +79,8 @@ class PreEdge(CommandHandler):
     def execute(args: Args_PreEdge, context: Context) -> CommandResult:
         log = getLogger("preedge")
 
-        domain = args.bounds.domain or Domain.REAL
-        if domain != Domain.REAL:
+        domain = args.bounds.domain or Domain.RECIPROCAL
+        if domain != Domain.RECIPROCAL:
             raise RuntimeError("Cannot fit preedge to a different domain.")
         
         _axes = [data.get_col_(data.datums[domain].default_axis) for data in context.data] # type: ignore
@@ -100,7 +100,7 @@ class PreEdge(CommandHandler):
             log.debug(f"{data.meta.name}: preedge = {pol(poly.coef)}")
 
             data.meta.run["preedge"] = poly, AxisType.RELENERGY
-            data.add_col("pre", P, Column(None, None, DataColType.PREEDGE), Domain.REAL)
+            data.add_col("pre", P, Column(None, None, DataColType.PREEDGE), Domain.RECIPROCAL)
             data.mod_col("a", Y - P)
             pass
 
