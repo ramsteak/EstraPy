@@ -20,7 +20,7 @@ See [Number and unit specification]({{ "/commands/general-syntax#number-and-unit
 cut <range>
 ```
 
-The bounds may be specified in any valid unit. EstraPy automatically infers the domain over which to cut (real domain: eV, k, fourier domain: A). If the unit is not specified, the default domain is assumed to be the energy axis (`E`, eV).
+The bounds may be specified in any valid unit. EstraPy automatically infers the domain over which to cut (reciprocal domain: eV, k, fourier domain: A). If the unit is not specified, the default domain is assumed to be the energy axis (`E`, eV).
 
 ### Example
 

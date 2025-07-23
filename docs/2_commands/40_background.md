@@ -29,7 +29,7 @@ preedge <range> [--options]
 
 ## PostEdge
 
-The `postedge` command estimates the postedge contribution from the signal in the `a` column and stores it in the `post` column. It then creates the `mu` and `x` columns, which represent the XANES ($$\mu$$) and EXAFS ($$\chi$$)signal intensities respectively. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extrapolated across the entire data range. The range can be specified in either eV or k.
+The `postedge` command estimates the postedge contribution from the signal in the `a` column and stores it in the `post` column. The postedge is modelled as a polynomial of degree n in the given range, and this estimation is extrapolated across the entire data range. The range can be specified in either eV or k.
 The command also defines the variable `J0` for each file, defined to be the value of the postedge estimated at $$E = E_{0}$$.
 
 ```sh
@@ -48,6 +48,18 @@ postedge <range> [--options]
 |<span class="nowrap">`--subtract` / `-s`</span>|Corrects the data by subtracting the postedge from the `a` column.|
 |<span class="nowrap">`--energy` / `-e`</span>|Performs the polynomial regression on $$\alpha_(E)$$, in energy space. If neither this flag nor `--wavevector` is specified, the regression space is inferred from the range.|
 |<span class="nowrap">`--wavevector` / `-k`</span>|Performs the polynomial regression on $$\alpha_(k)$$, in wavevector space. If neither this flag nor `--energy` is specified, the regression space is inferred from the range.|
+
+## Normalization
+
+The `normalize` command calculates $$\mu(k)$$ and $$\chi(k)$$ from the signal intensity, and stores them in the `mu` and `x` columns. By default it normalizes the signal by the `J0` value that was calculated with the `postedge` command.
+
+```sh
+normalize [variable] [--options]
+```
+
+|Argument|Explanation|
+|--|--|
+|<span class="nowrap">`--value` / `-v`</span>|Divides by the given value instead of using a variable.|
 
 ## Background
 

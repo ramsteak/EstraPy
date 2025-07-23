@@ -10,10 +10,10 @@ math: katex
 
 In order to interpret EXAFS spectra, it is useful to analyze the fourier-transform of the data. The `fourier` command calculates the transform, adding the calculated result to the fourier domain of the file.
 
-The command requires the input and output ranges of the data. The input range is taken from the real domain, and can be expressed in eV or k, while the output range is in the fourier domain, thus can only be expressed in Angstrom.
+The command requires the input and output ranges of the data. The input range is taken from the reciprocal domain, and can be expressed in eV or k, while the output range is in the fourier domain, thus can only be expressed in Angstrom.
 While the input range is expressed as `(start) (end)`, the output Fourier range is expressed as `(end) (spacing)`, as the beginning of the Fourier range is by default set to 0.
 
-The command adds a `win` column, containing the window function, to the real domain, and creates the fourier domain containing the `R` index column and the `f` complex valued column.
+The command adds a `win` column, containing the window function, to the reciprocal domain, and creates the fourier domain containing the `R` index column and the `f` complex valued column.
 
 ```sh
 fourier <range> <output> [--options]
