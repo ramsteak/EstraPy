@@ -165,7 +165,6 @@ class Background(CommandHandler):
         
                 _axes = [data.get_col_("k") for data in context.data]
                 bounds = actualize_range(_range, _axes, "k")
-
                 for data in context.data:
                     X,Y = data.get_col_("k", domain=Domain.RECIPROCAL), data.get_col_("x", domain=Domain.RECIPROCAL)
                     idx = range_to_index_(data, bounds)
@@ -178,10 +177,10 @@ class Background(CommandHandler):
                     W = get_flattop_window(r, Rmax/2, Apodizer.HANN, None, 0, (Rmax, -Rmax))
 
                     bkgs:list[npt.NDArray[np.floating]] = []
-                    bkgs.append(np.reciprocal(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
+                    bkgs.append(np.real(bfourier(r, (fourier(x, (y)*w, r))*W, x))/2 / w) # type: ignore
                     
                     for _ in range(iterations):
-                        bkgs.append(np.reciprocal(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
+                        bkgs.append(np.real(bfourier(r, (fourier(x, (y-sum(bkgs))*w, r))*W, x))/2 / w) # type: ignore
                     s = sum(bkgs)
 
                     S = Y.copy()
