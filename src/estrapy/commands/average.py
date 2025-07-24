@@ -76,6 +76,7 @@ class Average(CommandHandler):
             E0s = [data.meta.E0 for data in datas]
             if all(E is not None for E in E0s):
                 E0 = sum(E0s) / len(E0s) # type: ignore
+            else: E0 = None
 
             outmeta = MetaData(signaltype, refsigtype, name, path, nvars, run, refE0, E0)
             outdata = Data(outmeta)
