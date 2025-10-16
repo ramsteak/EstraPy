@@ -46,6 +46,7 @@ class Args_Plot(NamedTuple):
     linestyle: str | tuple[Literal[0], tuple[int,...]]
     legend: bool
     show: bool
+    grid: str|None
 
 class ColKind(NamedTuple):
     xcol: str | None
@@ -152,6 +153,9 @@ class Plot(CommandHandler):
         parser.add_argument("--alpha", type=float, default=1.0)
         parser.add_argument("--show", action="store_true")
         parser.add_argument("--legend", action="store_true")
+        parser.add_argument("--gridx", action="store_true")
+        parser.add_argument("--gridy", action="store_true")
+        parser.add_argument("--grid", action="store_true")
 
         lwidth = parser.add_mutually_exclusive_group()
         lwidth.add_argument("--linewidth", type=float, default=1.0)
@@ -240,6 +244,13 @@ class Plot(CommandHandler):
             style = (0, tuple(int(n) for n in str(args.linestyle).split(".")))
         except ValueError:
             style = args.linestyle
+        
+        match args.gridx, args.gridy, args.grid:
+            case [False, False, False]: grid = None
+            case [True, True, False] | [_, _, True]: grid = "xy"
+            case [True, False, False]: grid = "x"
+            case [False, True, False]: grid = "y"
+            case _:raise RuntimeError("Boolean logic goes brrr")
 
         return Args_Plot(
             plot,
@@ -255,7 +266,8 @@ class Plot(CommandHandler):
             args.linewidth,
             style,
             args.legend,
-            show
+            show,
+            grid
         )
 
     @staticmethod
@@ -433,6 +445,10 @@ class Plot(CommandHandler):
         
         if args.legend:
             ax.axis.legend()
+        
+        if args.grid is not None:
+            if "x" in args.grid:ax.axis.grid(True, axis="x")
+            if "y" in args.grid:ax.axis.grid(True, axis="y")
         
 
         if args.show:
