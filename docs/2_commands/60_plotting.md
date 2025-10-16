@@ -53,6 +53,8 @@ where `axis` represents the x axis, such as `E`, `e`, `k` or `R`, and `column` r
 
 You can apply operations to both the x and y axes by chaining operators with a dot (`.`). Each side of the `:` (x-axis and y-axis) supports independent transformation chains.
 
+To specify y operations it is necessary to include the x axis.
+
 |Operator|Requires argument|x-axis|y-axis|Explanation|
 |--|:--:|:--:|:--:|--|
 |`r`|<span class="text-red-200">&#10007;</span>|<span class="text-green-000">&#10003;</span>|<span class="text-green-000">&#10003;</span>|Takes the real part of the column.|
