@@ -99,6 +99,10 @@ def parse_column(p:str) -> ColKind:
         xcol = None
 
     y_spec = y_specs.split(".")
+    # Check that there is an index if there are operations. If there is not, error
+    if len(y_spec) > 1 and x_specs is None:
+        raise ValueError("Y operations require an X column to operate on.")
+
     for ys in reversed(y_spec[:-1]):
         factor = int(ys[1:]) if len(ys) > 1 else 1
         match ys[0]:
