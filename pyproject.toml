@@ -1,0 +1,15 @@
+[project]
+name = "estrapy2"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "lark>=1.3.0",
+    "polars>=1.34.0",
+    "scipy>=1.16.2",
+]
+
+
+[tool.setuptools.package-data]
+estrapy = ["grammar/*.lark"]
