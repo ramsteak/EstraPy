@@ -1,0 +1,66 @@
+// Lark grammar for parsing EstraPy input files.
+// An input file consists of a sequence of commands, each with its options and
+// values. Comments start with # and go until the end of the line.
+// Indentation matters for multi-line commands
+
+// Example commands:
+// filein data.xy --dir ./data --fluorescence
+// filein data.xy
+//     --dir ./data
+//     --fluorescence
+//     --referencetransmission
+// align shift --energy Pd.K --delta 2eV
+
+
+// -------- TERMINALS (tokens) --------
+
+// _INDENT and _DEDENT are provided by the Indenter class
+%declare _INDENT _DEDENT
+
+// Comments start with # and go until end of line. Use common.SH_COMMENT
+SH_COMMENT: /#[^\n]*/
+%ignore SH_COMMENT
+
+%import common.WS
+%ignore WS
+
+INTEGER.2: /[0-9]+(?![\w\.\,])/
+
+FLOAT_: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/
+FLOAT_U: FLOAT_ /[a-zA-Z]+/
+// FLOAT_U: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[a-zA-Z]+/
+FLOAT: FLOAT_ | FLOAT_U
+
+COMMANDNAME: /[^\s#"'%-][^\s#%"']*/
+
+SHORT_OPTION: /-[a-zA-Z]+/
+LONG_OPTION: /--[a-zA-Z0-9_-]+/
+OPTION: SHORT_OPTION | LONG_OPTION
+
+STRING: /[^#\s"']+/
+
+
+_STRING_INNER: /.*?/
+_STRING_ESC_INNER: _STRING_INNER /(?<!\\)(\\\\)*?/
+ESCAPED_STRING : ("\"" _STRING_ESC_INNER "\"") | ("'" _STRING_ESC_INNER "'") 
+
+_NL: (/\r?\n[\t ]*/ | SH_COMMENT)+
+
+
+// -------- RULES --------
+
+start: _NL* directive* command*
+
+?number: INTEGER | FLOAT
+?commandname: COMMANDNAME
+?string: STRING | ESCAPED_STRING
+
+?value: string | number
+option: OPTION value*
+?argument: value | option
+
+directive: "%" COMMANDNAME value* _NL+
+
+command: COMMANDNAME argument* _NL+
+       | COMMANDNAME argument* _NL+ _INDENT (argument+ _NL)+ _DEDENT
+       | COMMANDNAME argument* ":" _NL+ _INDENT command+ _DEDENT
