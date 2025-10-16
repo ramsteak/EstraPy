@@ -67,7 +67,7 @@ def parse_commands(
     log = getLogger("parser")
 
     # Check file version
-    if context.options.version[:3] != VERSION[:3]:
+    if context.options.version[:2] != VERSION[:2]:
         # TODO: is not valueerror
         raise ValueError(
             f"Estrapy version ({VERSION}) does not match file version {context.options.version}"
