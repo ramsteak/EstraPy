@@ -201,7 +201,7 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
 
 def main() -> None:
     timers = TimerCollection()
-    timers.start("total", already_started_at=_program_start_time)
+    timers.start("", already_started_at=_program_start_time)
     timers.stop("imports", already_started_at=_program_start_time)
 
     args = parse_args()
@@ -289,8 +289,11 @@ def main() -> None:
 
     # End of the program
 
-    timers.stop_all()
-    log.debug(f"Total execution time: {(timers["total"]) / 1e6:.2f} ms")
+    timers.stop()
+    log.debug(f"Total execution time: {timers.get_ms(""):.2f} ms")
+
+    for line in context.timers.table_format("ms").splitlines():
+        log.debug(line)
 
 
 def entry_point() -> None:
