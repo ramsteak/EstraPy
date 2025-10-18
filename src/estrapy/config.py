@@ -1,3 +1,3 @@
-from typing import Literal
+from os import getenv
 
-PANDAS: Literal[True] = True
+PANDAS: bool = getenv("PANDAS", "0") == "1"
