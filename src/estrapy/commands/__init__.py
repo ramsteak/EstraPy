@@ -7,9 +7,8 @@ from ..core.context import Context, ParseContext
 from .directives import Directive, Directive_define, Directive_clear, execute_directive
 
 from .filein import parse_filein_command, Command_filein, execute_filein_command
-
 from .align import parse_align_command, Command_align, execute_align_command
-# from .noise import parse_noise_command, Command_noise, execute_noise_command
+from .noise import parse_noise_command, Command_noise, execute_noise_command
 
 __all__ = [
     "parse_directive",
@@ -73,8 +72,8 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         case ['align', *args]:
             return parse_align_command(args, parsecontext)
         # Command noise ----------------------------------------------------------------------------
-        # case ['noise', *args]:
-        #     return parse_noise_command(args)
+        case ['noise', *args]:
+            return parse_noise_command(args, parsecontext)
         # Unknown command --------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as c, *args]:
             raise CommandSyntaxError(f"Unknown command '{name}'", c)
@@ -88,11 +87,14 @@ def execute_command(command: Command, context: Context) -> None:
     # print(f"Executing command: {command}")
     match command:
         case Command_filein(): # type: ignore
-            execute_filein_command(command, context) # type: ignore
+            with context.timers.time("execution/filein"):
+                execute_filein_command(command, context) # type: ignore
         case Command_align():
-            execute_align_command(command, context)
-        # case Command_noise():
-        #     execute_noise_command(command, context)
+            with context.timers.time("execution/align"):
+                execute_align_command(command, context)
+        case Command_noise():
+            with context.timers.time("execution/noise"):
+                execute_noise_command(command, context)
         # case Command_energy():
         #     execute_energy_command(command, context)
         # case Command_preedge():
