@@ -11,10 +11,10 @@ from .align import parse_align_command, Command_align, execute_align_command
 from .noise import parse_noise_command, Command_noise, execute_noise_command
 
 __all__ = [
-    "parse_directive",
-    "parse_command",
-    "execute_command",
-    "execute_directive",
+    'parse_directive',
+    'parse_command',
+    'execute_command',
+    'execute_directive',
 ]
 
 
@@ -28,20 +28,21 @@ def parse_directive(directive: list[Token | Tree[Token]], parsecontext: ParseCon
         case [Token('COMMANDNAME', 'define'), Token('STRING', name), Token('STRING', value)]:
             return Directive_define(name, str(value))
         case [Token('COMMANDNAME', 'define') as d, *_]:
-            raise CommandSyntaxError("Invalid define directive syntax", d)
+            raise CommandSyntaxError('Invalid define directive syntax', d)
         # Directive clear ---------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'clear')]:
             return Directive_clear()
         case [Token('COMMANDNAME', 'clear') as d, *_]:
-            raise CommandSyntaxError("Invalid clear directive syntax", d)
+            raise CommandSyntaxError('Invalid clear directive syntax', d)
         # Unknown directive -------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as d, *_]:
             raise CommandSyntaxError(f"Unknown directive '{name}'", d)
         # Invalid directive -------------------------------------------------------------------------
         case [Token() as d, *_]:
-            raise CommandSyntaxError("Invalid directive syntax", d)
+            raise CommandSyntaxError('Invalid directive syntax', d)
         case _:
-            raise CommandSyntaxError("Invalid directive syntax")
+            raise CommandSyntaxError('Invalid directive syntax')
+
 
 def parse_command_argument(arg: Token | Tree[Token]) -> Option | Value:
     match arg:
@@ -56,12 +57,12 @@ def parse_command_argument(arg: Token | Tree[Token]) -> Option | Value:
             vals = [v for v in vals if not isinstance(v, Option)]
             return Option(name, vals)
         case Token() as arg:
-            raise CommandSyntaxError("Invalid command argument syntax", arg)
+            raise CommandSyntaxError('Invalid command argument syntax', arg)
         case Tree(Token() as a, _):
-            raise CommandSyntaxError("Invalid command argument syntax", a)
+            raise CommandSyntaxError('Invalid command argument syntax', a)
         case _:
-            raise CommandSyntaxError("Invalid command argument syntax")
-        
+            raise CommandSyntaxError('Invalid command argument syntax')
+
 
 def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command:
     match command:
@@ -79,21 +80,22 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
             raise CommandSyntaxError(f"Unknown command '{name}'", c)
         # Invalid command --------------------------------------------------------------------------
         case [Token() as c, *args]:
-            raise CommandSyntaxError("Invalid command syntax", c)
+            raise CommandSyntaxError('Invalid command syntax', c)
         case _:
-            raise CommandSyntaxError("Invalid command syntax")
+            raise CommandSyntaxError('Invalid command syntax')
+
 
 def execute_command(command: Command, context: Context) -> None:
     # print(f"Executing command: {command}")
     match command:
-        case Command_filein(): # type: ignore
-            with context.timers.time("execution/filein"):
-                execute_filein_command(command, context) # type: ignore
+        case Command_filein():  # type: ignore
+            with context.timers.time('execution/filein'):
+                execute_filein_command(command, context)  # type: ignore
         case Command_align():
-            with context.timers.time("execution/align"):
+            with context.timers.time('execution/align'):
                 execute_align_command(command, context)
         case Command_noise():
-            with context.timers.time("execution/noise"):
+            with context.timers.time('execution/noise'):
                 execute_noise_command(command, context)
         # case Command_energy():
         #     execute_energy_command(command, context)

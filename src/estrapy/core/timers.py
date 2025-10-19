@@ -5,6 +5,7 @@ from types import TracebackType
 from collections import OrderedDict
 from statistics import mean, stdev
 
+
 @dataclass(slots=True)
 class Timer:
     """The data structure that holds the start and stop times of a stopwatch,
@@ -25,24 +26,24 @@ class Timer:
         if self.running:
             total += perf_counter_ns() - self._times[-1]
         return total
-    
+
     @property
     def times(self) -> list[int]:
         """The list of durations of each start/stop cycle, in nanoseconds."""
         if len(self._times) < 2:
             return []
-        return [b-a for a,b in zip(self._times[0::2], self._times[1::2])]
+        return [b - a for a, b in zip(self._times[0::2], self._times[1::2])]
 
     @property
     def mean(self) -> float:
         """The mean time of the stopwatch over the number of start/stop cycles, in nanoseconds."""
         return mean(self.times) if self.cycles else 0.0
-    
+
     @property
     def stdev(self) -> float:
         """The standard deviation of the stopwatch over the number of start/stop cycles, in nanoseconds."""
         return stdev(self.times) if self.cycles > 1 else 0.0
-    
+
     @property
     def cycles(self) -> int:
         """The number of start/stop cycles the stopwatch has undergone."""
@@ -66,7 +67,7 @@ class Timer:
             self._times.append(time)
 
     def __repr__(self) -> str:
-        return f"Timer(running={self.running}, total={self.total})"
+        return f'Timer(running={self.running}, total={self.total})'
 
 
 class TimerContextManager:
@@ -96,7 +97,7 @@ class TimerCollection:
 
     def __init__(self) -> None:
         self._timers: OrderedDict[str, Timer] = OrderedDict()
-    
+
     @staticmethod
     def _ancestors(name: str) -> list[str]:
         """Generate a list of all ancestor names of the given name, including the name itself.
@@ -108,18 +109,22 @@ class TimerCollection:
         """Get the time of the stopwatch with the given name. If the stopwatch
         does not exist, raises KeyError."""
         return self._timers[name].total
+
     def get_ns(self, name: str) -> int:
         """Get the time of the stopwatch with the given name in nanoseconds.
         If the stopwatch does not exist, raises KeyError."""
         return self._timers[name].total
+
     def get_ms(self, name: str) -> float:
         """Get the time of the stopwatch with the given name in milliseconds.
         If the stopwatch does not exist, raises KeyError."""
         return self._timers[name].total / 1_000_000
+
     def get_s(self, name: str) -> float:
         """Get the time of the stopwatch with the given name in seconds.
         If the stopwatch does not exist, raises KeyError."""
         return self._timers[name].total / 1_000_000_000
+
     def __getitem__(self, name: str) -> int:
         """Get the time of the stopwatch with the given name. If the stopwatch
         does not exist, raises KeyError."""
@@ -149,7 +154,7 @@ class TimerCollection:
             self._timers.setdefault(name or '', Timer()).stop(at=time, started_at=already_started_at)
         else:
             for subname, timer in self._timers.items():
-                if name is None or subname.startswith(name+'/') or subname == name:
+                if name is None or subname.startswith(name + '/') or subname == name:
                     timer.stop(at=time, started_at=already_started_at)
 
     def stop_all(self):
@@ -173,19 +178,23 @@ class TimerCollection:
         timer = self._timers.setdefault(name, Timer())
         return TimerContextManager(timer)
 
-    def table_format(self, unit: Literal["s", "ms", "us", "ns"] = "s") -> str:
+    def table_format(self, unit: Literal['s', 'ms', 'us', 'ns'] = 's') -> str:
         mul = {
-            "s": 1_000_000_000,
-            "ms": 1_000_000,
-            "us": 1_000,
-            "ns": 1,
+            's': 1_000_000_000,
+            'ms': 1_000_000,
+            'us': 1_000,
+            'ns': 1,
         }[unit]
         """Returns a string representation of the timers in a table format."""
         # Get longest name length
         maxlen = max((len(name) for name in self._timers), default=4)
         lines: list[str] = []
-        lines.append(f"{'Name':<{maxlen}} | {f'Total ({unit})':<12} | {f'Mean ({unit})':<12} | {f'Stdev ({unit})':<12} | {'Cycles':<6}")
-        lines.append("-" * len(lines[0]))
+        lines.append(
+            f"{'Name':<{maxlen}} | {f'Total ({unit})':<12} | {f'Mean ({unit})':<12} | {f'Stdev ({unit})':<12} | {'Cycles':<6}"
+        )
+        lines.append('-' * len(lines[0]))
         for name, timer in self._timers.items():
-            lines.append(f"{name or "<total>":<{maxlen}} | {timer.total / mul:>12.2f} | {timer.mean / mul:>12.2f} | {timer.stdev / mul:>12.2f} | {timer.cycles:<6}")
-        return "\n".join(lines)
+            lines.append(
+                f"{name or "<total>":<{maxlen}} | {timer.total / mul:>12.2f} | {timer.mean / mul:>12.2f} | {timer.stdev / mul:>12.2f} | {timer.cycles:<6}"
+            )
+        return '\n'.join(lines)

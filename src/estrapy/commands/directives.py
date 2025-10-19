@@ -11,9 +11,10 @@ class Directive_define(Directive):
     name: str
     value: Number | str | int
 
+
 @dataclass(slots=True)
-class Directive_clear(Directive):
-    ...
+class Directive_clear(Directive): ...
+
 
 def execute_directive(directive: Directive, context: Context) -> None:
     match directive:

@@ -5,6 +5,7 @@ from ..core.context import Context
 from ..core.number import Number, parse_number
 from ..grammar.commandparser import CommandParser
 
+
 @dataclass(slots=True)
 class Command_align(Command):
     mode: str | None = None
@@ -20,5 +21,6 @@ parse_align_command.add_argument('search', '--search', type=parse_number, requir
 parse_align_command.add_argument('delta', '--delta', '-d', type=parse_number, required=False, default=None)
 
 
-def execute_align_command(command: Command_align, context: Context) -> None:
-    ...  # Implement the logic for the 'align' command here
+def execute_align_command(
+    command: Command_align, context: Context
+) -> None: ...  # Implement the logic for the 'align' command here

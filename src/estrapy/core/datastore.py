@@ -11,17 +11,18 @@ from .number import Unit
 
 
 class Domain(Enum):
-    RECIPROCAL = "reciprocal"
-    FOURIER = "fourier"
-    PRINCIPALCOMPONENT = "principalcomponent"
-    WAVELET = "wavelet"
+    RECIPROCAL = 'reciprocal'
+    FOURIER = 'fourier'
+    PRINCIPALCOMPONENT = 'principalcomponent'
+    WAVELET = 'wavelet'
 
 
 class ColumnType(Enum):
-    AXIS = "axis"  # e.g. energy, k, r, etc.
-    DATA = "data"  # e.g. I0, mu, chi, etc.
-    ERROR = "error" # e.g. sI0, smu, etc
-    TEMP = "temp" # temporary columns, removed after import e.g. magnitude and phase -> complex value
+    AXIS = 'axis'  # e.g. energy, k, r, etc.
+    DATA = 'data'  # e.g. I0, mu, chi, etc.
+    ERROR = 'error'  # e.g. sI0, smu, etc
+    TEMP = 'temp'  # temporary columns, removed after import e.g. magnitude and phase -> complex value
+
 
 @dataclass(slots=True)
 class Column:

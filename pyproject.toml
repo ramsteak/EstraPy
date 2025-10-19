@@ -15,3 +15,10 @@ dependencies = [
 
 [tool.setuptools.package-data]
 estrapy = ["grammar/*.lark"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true

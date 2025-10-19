@@ -10,11 +10,13 @@ from ..core.context import ParseContext
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
 _T = TypeVar('_T', bound=Command)
 
+
 @dataclass(slots=True)
 class ActionSpecification:
     destination: str
     action: str
     constant: Any = None
+
 
 @dataclass(slots=True)
 class ArgumentSpecification:
@@ -25,9 +27,11 @@ class ArgumentSpecification:
     default: Any = None
     nargs: int | str = 1
 
+
 @dataclass(slots=True)
 class OptionSpecification(ArgumentSpecification):
     arg_names: list[str] = field(default_factory=list[str])
+
 
 @dataclass(slots=True)
 class ValueSpecification(ArgumentSpecification):
@@ -35,11 +39,13 @@ class ValueSpecification(ArgumentSpecification):
 
 
 _MISSING_ARG = object()
+
+
 class CommandParser(Generic[_T]):
     def __init__(self, returnstruct: type[_T], *args: Any, **kwargs: Any) -> None:
         # Check that returnstruct is a dataclass
         if not hasattr(returnstruct, '__dataclass_fields__'):
-            raise TypeError("returnstruct must be a dataclass")
+            raise TypeError('returnstruct must be a dataclass')
         self.returnstruct = returnstruct
         self.structinit = args, kwargs
         # Map from option name in the struct to its specification
@@ -49,18 +55,19 @@ class CommandParser(Generic[_T]):
         # (lookup table and collision check)
         # (e.g. '--energy' -> 'energy')
         self.argumentnames: dict[str | int, str] = {}
-    
-    def add_argument(self,
-                     name: str,
-                     *arg_names: str,
-                     nargs: int|str = 1,
-                     type: Callable[[str], Any] = str,
-                     default: Any = _MISSING_ARG,
-                     required: bool = False,
-                     destination: str | None = None,
-                     action: str = 'store',
-                     const: Any = _MISSING_ARG) -> None:
-        
+
+    def add_argument(
+        self,
+        name: str,
+        *arg_names: str,
+        nargs: int | str = 1,
+        type: Callable[[str], Any] = str,
+        default: Any = _MISSING_ARG,
+        required: bool = False,
+        destination: str | None = None,
+        action: str = 'store',
+        const: Any = _MISSING_ARG,
+    ) -> None:
         # If any arg_names start with '-', it's an option argument.
         # If so, all arg_names must start with at least one '-'.
         # Otherwise, it's a value argument.
@@ -72,8 +79,10 @@ class CommandParser(Generic[_T]):
             argument_type = 'value'
             arg_names = (name,)
         else:
-            raise ArgumentError("All argument names must start with '-' for option arguments, or none for value arguments")
-        
+            raise ArgumentError(
+                "All argument names must start with '-' for option arguments, or none for value arguments"
+            )
+
         # Check that nargs is valid
         if isinstance(nargs, int) and nargs >= 0:
             pass
@@ -82,8 +91,6 @@ class CommandParser(Generic[_T]):
         else:
             raise ArgumentError("nargs must be a positive integer or one of '*', '+', '?'")
 
-            
-        
         # Check if the argument name is valid (i.e. exists in the struct)
         field = next((f for f in fields(self.returnstruct) if f.name == name), None)
         if field is None:
@@ -94,8 +101,10 @@ class CommandParser(Generic[_T]):
             raise DuplicateArgumentError(f"Argument '{name}' is already defined")
         for arg_name in arg_names:
             if arg_name in self.argumentnames:
-                raise DuplicateArgumentError(f"Argument name '{arg_name}' is already used for argument '{self.argumentnames[arg_name]}'")
-        
+                raise DuplicateArgumentError(
+                    f"Argument name '{arg_name}' is already used for argument '{self.argumentnames[arg_name]}'"
+                )
+
         # If default is not given, use the dataclass default
         if default is _MISSING_ARG:
             if field.default is not MISSING:
@@ -106,34 +115,50 @@ class CommandParser(Generic[_T]):
                 default = None
 
         argumentaction = ActionSpecification(
-            destination = destination if destination is not None else name,
-            action = action,
-            constant = const if const is not _MISSING_ARG else None
+            destination=destination if destination is not None else name,
+            action=action,
+            constant=const if const is not _MISSING_ARG else None,
         )
 
         if argument_type == 'value':
             position = len([v for v in self.arguments.values() if isinstance(v, ValueSpecification)])
-            arg = ValueSpecification(name = name,action = argumentaction,nargs = nargs,type = type,required = required,position = position,default = default)
+            arg = ValueSpecification(
+                name=name,
+                action=argumentaction,
+                nargs=nargs,
+                type=type,
+                required=required,
+                position=position,
+                default=default,
+            )
             self.argumentnames[position] = name
         elif argument_type == 'option':
-            arg = OptionSpecification(name = name,action = argumentaction,nargs = nargs,arg_names = list(arg_names),type = type,required = required,default = default)
+            arg = OptionSpecification(
+                name=name,
+                action=argumentaction,
+                nargs=nargs,
+                arg_names=list(arg_names),
+                type=type,
+                required=required,
+                default=default,
+            )
         else:
-            raise RuntimeError("Unknown program state")
-        
+            raise RuntimeError('Unknown program state')
+
         self.arguments[name] = arg
         for arg_name in arg_names:
             self.argumentnames[arg_name] = name
-        
+
         pass
 
     def parse(self, tokens: Iterable[Token | Tree[Token]]) -> _T:
-        a,k = self.structinit
+        a, k = self.structinit
         output = self.returnstruct(*a, **k)
         for idx, token in enumerate(tokens):
             self._parse_token(output, token, idx)
         return output
-    
-    def _parse_token(self, output:_T, token: Token | Tree[Token], index: int) -> Any:
+
+    def _parse_token(self, output: _T, token: Token | Tree[Token], index: int) -> Any:
         match token:
             case Token(_, str(value)):
                 # The token is a simple value, so it must be a positional argument -> value
@@ -147,7 +172,7 @@ class CommandParser(Generic[_T]):
                 parsed_value = arg.type(value)
                 # Perform the action for the given argument
                 self._perform_action(output, arg, parsed_value)
-            
+
             case Tree(Token('RULE', 'option'), [Token('OPTION', str(optname)) as t, *values]):
                 try:
                     opt = self.arguments[self.argumentnames[optname]]
@@ -170,19 +195,25 @@ class CommandParser(Generic[_T]):
                     case '?', m if m <= 1:
                         self._perform_action(output, opt, parsed_values[0] if m == 1 else None)
                     case int(n), m:
-                        raise ParseError(f"Argument '{opt.name}' expects {opt.nargs} values, but got {len(parsed_values)}", t)
+                        raise ParseError(
+                            f"Argument '{opt.name}' expects {opt.nargs} values, but got {len(parsed_values)}", t
+                        )
                     case '*', m:
-                        raise ParseError(f"Argument '{opt.name}' expects 0 or more values, but got {len(parsed_values)}", t)
+                        raise ParseError(
+                            f"Argument '{opt.name}' expects 0 or more values, but got {len(parsed_values)}", t
+                        )
                     case '+', 0:
                         raise ParseError(f"Argument '{opt.name}' expects 1 or more values, but got 0", t)
                     case '?', m if m > 1:
-                        raise ParseError(f"Argument '{opt.name}' expects at most 1 value, but got {len(parsed_values)}", t)
+                        raise ParseError(
+                            f"Argument '{opt.name}' expects at most 1 value, but got {len(parsed_values)}", t
+                        )
                     case _:
-                        raise RuntimeError("Unknown program state")
+                        raise RuntimeError('Unknown program state')
             case Tree(Token() as t, _):
-                raise ParseError("Invalid token", t)
+                raise ParseError('Invalid token', t)
             case _:
-                raise ParseError("Invalid token")
+                raise ParseError('Invalid token')
 
     def _perform_action(self, output: _T, arg: ArgumentSpecification, value: Any) -> None:
         match arg.action.action:
@@ -199,7 +230,7 @@ class CommandParser(Generic[_T]):
                 getattr(output, arg.action.destination).append(value)
             case _:
                 raise ArgumentError(f"Unknown action '{arg.action.action}' for argument '{arg.name}'")
-    
+
     def validate(self, output: _T) -> None:
         # Check that all required arguments are present
         for arg in self.arguments.values():

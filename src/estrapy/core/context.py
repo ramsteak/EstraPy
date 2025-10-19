@@ -65,6 +65,7 @@ class Context:
     # DataStore object containing all loaded data files.
     datastore: DataStore = field(default_factory=DataStore)
 
+
 @dataclass(slots=True)
 class ParseContext:
     # Logger object for logging.

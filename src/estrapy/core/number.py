@@ -6,32 +6,21 @@ from unicodedata import normalize
 
 
 class Unit(Enum):
-    EV = "eV"
-    A = "Å"
-    K = "k"
+    EV = 'eV'
+    A = 'Å'
+    K = 'k'
 
 
 def parse_unit(s: str) -> Unit | None:
     """Parse a string into a Unit enum member. Returns None if the string does not match any unit."""
     # Remove and normalize whitespace and case, removing diacritics
-    s = (
-        normalize("NFKD", s.strip().casefold())
-        .encode("ascii", "ignore")
-        .decode("ascii")
-    )
+    s = normalize('NFKD', s.strip().casefold()).encode('ascii', 'ignore').decode('ascii')
     match s:
-        case "ev":
+        case 'ev':
             return Unit.EV
-        case "a" | "ang" | "angstrom":
+        case 'a' | 'ang' | 'angstrom':
             return Unit.A
-        case (
-            "k"
-            | "wavevector"
-            | "a-1"
-            | "1/angstrom"
-            | "a^-1"
-            | "a1"
-        ):  # result of normalization from a⁻¹
+        case 'k' | 'wavevector' | 'a-1' | '1/angstrom' | 'a^-1' | 'a1':  # result of normalization from a⁻¹
             return Unit.K
         case _:
             return None
@@ -52,19 +41,17 @@ def parse_number(s: str) -> Number:
     """Parse a string into a Number object."""
     s = s.strip()
     if not s:
-        raise ValueError("Empty string cannot be parsed as a number.")
+        raise ValueError('Empty string cannot be parsed as a number.')
 
     m = re.match(
-        r"^([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:([GMkdcm])?([a-zA-ZåÅ/\^⁻¹1-]+))?$",
+        r'^([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:([GMkdcm])?([a-zA-ZåÅ/\^⁻¹1-]+))?$',
         s,
     )
     if m is None:
         raise ValueError(f"String '{s}' is not a valid number format.")
 
     num_str, mult_str, unit_str = m.groups()
-    mult = {"G": 1e9, "M": 1e6, "k": 1e3, "d": 1e-1, "c": 1e-2, "m": 1e-3}.get(
-        mult_str, 1
-    )
+    mult = {'G': 1e9, 'M': 1e6, 'k': 1e3, 'd': 1e-1, 'c': 1e-2, 'm': 1e-3}.get(mult_str, 1)
     num = float(num_str) * mult
     unit = parse_unit(unit_str) if unit_str else None
 

@@ -4,15 +4,15 @@ from lark.indenter import Indenter
 class EstraIndenter(Indenter):
     @property
     def NL_type(self) -> str:
-        return "_NL"
+        return '_NL'
 
     @property
     def INDENT_type(self) -> str:
-        return "_INDENT"
+        return '_INDENT'
 
     @property
     def DEDENT_type(self) -> str:
-        return "_DEDENT"
+        return '_DEDENT'
 
     @property
     def OPEN_PAREN_types(self) -> list[str]:
