@@ -339,7 +339,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
     match options.reciprocal_sample_signal_mode__:
         case 'calc_fluorescence':
             column = Column(name='a', unit=None, type=ColumnType.DATA)
-            importer:Expr = lambda df: (df['If'] / df['I0']).rename('a')
+            importer:Expr = lambda df: (df['If'] / df['I0']).rename('a') # noqa: E731
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_fluorescence':
             assert options.fluorescence is not ..., "Invalid program state: #MPylXTU7xl"
@@ -348,7 +348,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
             cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
         case 'calc_transmission':
             column = Column(name='a', unit=None, type=ColumnType.DATA)
-            importer:Expr = lambda df: (np.log10(df['I0'] / df['I1'])).rename('a') # type: ignore
+            importer:Expr = lambda df: (np.log10(df['I0'] / df['I1'])).rename('a') # type: ignore  # noqa: E731
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_transmission':
             assert options.transmission is not ..., "Invalid program state: #qGBvcHeGhS"
@@ -361,7 +361,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
     match options.reciprocal_reference_signal_mode__:
         case 'calc_referencetransmission':
             column = Column(name='ref', unit=None, type=ColumnType.DATA)
-            importer:Expr = lambda df: (np.log10(df['I1'] / df['I2'])).rename('ref') # type: ignore
+            importer:Expr = lambda df: (np.log10(df['I1'] / df['I2'])).rename('ref') # type: ignore  # noqa: E731
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_referencetransmission':
             assert options.referencetransmission is not ..., "Invalid program state: #Xvlkkp7Wyz"
@@ -375,13 +375,13 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
     if options.fourierreal is not ... and options.fourierimaginary is not ...:
         # real/imaginary specified as pure columns. Calculate f = real + i*imaginary
         column = Column(name='fourier', unit=None, type=ColumnType.DATA)
-        importer:Expr = lambda df: (df['fourierreal'] + 1j * df['fourierimaginary']).rename('f')
+        importer:Expr = lambda df: (df['fourierreal'] + 1j * df['fourierimaginary']).rename('f')  # noqa: E731
         cmd.signals.append((column, Domain.FOURIER, importer))
     elif options.fouriermagnitude is not ... and options.fourierphase is not ...:
         # magnitude/phase specified as pure columns. Calculate f = magnitude * (cos(phase) + i * sin(phase))
         # sin/cos is faster than exp
         column = Column(name='fourier', unit=None, type=ColumnType.DATA)
-        importer: Expr = lambda df: (df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))).rename('f')
+        importer: Expr = lambda df: (df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))).rename('f')  # noqa: E731
         cmd.signals.append((column, Domain.FOURIER, importer))
     
     # TODO: fourier errors
