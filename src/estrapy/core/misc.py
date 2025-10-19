@@ -227,3 +227,42 @@ class fmt(StaticUtility):
         pieces = [f"{a}{var}{exp}{e}" for e,a in coeff]
         return sep.join(pieces if order > 0 else reversed(pieces))
     
+    @staticmethod
+    def prettytable(rows: Iterable[Iterable[Any]], sep: str = "│", header: bool = False) -> str:
+        """Formats a table from an iterable of rows."""
+        # ┌─┬─┐    0  1  2  3  4
+        # │ │ │    5     7     9
+        # ├─┼─┤   10 11 12    14
+        # │ │ │   15    17    19
+        # └─┴─┘   20 21 22    24
+        # Convert all items to string
+        str_rows = [[f" {item!s} " for item in row] for row in rows]
+        # Calculate the maximum width of each column
+        col_widths = [max(len(row[i]) for row in str_rows) for i in range(len(str_rows[0]))]
+        # Create the formatted table
+        lines:list[str] = []
+
+        if header:
+            lines.append('┌' + ('┬'.join('─' * col_widths[j] for j in range(len(str_rows[0])))) + '┐')
+
+        for i, row in enumerate(str_rows):
+            lines.append('│' + (sep.join(item.ljust(col_widths[j]) for j, item in enumerate(row))) + '│')
+            if header and i == 0:
+                lines.append('├' + ('┼'.join('─' * col_widths[j] for j in range(len(row)))) + '┤')
+        
+        lines.append('└' + ('┴'.join('─' * col_widths[j] for j in range(len(str_rows[0])))) + '┘')
+
+        return "\n".join(lines)
+
+    @staticmethod
+    def mdtable(rows: Iterable[Iterable[Any]]) -> str:
+        """Formats a markdown table from an iterable of rows."""
+        str_rows = [[f" {item!s} " for item in row] for row in rows]
+        col_widths = [max(len(row[i]) for row in str_rows) for i in range(len(str_rows[0]))]
+        lines:list[str] = []
+
+        for i, row in enumerate(str_rows):
+            lines.append('|' + '|'.join(item.ljust(col_widths[j]) for j, item in enumerate(row)) + '|')
+            if i == 0:
+                lines.append('|' + '|'.join('-' * col_widths[j] for j in range(len(row))) + '|')
+        return "\n".join(lines)
