@@ -4,7 +4,7 @@ from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
 from ..core.context import Context, ParseContext
 
-from .directives import Directive, Directive_define, Directive_clear, execute_directive
+from .directives import Directive_define, Directive_clear, execute_directive
 
 from .filein import parse_filein_command, Command_filein, execute_filein_command
 from .align import parse_align_command, Command_align, execute_align_command
