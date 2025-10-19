@@ -184,8 +184,8 @@ class TimerCollection:
         # Get longest name length
         maxlen = max((len(name) for name in self._timers), default=4)
         lines: list[str] = []
-        lines.append(f"{'Name':<{maxlen}} | {f'Total ({unit})':<10} | {f'Mean ({unit})':<10} | {f'Stdev ({unit})':<10} | {'Cycles':<6}")
+        lines.append(f"{'Name':<{maxlen}} | {f'Total ({unit})':<12} | {f'Mean ({unit})':<12} | {f'Stdev ({unit})':<12} | {'Cycles':<6}")
         lines.append("-" * len(lines[0]))
         for name, timer in self._timers.items():
-            lines.append(f"{name or "<total>":<{maxlen}} | {timer.total / mul:>8.2f} | {timer.mean / mul:>8.2f} | {timer.stdev / mul:>8.2f} | {timer.cycles:<6}")
+            lines.append(f"{name or "<total>":<{maxlen}} | {timer.total / mul:>12.2f} | {timer.mean / mul:>12.2f} | {timer.stdev / mul:>12.2f} | {timer.cycles:<6}")
         return "\n".join(lines)
