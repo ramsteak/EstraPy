@@ -3,15 +3,20 @@ from typing import Any
 
 
 from ..core.grammarclasses import Command, Script, Directive
+from ..core.context import ParseContext
 from ..commands import parse_command, parse_directive
 
 
 class EstraTransformer(Transformer[Any, Script]):
+    def __init__(self, parsecontext: ParseContext, visit_tokens: bool = True) -> None:
+        super().__init__(visit_tokens)
+        self.parsecontext = parsecontext
+
     def directive(self, items: list[Any]) -> Directive:
-        return parse_directive(items)
+        return parse_directive(items, self.parsecontext)
 
     def command(self, items: list[Any]) -> Command:
-        return parse_command(items)
+        return parse_command(items, self.parsecontext)
 
     def start(self, items: list[Any]) -> Script:
         return Script(

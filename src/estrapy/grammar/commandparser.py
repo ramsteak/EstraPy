@@ -5,6 +5,7 @@ from dataclasses import dataclass, fields, MISSING, field
 from ..core.grammarclasses import Command
 from ..core.errors import ParseError
 from ..core.errors import ArgumentError, DuplicateArgumentError
+from ..core.context import ParseContext
 
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
 _T = TypeVar('_T', bound=Command)
@@ -205,7 +206,7 @@ class CommandParser(Generic[_T]):
             if arg.required and getattr(output, arg.name) is None:
                 raise ArgumentError(f"Argument '{arg.name}' is required but not provided")
 
-    def __call__(self, args: Iterable[Token | Tree[Token]]) -> _T:
+    def __call__(self, args: Iterable[Token | Tree[Token]], parsecontext: ParseContext) -> _T:
         out = self.parse(args)
         self.validate(out)
         return out

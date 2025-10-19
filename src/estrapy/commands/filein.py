@@ -5,21 +5,23 @@ from io import StringIO
 from itertools import zip_longest
 from pathlib import Path
 from lark import Tree, Token
-from typing import TypeAlias, Sequence
+from typing import TypeAlias, Sequence, Callable
 from types import EllipsisType
-from tqdm import tqdm
+from tqdm.std import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
+from os import cpu_count
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.errors import CommandSyntaxError, ExecutionError
 from ..core.grammarclasses import Command
 from ..core.number import Number, parse_number, Unit
-from ..core.context import Context
+from ..core.context import Context, ParseContext
 from ..core.datastore import FileMetadata, DataDomain, Domain, Column, ColumnType, DataFile
 from ..core.misc import peek, Bag, fmt
 
-import polars as pl
+import pandas as pd
+import numpy as np
 
 Column_id: TypeAlias = str | int
 ColumnRange: TypeAlias = tuple[Column_id, Column_id]
@@ -42,6 +44,9 @@ class ImporterOptions:
     skip_rows: int = 0
     decimal: str | None = None
 
+    re_sep: re.Pattern[str] | None = None
+
+Expr: TypeAlias = Callable[[pd.DataFrame], pd.Series]
 @dataclass(slots=True)
 class Command_filein(Command):
     filenames: list[str] = field(default_factory=list[str])
@@ -52,7 +57,7 @@ class Command_filein(Command):
     columns: list[tuple[Column, Domain, ColumnDescriptor]] = field(default_factory=list[tuple[Column, Domain, ColumnDescriptor]])
 
     # Signals to be calculated from the imported columns. The 
-    signals: list[tuple[Column, Domain, pl.Expr]] = field(default_factory=list[tuple[Column, Domain, pl.Expr]])
+    signals: list[tuple[Column, Domain, Expr]] = field(default_factory=list[tuple[Column, Domain, Expr]])
 
     # Variable to sort the data by
     sortby: str = '.fn'
@@ -177,7 +182,7 @@ def _assert_flag_not_assigned_set(options: FileInOptions, option: str, optiontok
         raise CommandSyntaxError(f"The {optiontoken.value} option can only be specified once.", optiontoken)
     setattr(options, option, value)
 
-def parse_filein_command(args: Sequence[Token | Tree[Token]]) -> Command_filein:
+def parse_filein_command(args: Sequence[Token | Tree[Token]], parsecontext: ParseContext) -> Command_filein:
     options = get_filein_options(args)
     return get_filein_command(options)
 
@@ -311,6 +316,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
         columndescriptor = parse_column_descriptor(options.fourierphase)
         column = Column(name='fourierphase', unit=None, type=ColumnType.TEMP)
         cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+
     if options.fourierrealerror is not ...:
         columndescriptor = parse_column_descriptor(options.fourierrealerror)
         column = Column(name='fourierrealerror', unit=None, type=ColumnType.TEMP)
@@ -319,6 +325,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
         columndescriptor = parse_column_descriptor(options.fourierimaginaryerror)
         column = Column(name='fourierimaginaryerror', unit=None, type=ColumnType.TEMP)
         cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+
     if options.fouriermagnitudeerror is not ...:
         columndescriptor = parse_column_descriptor(options.fouriermagnitudeerror)
         column = Column(name='fouriermagnitudeerror', unit=None, type=ColumnType.TEMP)
@@ -327,15 +334,12 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
         columndescriptor = parse_column_descriptor(options.fourierphaseerror)
         column = Column(name='fourierphaseerror', unit=None, type=ColumnType.TEMP)
         cmd.columns.append((column, Domain.FOURIER, columndescriptor))
-    # TODO: implement fourier column transformation.
-    # Polars does not have complex numbers, so we need to calculate real and imaginary
-    # from magnitude and phase, or vice versa.
 
     # Setup all signals and relative functions
     match options.reciprocal_sample_signal_mode__:
         case 'calc_fluorescence':
             column = Column(name='a', unit=None, type=ColumnType.DATA)
-            importer = (pl.col('If') / pl.col('I0')).alias('a')
+            importer:Expr = lambda df: (df['If'] / df['I0']).rename('a')
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_fluorescence':
             assert options.fluorescence is not ..., "Invalid program state: #MPylXTU7xl"
@@ -344,7 +348,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
             cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
         case 'calc_transmission':
             column = Column(name='a', unit=None, type=ColumnType.DATA)
-            importer = (pl.col('I0') / pl.col('I1')).log10().alias('a')
+            importer:Expr = lambda df: (np.log10(df['I0'] / df['I1'])).rename('a') # type: ignore
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_transmission':
             assert options.transmission is not ..., "Invalid program state: #qGBvcHeGhS"
@@ -357,7 +361,7 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
     match options.reciprocal_reference_signal_mode__:
         case 'calc_referencetransmission':
             column = Column(name='ref', unit=None, type=ColumnType.DATA)
-            importer = (pl.col('I1') / pl.col('I2')).log10().alias('ref')
+            importer:Expr = lambda df: (np.log10(df['I1'] / df['I2'])).rename('ref') # type: ignore
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_referencetransmission':
             assert options.referencetransmission is not ..., "Invalid program state: #Xvlkkp7Wyz"
@@ -367,6 +371,30 @@ def get_filein_command(options: FileInOptions) -> Command_filein:
         case _:
             assert False, "Invalid program state: #Cxcis9JxTS"
 
+    # Add complex number recovery (from real/imaginary or magnitude/phase) if fourier columns are specified
+    if options.fourierreal is not ... and options.fourierimaginary is not ...:
+        # real/imaginary specified as pure columns. Calculate f = real + i*imaginary
+        column = Column(name='fourier', unit=None, type=ColumnType.DATA)
+        importer:Expr = lambda df: (df['fourierreal'] + 1j * df['fourierimaginary']).rename('f')
+        cmd.signals.append((column, Domain.FOURIER, importer))
+    elif options.fouriermagnitude is not ... and options.fourierphase is not ...:
+        # magnitude/phase specified as pure columns. Calculate f = magnitude * (cos(phase) + i * sin(phase))
+        # sin/cos is faster than exp
+        column = Column(name='fourier', unit=None, type=ColumnType.DATA)
+        importer: Expr = lambda df: (df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))).rename('f')
+        cmd.signals.append((column, Domain.FOURIER, importer))
+    
+    # TODO: fourier errors
+
+    # Compile importer options
+    if cmd.importeroptions.separator is None:
+        cmd.importeroptions.separator = r'\s+'
+    else:
+        cmd.importeroptions.re_sep = re.compile(cmd.importeroptions.separator)
+        cmd.importeroptions.separator = ' ' # If a custom separator is given, the regex will be used to edit the separator to a single space
+
+    if cmd.importeroptions.decimal is None:
+        cmd.importeroptions.decimal = '.'
     return cmd
 
 
@@ -581,49 +609,53 @@ def get_filein_options(args: Sequence[Token | Tree[Token]]) -> FileInOptions:
     # Return options
     return options
 
-
 def execute_filein_command(command: Command_filein, context: Context) -> None:
     log = context.logger.getChild("filein")
-    # This function is a placeholder for the actual implementation of the filein command.
-    # It should handle reading the specified files, processing the data according to
-    # the options set in the command, and storing the results in the appropriate data structures.
-    
-    # Get filename list from the given folder and filenames
-    directory = command.directory or context.paths.workingdir
-    if not directory.is_absolute():
-        directory = (context.paths.workingdir / directory).resolve()
-    
-    files = [f for fs in command.filenames for f in directory.glob(fs)]
-
-    # If no files found, raise an error
-    if not files:
-        raise ExecutionError(f"No files found in directory '{directory}' matching the specified filenames.")
-
-    imported_files:list[DataFile] = []
-    if context.options.debug:
-        # Single-threaded file reading, better for debugging
-        with logging_redirect_tqdm([context.logger]):
-            for f in tqdm(files, desc="Importing files", unit="file", leave=False):
-                data = read_file(f, command)
-                log.debug(f"Imported file with polars '{data.meta.path}'")
-                imported_files.append(data)
-    else:
-        # Multithreaded file reading
-        with (logging_redirect_tqdm([context.logger]), ThreadPoolExecutor(max_workers=4) as executor):
-            futures = {executor.submit(read_file, f, command): f for f in files}
-
-            for future in tqdm(as_completed(futures), total=len(futures), desc="Importing files", unit="file", leave=False):
-                data = future.result()
-                log.debug(f"Imported file with polars '{data.meta.path}'")
-                imported_files.append(data)
+    with context.timers.time("execution/filein"):
+        # Get filename list from the given folder and filenames
+        directory = command.directory or context.paths.workingdir
+        if not directory.is_absolute():
+            directory = (context.paths.workingdir / directory).resolve()
         
-    # Sort by the given sortby variable
-    imported_files.sort(key=lambda df: df.meta[command.sortby])
+        files = [f for fs in command.filenames for f in directory.glob(fs)]
+
+        # If no files found, raise an error
+        if not files:
+            raise ExecutionError(f"No files found in directory '{directory}' matching the specified filenames.")
+
+        imported_files:list[DataFile] = []
+        if context.options.debug or len(files) <= 8:
+            # Single-threaded file reading, better for debugging and small number of files
+            with logging_redirect_tqdm([context.logger]):
+                for f in tqdm(files, desc="Importing files", unit="file", leave=False):
+                    data = read_file(f, command, context)
+                    log.debug(f"Imported file '{data.meta.path.relative_to(context.paths.workingdir)}'")
+                    imported_files.append(data)
+        else:
+            # Multithreaded file reading
+            workers = min(32, (cpu_count() or 4) + 4)
+            with (logging_redirect_tqdm([context.logger]), ThreadPoolExecutor(max_workers=workers) as executor):
+                futures = {executor.submit(read_file, f, command, context): f for f in files}
+
+                for future in tqdm(as_completed(futures), total=len(futures), desc="Importing files", unit="file", leave=False):
+                    data = future.result()
+                    log.debug(f"Imported file '{data.meta.path.relative_to(context.paths.workingdir)}'")
+                    imported_files.append(data)
+            
+        # Sort by the given sortby variable
+        imported_files.sort(key=lambda df: df.meta[command.sortby])
+
+        # Set the variable '.n' for each file (file index in the current import session)
+        # Set the variable '.N' for each file (file index across all import sessions)
+        previous_file_count = len(context.datastore.files)
+        for n, df in enumerate(imported_files, start=1):
+            df.meta['.n'] = n
+            df.meta['.N'] = previous_file_count + n
 
     # Store imported files in the context
-    context.datastore.files.update({df.meta.name:df for df in imported_files})
+    context.datastore.files.update({df.meta.name:df for df in imported_files}) # to check the error
     _total_size = sum(f.meta[".fs"] for f in imported_files)
-    log.info(f"Imported {len(imported_files)} files ({fmt.human(_total_size, "B", format="0.1f", order=1024)}).")
+    log.debug(f"Imported {len(imported_files)} files in {context.timers.get_ms('execution/filein'):0.2f} ms ({fmt.human(_total_size, "B", format="0.1f", order=1024)}).")
 
 def guess_type(s: str) -> str | Number | int:
     # Try to guess if the string is an integer, a number with unit, or just a string
@@ -645,7 +677,6 @@ def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
             for pos, item in enumerate(line.split(), start=1)
     }
 
-
 def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
     vars:dict[str, str|int|Number] = {f'.f{i+1}':guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)}
     vars['.fn'] = file.name
@@ -660,18 +691,12 @@ def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
     vars['.tm'] = int(stat.st_mtime)
     return vars
 
-def normalize_csv(s: str, separator: str, decimal: str) -> str:
-    re_sep = re.compile(separator)
-    # Remove spaces at the beginning and end of the lines
-    re_srp = re.compile(r'^\s+|\s+$', re.MULTILINE)
-    s = re_srp.sub('', s)
-    if decimal != ".":
-        re_dec = re.compile(fr'(?<=\d){re.escape(decimal)}(?=\d)')
-        return re_sep.sub(' ', re_dec.sub('.', s)).strip()
+def normalize_csv(s: str, re_sep: re.Pattern[str] | None) -> str:
+    if re_sep is None:
+        return s
     return re_sep.sub(' ', s)
 
-
-def read_file(file: Path, command: Command_filein) -> DataFile:
+def read_file(file: Path, command: Command_filein, context: Context) -> DataFile:
     # Open the file, and read lines until the first non-comment line.
     # The last comment line is the header of the file.
     fileheader:list[str] = []
@@ -690,17 +715,16 @@ def read_file(file: Path, command: Command_filein) -> DataFile:
             header = line.strip().split()[1:] # type: ignore
         else:
             header = []
-        
-        # Now we replace separator characters with spaces, and read the data using polars.
+
+        # Now we replace separator characters with spaces, and read the data using pandas.
         normfiledata = normalize_csv(f.read(),
-                                     command.importeroptions.separator or r'(?:,[ \t\r\f\v]*|[ \t\r\f\v]+)',
-                                     command.importeroptions.decimal or '.')
-        dat = pl.read_csv(StringIO(normfiledata), 
-                          comment_prefix=command.importeroptions.comment_prefix,
-                          separator=" ",
-                          has_header=False,
-                          ignore_errors=True,
-                        )
+                                    command.importeroptions.re_sep)
+        dat = pd.read_csv(StringIO(normfiledata), #type: ignore
+                            sep=command.importeroptions.separator,
+                            header=None,
+                            decimal=command.importeroptions.decimal or '.',
+                            engine='c',
+                            dtype=float,)
         dat.columns = [h or c for h,c in zip_longest(header, dat.columns)][:len(dat.columns)]
 
     # Parse file header and name variables
@@ -716,22 +740,26 @@ def read_file(file: Path, command: Command_filein) -> DataFile:
             file_variables[var] = val
     
     # Get the specified columns and store them in their respective domains
-    extractedcolumns = Bag[Domain, tuple[Column, pl.Series]].from_iter(
-        (domain, (column,dat.select(pl.mean_horizontal([pl.col(c) for c in expand_column_descriptor(descriptor, dat.columns)]).alias(column.name))[column.name]))
+    extractedcolumns = Bag[Domain, tuple[Column, pd.Series]].from_iter(
+        (domain, (column, dat[expand_column_descriptor(descriptor, dat.columns.to_list())].mean(axis=1).rename(column.name)))
         for column, domain, descriptor in command.columns
     )
+    signalcolumns = Bag[Domain, tuple[Column, Expr]].from_iter(
+        (domain, (column, expr))
+        for column, domain, expr in command.signals
+    )
 
+    # Get data from extracted columns
     newdata = {
-        domain: DataDomain([c for c,_ in columns], pl.DataFrame(c for _,c in columns))
+        domain: DataDomain([c for c,_ in columns], pd.DataFrame(c for _,c in columns).T)
         for domain, columns in extractedcolumns.groups()
     }
-
-
-    # Get the specified signals and store them in the respective domains
-    for column, domain, importer in command.signals:
-        datadomain = newdata[domain]
-        datadomain.data = datadomain.data.with_columns(importer)
-        datadomain.columns.append(column)
+    # Compute and store the new signals in their respective domains
+    for domain, newcolexps in signalcolumns.groups():
+        if domain not in newdata:
+            raise ExecutionError(f"Cannot compute signal in domain {domain} without any columns.")
+        newdata[domain].columns.extend(c for c,_ in newcolexps)
+        newdata[domain].data = newdata[domain].data.assign(**{c.name:e for c,e in newcolexps}) # type: ignore
     
     return DataFile(
         FileMetadata(

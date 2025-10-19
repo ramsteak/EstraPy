@@ -1,9 +1,4 @@
-from ..config import PANDAS
-
-if PANDAS:
-    from pandas import DataFrame
-else:
-    from polars import DataFrame
+from pandas import DataFrame
 
 from dataclasses import dataclass, field
 from enum import Enum

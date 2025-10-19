@@ -2,16 +2,11 @@ from lark import Token, Tree
 from ..core.grammarclasses import Option, Directive, Command, Value
 from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
-from ..core.context import Context
-
-from ..config import PANDAS
+from ..core.context import Context, ParseContext
 
 from .directives import Directive, Directive_define, Directive_clear, execute_directive
 
-if PANDAS:
-    from .filein_pd import parse_filein_command, Command_filein, execute_filein_command
-else:
-    from .filein import parse_filein_command, Command_filein, execute_filein_command
+from .filein import parse_filein_command, Command_filein, execute_filein_command
 
 from .align import parse_align_command, Command_align, execute_align_command
 # from .noise import parse_noise_command, Command_noise, execute_noise_command
@@ -24,7 +19,7 @@ __all__ = [
 ]
 
 
-def parse_directive(directive: list[Token | Tree[Token]]) -> Directive:
+def parse_directive(directive: list[Token | Tree[Token]], parsecontext: ParseContext) -> Directive:
     match directive:
         # Directive define --------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'define'), Token('STRING', name), Token('INTEGER', value)]:
@@ -69,14 +64,14 @@ def parse_command_argument(arg: Token | Tree[Token]) -> Option | Value:
             raise CommandSyntaxError("Invalid command argument syntax")
         
 
-def parse_command(command: list[Token | Tree[Token]]) -> Command:
+def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command:
     match command:
         # Command filein ---------------------------------------------------------------------------
         case ['filein', *args]:
-            return parse_filein_command(args)
+            return parse_filein_command(args, parsecontext)
         # Command align ----------------------------------------------------------------------------
         case ['align', *args]:
-            return parse_align_command(args)
+            return parse_align_command(args, parsecontext)
         # Command noise ----------------------------------------------------------------------------
         # case ['noise', *args]:
         #     return parse_noise_command(args)
