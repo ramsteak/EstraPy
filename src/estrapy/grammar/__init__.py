@@ -4,6 +4,11 @@ from lark import Lark
 from .indenter import EstraIndenter
 from .transformer import EstraTransformer
 
+__all__ = [
+    "file_parser",
+    "EstraTransformer",
+]
+
 grammar_data = files("estrapy.grammar").joinpath("estrapy.lark").read_text()
 
 file_parser = Lark(
@@ -14,4 +19,3 @@ file_parser = Lark(
     propagate_positions=True,
 )
 
-transformer = EstraTransformer()
