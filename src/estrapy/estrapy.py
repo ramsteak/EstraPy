@@ -13,8 +13,8 @@ from pathlib import Path  # noqa: E402
 from lark.exceptions import VisitError  # noqa: E402
 
 from . import __version__, __version_tuple__  # noqa: E402
-from .grammar import file_parser, transformer  # noqa: E402
-from .core.context import Context, Paths, Options  # noqa: E402
+from .grammar import file_parser, EstraTransformer  # noqa: E402
+from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
 
 from .core.timers import TimerCollection  # noqa: E402
 from .dispatcher import execute_script  # noqa: E402
@@ -252,6 +252,8 @@ def main() -> None:
 
         # Transform the parse tree into a more manageable structure
         try:
+            parsecontext = ParseContext(context.logger.getChild("parser"))
+            transformer = EstraTransformer(parsecontext)
             t_tree = transformer.transform(parsed_tree)
         except VisitError as ve:
         # On transformation error, check if it's a CommandSyntaxError and re-raise it with input file context
