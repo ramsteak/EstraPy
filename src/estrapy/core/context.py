@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from io import StringIO
 from logging import Logger
 from pathlib import Path
 from typing import Any
@@ -28,7 +27,7 @@ class Paths:
     logfile: Path | None
 
     # Output file path. Contains the output of the program as a report.
-    outfile: Path | StringIO
+    outfile: Path | None
 
 
 @dataclass(slots=True)

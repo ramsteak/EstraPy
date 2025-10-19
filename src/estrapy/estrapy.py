@@ -8,18 +8,15 @@ import colorlog  # noqa: E402
 import logging  # noqa: E402
 import re  # noqa: E402
 
-from io import StringIO  # noqa: E402
 from pathlib import Path  # noqa: E402
 from lark.exceptions import VisitError  # noqa: E402
 
 from . import __version__, __version_tuple__  # noqa: E402
+from .dispatcher import execute_script  # noqa: E402
 from .grammar import file_parser, EstraTransformer  # noqa: E402
 from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
-
-from .core.timers import TimerCollection  # noqa: E402
-from .dispatcher import execute_script  # noqa: E402
-
 from .core.errors import ParseError  # noqa: E402
+from .core.timers import TimerCollection  # noqa: E402
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
 logging.getLogger("PIL").setLevel(logging.WARNING)
@@ -128,7 +125,7 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
             workingdir=Path.cwd(),
             outputdir=Path.cwd(),
             logfile=None,
-            outfile=StringIO(),
+            outfile=None,
         ),
         timers=timers,
         projectname=Path.cwd().name,
@@ -191,11 +188,6 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
     context.paths.logfile = context.paths.outputdir / "estrapy.log"
     context.paths.outfile = context.paths.outputdir / (context.projectname + ".out")
 
-    # Create or clear the output file
-    if context.paths.outfile is not None:  # type: ignore
-        context.paths.outfile.touch(exist_ok=True)
-        context.paths.outfile.write_text("")
-
     return context
 
 
@@ -212,9 +204,8 @@ def main() -> None:
     log = context.logger
 
     # Log information about the program
-
-    log.info("EstraPy - XAS data analysis tool")
-    log.info("(c) 2024 Marco Stecca")
+    log.info( "EstraPy - XAS data analysis tool")
+    log.info( "(c) 2024 Marco Stecca")
     log.info(f"Version {__version__}")
     log.debug(f"Time to load imports: {(timers["imports"]) / 1e6:.2f} ms")
 
@@ -294,6 +285,7 @@ def main() -> None:
     timers.stop()
     log.debug(f"Total execution time: {timers.get_ms(""):.2f} ms")
 
+    log.debug("Timing summary:")
     for line in context.timers.table_format("ms").splitlines():
         log.debug(line)
 
