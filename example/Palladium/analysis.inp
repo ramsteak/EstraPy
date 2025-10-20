@@ -25,6 +25,16 @@ background fourier 0.9A -k ${kpow}
 
 fourier 3k 14k 6A 0.01A -a hann -k ${kpow} -w1
 
+fit 3k 12k --dir ./feff
+  --param N   1     0             # Coordination number
+  --param s02 0.85  0.8 0.95 0.01 # Debye-Waller factor
+  --param dE0 0.00 -0.5 0.5  0.01 # Energy shift
+  --param dR  0.00 -0.5 0.5  0.01 # Distance shift
+  --param s2  0.00 -0.5 0.5  0.01 # Noise scale factor
+  --param g   0.00 -0.5 0.5  0.01 # Skewness factor
+  --param k   0.00 -0.5 0.5  0.01 # Kurtosis factor
+  --shell feff00001.dat -N N -dE0 dE0 -dR dR -s2 s2 -g g -k k -s02 s02
+  --shell feff00002.dat -N (2*N) -dE0 dE0 -dR dR -s2 s2 -g g -k k -s02 s02
 # ------------------------------------------------------------------------------
 # Plotting
 
