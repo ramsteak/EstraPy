@@ -297,72 +297,18 @@ class FileIn(CommandHandler):
     @staticmethod
     def parse(tokens: list[Token], context: Context) -> Args_FileIn:
         parser = CommandParser("filein", description="Imports the data from files.")
-        parser.add_argument(
-            "filepos", help="The file to import. Can be a glob pattern."
-        )
-        parser.add_argument(
-            "--dir",
-            help="The directory to import the files from, instead of the current workdir.",
-        )
-        parser.add_argument(
-            "--batch", "-b", action="store_true", help="Uses the batch arguments"
-        )
-
+        parser.add_argument("filepos", help="The file to import. Can be a glob pattern.")
+        parser.add_argument("--dir", help="The directory to import the files from, instead of the current workdir.", )
+        parser.add_argument("--batch", "-b", action="store_true", help="Uses the batch arguments")
         parser.add_argument("--xaxiscolumn", "-X", help="Column containing the x-axis.")
 
         groupx = parser.add_mutually_exclusive_group()
-        groupx.add_argument(
-            "--index",
-            nargs="?",
-            type=str,
-            default=None,
-            const=True,
-            help="Sets the x axis to a numeric index.",
-        )
-        groupx.add_argument(
-            "--energy",
-            "-E",
-            nargs="?",
-            type=str,
-            default=None,
-            const=True,
-            help="Reads the x-axis column as energy.",
-        )
-        groupx.add_argument(
-            "--kvector",
-            "-k",
-            nargs="?",
-            type=str,
-            default=None,
-            const=True,
-            help="Reads the x-axis column as k-vector.",
-        )
-        groupx.add_argument(
-            "--rdistance",
-            "-R",
-            nargs="?",
-            type=str,
-            default=None,
-            const=True,
-            help="Reads the x-axis column as radial distance.",
-        )
-        groupx.add_argument(
-            "--qvector",
-            "-q",
-            nargs="?",
-            type=str,
-            default=None,
-            const=True,
-            help="Reads the x-axis column as q-vector.",
-        )
-
-        parser.add_argument(
-            "--shift",
-            type=float,
-            default=0,
-            help="Shifts the data by the specified amount.",
-        )
-
+        groupx.add_argument("--index", nargs="?", type=str, default=None, const=True, help="Sets the x axis to a numeric index.")
+        groupx.add_argument("--energy", "-E", nargs="?", type=str, default=None, const=True, help="Reads the x-axis column as energy.")
+        groupx.add_argument("--kvector", "-k", nargs="?", type=str, default=None, const=True, help="Reads the x-axis column as k-vector.")
+        groupx.add_argument("--rdistance", "-R", nargs="?", type=str, default=None, const=True, help="Reads the x-axis column as radial distance.")
+        groupx.add_argument("--qvector", "-q", nargs="?", type=str, default=None, const=True, help="Reads the x-axis column as q-vector.")
+        parser.add_argument("--shift", type=float, default=0, help="Shifts the data by the specified amount.")
         parser.add_argument("--intensities","-I",nargs="+",help="Imports raw intensities, in order: I0, I1, I2, If. If not specified, determines columns from data import commands. To skip one, use '-'",)
 
         groupd = parser.add_mutually_exclusive_group()

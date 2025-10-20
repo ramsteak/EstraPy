@@ -8,8 +8,7 @@ from logging import getLogger
 from ._context import Context, Column, DataColType, AxisType, Domain, range_to_index
 from ._format import pol
 from ._handler import CommandHandler, Token, CommandResult
-from ._numberunit import parse_range, NumberUnitRange
-from ._numberunit import actualize_range
+from ._numberunit import parse_range, NumberUnitRange, actualize_range
 
 from ._parser import CommandParser
 
