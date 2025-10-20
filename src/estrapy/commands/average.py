@@ -67,7 +67,7 @@ class Average(CommandHandler):
 
             signaltype = eqor([data.meta.signaltype for data in datas], default = SignalType.OTHER)
             refsigtype = eqor([data.meta.refsigtype for data in datas], default = SignalType.OTHER)
-            name = "_".join(var)
+            name = "_".join(str(v) for v in var)
             path = context.paths.workdir
             refE0 = eqor([data.meta.refE0 for data in datas], default = None)
 
@@ -78,6 +78,8 @@ class Average(CommandHandler):
                 E0 = sum(E0s) / len(E0s) # type: ignore
             else: E0 = None
 
+            # Add the {.fn} variable as the "_".join of the variables
+            nvars[".fn"] = name
             outmeta = MetaData(signaltype, refsigtype, name, path, nvars, run, refE0, E0)
             outdata = Data(outmeta)
 
