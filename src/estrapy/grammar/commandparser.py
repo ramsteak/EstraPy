@@ -2,13 +2,13 @@ from typing import TypeVar, Generic, Iterable, Callable, Any
 from lark import Token, Tree
 from dataclasses import dataclass, fields, MISSING, field
 
-from ..core.grammarclasses import Command
+from ..core.grammarclasses import CommandArguments, CommandMetadata, Command
 from ..core.errors import ParseError
 from ..core.errors import ArgumentError, DuplicateArgumentError
 from ..core.context import ParseContext
 
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
-_T = TypeVar('_T', bound=Command)
+_T = TypeVar('_T', bound=CommandArguments)
 
 
 @dataclass(slots=True)
@@ -42,12 +42,13 @@ _MISSING_ARG = object()
 
 
 class CommandParser(Generic[_T]):
-    def __init__(self, returnstruct: type[_T], *args: Any, **kwargs: Any) -> None:
+    def __init__(self, returnstruct: type[_T], metadata: CommandMetadata, *args: Any, **kwargs: Any) -> None:
         # Check that returnstruct is a dataclass
         if not hasattr(returnstruct, '__dataclass_fields__'):
             raise TypeError('returnstruct must be a dataclass')
         self.returnstruct = returnstruct
         self.structinit = args, kwargs
+        self.metadata = metadata
         # Map from option name in the struct to its specification
         # (e.g. 'energy' -> ArgumentSpecification)
         self.arguments: dict[str, ArgumentSpecification] = {}
@@ -151,12 +152,16 @@ class CommandParser(Generic[_T]):
 
         pass
 
-    def parse(self, tokens: Iterable[Token | Tree[Token]]) -> _T:
+    def parse(self, cmd: Token, tokens: Iterable[Token | Tree[Token]]) -> Command[_T]:
+        linenumber = cmd.line if cmd.line else 0
         a, k = self.structinit
         output = self.returnstruct(*a, **k)
+        # Set default values from the argument specifications
+        for arg in self.arguments.values():
+            setattr(output, arg.name, arg.default)
         for idx, token in enumerate(tokens):
             self._parse_token(output, token, idx)
-        return output
+        return Command(linenumber, cmd.value, output, self.metadata)
 
     def _parse_token(self, output: _T, token: Token | Tree[Token], index: int) -> Any:
         match token:
@@ -234,10 +239,12 @@ class CommandParser(Generic[_T]):
     def validate(self, output: _T) -> None:
         # Check that all required arguments are present
         for arg in self.arguments.values():
+            if getattr(output, arg.name) is _MISSING_ARG:
+                raise ArgumentError(f"Argument '{arg.name}' was not provided")
             if arg.required and getattr(output, arg.name) is None:
                 raise ArgumentError(f"Argument '{arg.name}' is required but not provided")
 
-    def __call__(self, args: Iterable[Token | Tree[Token]], parsecontext: ParseContext) -> _T:
-        out = self.parse(args)
-        self.validate(out)
+    def __call__(self, cmd: Token, args: Iterable[Token | Tree[Token]], parsecontext: ParseContext) -> Command[_T]:
+        out = self.parse(cmd, args)
+        self.validate(out.args)
         return out

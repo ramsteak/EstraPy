@@ -1,27 +1,30 @@
-from dataclasses import dataclass
+import pandas as pd
+import numpy as np
 
-from ..core.grammarclasses import Command
+from dataclasses import dataclass
+from numpy import typing as npt
+from functools import partial
+
+from ..core.grammarclasses import CommandArguments, CommandMetadata
 from ..core.context import Context
 from ..grammar.commandparser import CommandParser
 
 from ..core.datastore import Domain, Column, ColumnType
 
-import numpy as np
-from numpy import typing as npt
-
 
 @dataclass(slots=True)
-class Command_noise(Command):
+class CommandArguments_noise(CommandArguments):
     x: str
     y: str
 
 
-parse_noise_command = CommandParser(Command_noise, x=None, y=None)
+metadata = CommandMetadata(chainable=True, requires_global_context=False, cpu_bound=True)
+parse_noise_command = CommandParser(CommandArguments_noise, metadata, x=None, y=None)
 parse_noise_command.add_argument('x', '-x', type=str, default='E')
 parse_noise_command.add_argument('y', '-y', type=str, default='a')
 
 
-def estimate_noise(xy: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+def _estimate_noise_np(xy: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
     # Split even and odd indices and perform linear interpolation
     even, odd = xy[::2], xy[1::2]
 
@@ -36,15 +39,24 @@ def estimate_noise(xy: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
     #    Best value found was 0.65 on the current data. |
     return interp
 
-    # Use even-odd difference method to estimate noise
+
+def estimate_noise(df: pd.DataFrame, xcol: str, ycol: str, name: str) -> pd.Series:
+    xy = df[[xcol, ycol]].to_numpy()
+    noise = _estimate_noise_np(xy)
+    return pd.Series(noise, index=df.index).rename(name)
 
 
-def execute_noise_command(command: Command_noise, context: Context) -> None:
-    for name, file in context.datastore.files.items():
-        xy = file.domains[Domain.RECIPROCAL].data[[command.x, command.y]].to_numpy()
-        noise = estimate_noise(xy)
-        # TODO: Handle automatic addition of columns
+# Ready for chaining and parallel execution in the future
+# def single_file_noise(df: DataDomain, expr: Callable[[pd.DataFrame], pd.Series]) -> None:
+#     col = Column('noise', None, ColumnType.DATA, expr)
+#     df.data['noise'] = expr(df.data)
+#     df.columns.append(col)
+
+
+def execute_noise_command(command: CommandArguments_noise, context: Context) -> None:
+    expr = partial(estimate_noise, xcol=command.x, ycol=command.y, name='noise')
+    for _, file in context.datastore.files.items():
+        noise = expr(file.domains[Domain.RECIPROCAL].data)
+        col = Column('noise', None, ColumnType.DATA, expr)
         file.domains[Domain.RECIPROCAL].data['noise'] = noise
-        file.domains[Domain.RECIPROCAL].columns.append(Column('noise', None, ColumnType.DATA))
-    ...  # Implement the logic for the 'noise' command here
-    # plt.show()
+        file.domains[Domain.RECIPROCAL].columns.append(col)

@@ -104,6 +104,11 @@ def parse_args() -> argparse.Namespace:
         help='Enable debug mode. Implies --verbose. Changes some execution behavior for easier debugging (e.g. do not use multiprocessing).',
     )
     parser.add_argument(
+        '--timings',
+        action='store_true',
+        help='Enable detailed timing logging. Implied by --debug.',
+    )
+    parser.add_argument(
         '--vars',
         type=str,
         nargs='*',
@@ -131,6 +136,7 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
             # If debug flag is set, also set verbose to True
             verbose=args.verbose or args.debug,
             debug=args.debug,
+            timings=args.timings or args.debug,
         ),
         logger=logging.getLogger('estrapy'),
     )
@@ -233,7 +239,7 @@ def main() -> None:
 
         # Transform the parse tree into a more manageable structure
         try:
-            parsecontext = ParseContext(context.logger.getChild('parser'))
+            parsecontext = ParseContext(context.paths, context.logger.getChild('parser'))
             transformer = EstraTransformer(parsecontext)
             t_tree = transformer.transform(parsed_tree)
         except VisitError as ve:
@@ -275,9 +281,10 @@ def main() -> None:
     timers.stop()
     log.debug(f"Total execution time: {timers.get_ms(""):.2f} ms")
 
-    log.debug('Timing summary:')
-    for line in context.timers.table_format('ms').splitlines():
-        log.debug(line)
+    if context.options.timings:
+        log.info('Timing summary:')
+        for line in context.timers.table_format('ms').splitlines():
+            log.info(line)
 
 
 def entry_point() -> None:

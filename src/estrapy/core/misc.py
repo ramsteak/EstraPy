@@ -1,7 +1,11 @@
+import re
+
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
 from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, Never, Sequence
+
+from .number import Number, parse_number, Unit
 
 _K = TypeVar('_K')
 _V = TypeVar('_V')
@@ -290,3 +294,36 @@ class fmt(StaticUtility):
             if i == 0:
                 lines.append('|' + '|'.join('-' * col_widths[j] for j in range(len(row))) + '|')
         return '\n'.join(lines)
+
+
+def parse_edge(edge: str) -> Number:
+    """Parse an edge string and return the energy edge in eV.
+    The edge string can be shifted by a number.
+    Examples:
+        - Pd.K -> K edge of Pd
+        - Fe.L3+10eV -> L3 edge of Fe shifted by +10 eV
+        - Cu.M5-5eV -> M5 edge of Cu shifted by -5 eV
+    """
+    try:
+        return parse_number(edge)
+    except ValueError:
+        m = re.match(r'^([A-Za-z]+)(?:\.([A-Za-z0-9+]+))(.*)', edge)
+        if m is None:
+            raise ValueError(f"Invalid edge format: '{edge}'")
+
+        element, edge, shift = m.groups()
+        if shift != '':
+            shift = parse_number(shift)
+            if shift.unit not in (None, Unit.EV):
+                raise ValueError('Edge shift must be in eV.')
+            shift = shift.value
+        else:
+            shift = 0.0
+
+        from xraydb import xray_edge  # type: ignore
+
+        try:
+            edge_energy: float = xray_edge(element, edge).energy  # type: ignore
+            return Number(edge_energy + shift, Unit.EV)
+        except ValueError:
+            raise ValueError(f"Invalid element or edge: '{element}.{edge}'")

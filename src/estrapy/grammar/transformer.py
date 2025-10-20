@@ -2,7 +2,7 @@ from lark import Transformer, Token
 from typing import Any
 
 
-from ..core.grammarclasses import Command, Script, Directive
+from ..core.grammarclasses import Command, Script, Directive, CommandArguments
 from ..core.context import ParseContext
 from ..commands import parse_command, parse_directive
 
@@ -15,7 +15,7 @@ class EstraTransformer(Transformer[Any, Script]):
     def directive(self, items: list[Any]) -> Directive:
         return parse_directive(items, self.parsecontext)
 
-    def command(self, items: list[Any]) -> Command:
+    def command(self, items: list[Any]) -> Command[CommandArguments]:
         return parse_command(items, self.parsecontext)
 
     def start(self, items: list[Any]) -> Script:

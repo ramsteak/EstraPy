@@ -37,6 +37,7 @@ class Options:
     # debug -> changes some execution behavior for easier debugging (e.g. do not use multiprocessing).
     verbose: bool = False
     debug: bool = False
+    timings: bool = False
 
     # Whether interactive mode is enabled.
     interactive: bool = False
@@ -68,5 +69,8 @@ class Context:
 
 @dataclass(slots=True)
 class ParseContext:
+    # Paths object containing all relevant paths.
+    paths: Paths
+
     # Logger object for logging.
     logger: Logger

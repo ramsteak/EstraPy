@@ -1,14 +1,14 @@
 from lark import Token, Tree
-from ..core.grammarclasses import Option, Directive, Command, Value
+from ..core.grammarclasses import Option, Directive, CommandArguments, Value, Command
 from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
 from ..core.context import Context, ParseContext
 
 from .directives import Directive_define, Directive_clear, execute_directive
 
-from .filein import parse_filein_command, Command_filein, execute_filein_command
-from .align import parse_align_command, Command_align, execute_align_command
-from .noise import parse_noise_command, Command_noise, execute_noise_command
+from .filein import parse_filein_command, CommandArguments_filein, execute_filein_command
+from .align import parse_align_command, CommandArguments_align, execute_align_command
+from .noise import parse_noise_command, CommandArguments_noise, execute_noise_command
 
 __all__ = [
     'parse_directive',
@@ -64,17 +64,17 @@ def parse_command_argument(arg: Token | Tree[Token]) -> Option | Value:
             raise CommandSyntaxError('Invalid command argument syntax')
 
 
-def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command:
+def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments]:
     match command:
         # Command filein ---------------------------------------------------------------------------
-        case ['filein', *args]:
-            return parse_filein_command(args, parsecontext)
+        case [Token('COMMANDNAME', 'filein') as t, *args]:
+            return parse_filein_command(t, args, parsecontext)
         # Command align ----------------------------------------------------------------------------
-        case ['align', *args]:
-            return parse_align_command(args, parsecontext)
+        case [Token('COMMANDNAME', 'align') as t, *args]:
+            return parse_align_command(t, args, parsecontext)
         # Command noise ----------------------------------------------------------------------------
-        case ['noise', *args]:
-            return parse_noise_command(args, parsecontext)
+        case [Token('COMMANDNAME', 'noise') as t, *args]:
+            return parse_noise_command(t, args, parsecontext)
         # Unknown command --------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as c, *args]:
             raise CommandSyntaxError(f"Unknown command '{name}'", c)
@@ -85,18 +85,19 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
             raise CommandSyntaxError('Invalid command syntax')
 
 
-def execute_command(command: Command, context: Context) -> None:
-    # print(f"Executing command: {command}")
-    match command:
-        case Command_filein():  # type: ignore
+def execute_command(command: Command[CommandArguments], context: Context) -> None:
+    # TODO: switch to Process pool for CPU-bound tasks and handle metadata.
+    # This is backwards implemented as for now, ignoring all metadata etc..
+    match command.args:
+        case CommandArguments_filein():  # type: ignore
             with context.timers.time('execution/filein'):
-                execute_filein_command(command, context)  # type: ignore
-        case Command_align():
+                execute_filein_command(command.args, context)  # type: ignore
+        case CommandArguments_align():
             with context.timers.time('execution/align'):
-                execute_align_command(command, context)
-        case Command_noise():
+                execute_align_command(command.args, context)
+        case CommandArguments_noise():
             with context.timers.time('execution/noise'):
-                execute_noise_command(command, context)
+                execute_noise_command(command.args, context)
         # case Command_energy():
         #     execute_energy_command(command, context)
         # case Command_preedge():

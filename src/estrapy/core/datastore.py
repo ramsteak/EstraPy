@@ -1,9 +1,9 @@
-from pandas import DataFrame
+import pandas as pd
 
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .number import Unit
 
@@ -29,6 +29,7 @@ class Column:
     name: str
     unit: Unit | None = None
     type: ColumnType = ColumnType.DATA
+    calc: Callable[[pd.DataFrame], pd.Series] | None = None
 
 
 @dataclass(slots=True)
@@ -36,7 +37,7 @@ class DataDomain:
     """A single domain (e.g. reciprocal space, fourier space, etc.) of a data file."""
 
     columns: list[Column] = field(default_factory=list[Column])
-    data: DataFrame = field(default_factory=DataFrame)
+    data: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 @dataclass(slots=True)
