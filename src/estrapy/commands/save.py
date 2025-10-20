@@ -214,7 +214,7 @@ class Save(CommandHandler):
                 outnames:dict[str,int] = {}
                 for data in context.data:
                     filename = fname
-                    for m in reversed([*re.finditer(r"\{([^{:}]*)(?::(.*))?\}", fname)]):
+                    for m in reversed([*re.finditer(r"\{([^{:}]*)(?::([^{:}]*))?\}", fname)]):
                         var,fmt = m.groups()
                         val = data.meta.get(var)
                         val = "" if val is None else val
