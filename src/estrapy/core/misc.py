@@ -3,7 +3,7 @@ import re
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
-from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, Never, Sequence
+from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence
 
 from .number import Number, parse_number, Unit
 
@@ -173,7 +173,7 @@ def peek(f: TextIOWrapper, n: int | Literal['line'] | None = 1) -> str:
 
 
 class StaticUtility:
-    def __new__(cls, *args: Any, **kwargs: Any) -> Never:
+    def __new__(cls, *args: Any, **kwargs: Any) -> NoReturn:
         raise TypeError(f'{cls.__name__} is a static utility class and cannot be instantiated.')
 
 
