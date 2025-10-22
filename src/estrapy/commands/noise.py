@@ -19,7 +19,7 @@ class CommandArguments_noise(CommandArguments):
 
 
 metadata = CommandMetadata(chainable=True, requires_global_context=False, cpu_bound=True)
-parse_noise_command = CommandParser(CommandArguments_noise, metadata, x=None, y=None)
+parse_noise_command = CommandParser(CommandArguments_noise, metadata)
 parse_noise_command.add_argument('x', '-x', type=str, default='E')
 parse_noise_command.add_argument('y', '-y', type=str, default='a')
 

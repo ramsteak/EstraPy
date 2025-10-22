@@ -9,10 +9,10 @@ from ..core.misc import parse_edge
 
 @dataclass(slots=True)
 class CommandArguments_align(CommandArguments):
-    mode: str | None = None
-    energy: Number | str | None = None
-    search: Number | None = None
-    delta: Number | None = None
+    mode: str
+    energy: Number | str
+    search: Number
+    delta: Number
 
 
 metadata = CommandMetadata(chainable=True, requires_global_context=False, cpu_bound=True)
@@ -25,4 +25,5 @@ parse_align_command.add_argument('delta', '--delta', '-d', type=parse_number, re
 
 def execute_align_command(
     command: CommandArguments_align, context: Context
-) -> None: ...  # Implement the logic for the 'align' command here
+) -> None:
+    ...  # Implement the logic for the 'align' command here
