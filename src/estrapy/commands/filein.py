@@ -44,6 +44,7 @@ class ImporterOptions:
     comment_prefix: str = '#'
     skip_rows: int = 0
     decimal: str | None = None
+    leadingheader: int | None = None
 
     re_sep: re.Pattern[str] | None = None
 
@@ -742,6 +743,10 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                         options.importeroptions.skip_rows = int(skip)
                     case 'skip', _:
                         raise CommandSyntaxError('The skip option requires an integer argument.', v)
+                    case 'leadingheader', Token('INTEGER', str(skip)):
+                        options.importeroptions.leadingheader = int(skip)
+                    case 'leadingheader', _:
+                        raise CommandSyntaxError('The leadingheader option requires an integer argument.', v)
                     case opt, _:
                         raise CommandSyntaxError(f"Unknown format option '{opt}'.", k)
 
@@ -921,10 +926,10 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             while peek(f) == command.importeroptions.comment_prefix:
                 line = f.readline()
                 fileheader.append(line.strip())
-            # Skip the leading comment (we know line is defined here, because we made sure the line is a comment)
-            header = line.strip().split()[1:]
+            # Moved header detection to after reading the data, to support leadingheader option
+            headerline = line.strip()
         else:
-            header = []
+            headerline = ''
 
         # Now we replace separator characters with spaces, and read the data using pandas.
         normfiledata = normalize_csv(f.read(), command.importeroptions.re_sep)
@@ -936,6 +941,19 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             engine='c',
             dtype=float,
         )
+        # Now that we know how many columns there are in the data, we can parse the header line if present
+        # TODO: check that this actually works
+        if command.importeroptions.leadingheader is None:
+            # Check if the number of header items matches the number of data columns. If so, set leadingheader to 0, else to 1
+            if len(headerline.split()) == len(dat.columns):
+                leadingheader = 0
+                headerline = headerline.removeprefix("#")
+            else:
+                leadingheader = 1
+        else:
+            leadingheader = command.importeroptions.leadingheader
+        header = headerline.split()[leadingheader:]
+
         dat.columns = [h or c for h, c in zip_longest(header, dat.columns)][: len(dat.columns)]
 
     # Parse file header and name variables
