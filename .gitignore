@@ -3,6 +3,8 @@
 
 # Temporary files
 tmp*
+_tmp*
+__tmp*
 
 # Example folder, temporarily ignored for development
 example/
