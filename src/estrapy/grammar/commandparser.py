@@ -55,9 +55,12 @@ def _validate_nargs(nargs: int | str | tuple[Any,...]) -> None:
     #  - '*', '+', '?'
     #  - tuple of two positive integers (min, max), inclusive, with min <= max
     match nargs:
-        case int(n) if n >= 0: return
-        case '*' | '+' | '?': return
-        case [int(minn), int(maxn)] if minn >= 0 and maxn >= minn: return
+        case int(n) if n >= 0:
+            return
+        case '*' | '+' | '?':
+            return
+        case [int(minn), int(maxn)] if minn >= 0 and maxn >= minn:
+            return
         case _:
             raise ArgumentError(f"nargs must be a positive integer, one of '*', '+', '?', or a tuple of two positive integers (min, max) with min <= max, not '{nargs}'")
 
