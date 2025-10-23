@@ -9,6 +9,7 @@ from .directives import Directive_define, Directive_clear, execute_directive
 from .filein import Command_Filein
 from .align import Command_Align
 from .noise import Command_Noise
+from .preedge import Command_Preedge
 
 __all__ = [
     'parse_directive',
@@ -54,6 +55,9 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         # Command noise ----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'noise') as t, *args]:
             return Command_Noise.parse(t, args, parsecontext)
+        # Command preedge --------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'preedge') as t, *args]:
+            return Command_Preedge.parse(t, args, parsecontext)
         # Unknown command --------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as c, *args]:
             raise CommandSyntaxError(f"Unknown command '{name}'", c)
