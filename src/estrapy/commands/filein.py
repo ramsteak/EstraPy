@@ -390,9 +390,9 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
     elif options.fouriermagnitude is not ... and options.fourierphase is not ...:
         # magnitude/phase specified as pure columns. Calculate f = magnitude * (cos(phase) + i * sin(phase))
         # sin/cos is faster than exp
-        importer: Expr = lambda df: (
+        importer: Expr = lambda df: (  # noqa: E731
             df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))
-        ).rename('f')  # noqa: E731
+        ).rename('f')
         column = Column(name='fourier', unit=None, type=ColumnType.DATA, calc=importer)
         cmd.signals.append((column, Domain.FOURIER, importer))
 
