@@ -201,8 +201,6 @@ class fmt(StaticUtility):
             *,
             sep: str = ' ',
             var: str = 'x',
-            hide_0: bool = True,
-            hide_1: bool = True,
             order: Literal[-1, +1] = 1,
             poly_order: Literal[-1, +1] = -1,
         ) -> str:
@@ -245,14 +243,14 @@ class fmt(StaticUtility):
         sep: str = ' ',
         var: str = 'x',
         exp: str = '^',
-        hide_0: bool = True,
-        hide_1: bool = True,
+        after_exp: str = '',  # string to add after the exponent, useful for <sup> or <sub>
         order: Literal[-1, +1] = 1,
         poly_order: Literal[-1, +1] = -1,
     ) -> str:
         """Convert a list of polynomial coefficients to a human-readable string."""
         coeff = list(enumerate(p)) if poly_order > 0 else list(enumerate(reversed(p)))
-        pieces = [f'{a}{var}{exp}{e}' for e, a in coeff]
+        pieces: list[str] = []
+        pieces = [f'{a}{var}{exp}{e}{after_exp}' for e, a in coeff]
         return sep.join(pieces if order > 0 else reversed(pieces))
 
     @staticmethod
