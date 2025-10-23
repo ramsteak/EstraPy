@@ -27,6 +27,7 @@ def parse_unit(s: str) -> Unit | None:
 
 
 class Number(NamedTuple):
+    sign: str | None
     value: float
     unit: Unit | None = None
 
@@ -44,15 +45,15 @@ def parse_number(s: str) -> Number:
         raise ValueError('Empty string cannot be parsed as a number.')
 
     m = re.match(
-        r'^([+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:([GMkdcm])?([a-zA-ZåÅ/\^⁻¹1-]+))?$',
+        r'^(([+-])?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:([GMkdcm])?([a-zA-ZåÅ/\^⁻¹1-]+))?$',
         s,
     )
     if m is None:
         raise ValueError(f"String '{s}' is not a valid number format.")
 
-    num_str, mult_str, unit_str = m.groups()
+    num_str, sgn_str, mult_str, unit_str = m.groups()
     mult = {'G': 1e9, 'M': 1e6, 'k': 1e3, 'd': 1e-1, 'c': 1e-2, 'm': 1e-3}.get(mult_str, 1)
     num = float(num_str) * mult
     unit = parse_unit(unit_str) if unit_str else None
 
-    return Number(num, unit)
+    return Number(sgn_str, num, unit)
