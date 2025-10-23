@@ -1,5 +1,5 @@
 from lark import Token, Tree
-from ..core.grammarclasses import Option, Directive, CommandArguments, Value, Command
+from ..core.grammarclasses import Directive, CommandArguments, Command
 from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
 from ..core.context import Context, ParseContext
@@ -42,26 +42,6 @@ def parse_directive(directive: list[Token | Tree[Token]], parsecontext: ParseCon
             raise CommandSyntaxError('Invalid directive syntax', d)
         case _:
             raise CommandSyntaxError('Invalid directive syntax')
-
-
-def parse_command_argument(arg: Token | Tree[Token]) -> Option | Value:
-    match arg:
-        case Token('STRING', value):
-            return str(value)
-        case Token('INTEGER', value):
-            return int(value)
-        case Token('FLOAT', value):
-            return parse_number(value)
-        case Tree(Token('RULE', 'option'), [Token('OPTION', str(name)), *values]):
-            vals = [parse_command_argument(v) for v in values]
-            vals = [v for v in vals if not isinstance(v, Option)]
-            return Option(name, vals)
-        case Token() as arg:
-            raise CommandSyntaxError('Invalid command argument syntax', arg)
-        case Tree(Token() as a, _):
-            raise CommandSyntaxError('Invalid command argument syntax', a)
-        case _:
-            raise CommandSyntaxError('Invalid command argument syntax')
 
 
 def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments]:
