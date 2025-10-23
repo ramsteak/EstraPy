@@ -124,7 +124,7 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
             raise ArgumentError(f"Unknown action type '{action}' for argument '{destination}'.")
 
 class CommandParser(Generic[_T]):
-    def __init__(self, returnstruct: type[_T], metadata: CommandMetadata) -> None:
+    def __init__(self, returnstruct: type[_T], metadata: CommandMetadata | Callable[[_T], CommandMetadata]) -> None:
         # Check that returnstruct is a dataclass
         if not hasattr(returnstruct, '__dataclass_fields__'):
             raise TypeError('returnstruct must be a dataclass')
@@ -229,8 +229,10 @@ class CommandParser(Generic[_T]):
                 raise ArgumentError(f"Argument '{argname}' is required but not provided.")
         
         output = self.command_returnstruct(**defaults)
+
+        metadata = self.command_metadata(output) if callable(self.command_metadata) else self.command_metadata
     
-        return Command[_T](linenumber, commandtoken.value, output, self.command_metadata)
+        return Command[_T](linenumber, commandtoken.value, output, metadata)
     
 
     def _parse_token(self, kwargs: dict[str, Any], index: int, token: Token | Tree[Token]) -> None:
