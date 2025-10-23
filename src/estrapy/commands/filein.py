@@ -5,7 +5,7 @@ from io import StringIO
 from itertools import zip_longest
 from pathlib import Path
 from lark import Tree, Token
-from typing import TypeAlias, Sequence, Callable
+from typing import TypeAlias, Sequence, Callable, Self
 from types import EllipsisType
 from tqdm.std import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -16,9 +16,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from ..core.errors import CommandSyntaxError, ExecutionError
 from ..core.grammarclasses import CommandArguments, Command, CommandMetadata
 from ..core.number import Number, parse_number, Unit
-from ..core.context import Context, ParseContext
-from ..core.datastore import FileMetadata, DataDomain, Domain, Column, ColumnType, DataFile
+from ..core.datastore import FileMetadata, DataDomain, Domain, Column, ColumnType, DataPage
 from ..core.misc import peek, Bag, fmt
+from ..core.context import Context, ParseContext, LocalContext
 
 import pandas as pd
 import numpy as np
@@ -86,7 +86,6 @@ class FileInOptions:
     # ------------------------ Column specification options ------------------------
     # # ---------------------- Axis columns ----------------------
     reciprocal_axis_flag__: bool = False
-    reciprocal_intensity_flag__: bool = False
     # --energy <column> | -E <column>
     energy: Token | EllipsisType = ...
     # --wavevector <column> | -k <column>
@@ -196,16 +195,6 @@ def _assert_flag_not_assigned_set(options: FileInOptions, option: str, optiontok
     setattr(options, option, value)
 
 
-def parse_filein_command(
-    cmd: Token, args: Sequence[Token | Tree[Token]], parsecontext: ParseContext
-) -> Command[CommandArguments_filein]:
-    linenumber = cmd.line if cmd.line else 0
-    options = get_filein_options(args, parsecontext)
-    commandargs = get_filein_command(linenumber, options, parsecontext)
-    metadata = CommandMetadata(chainable=False, requires_global_context=True, cpu_bound=False)
-    return Command[CommandArguments_filein](linenumber, 'filein', commandargs, metadata)
-
-
 def parse_column_descriptor(t: Token) -> ColumnDescriptor:
     s = str(t.value)
     desc: ColumnDescriptor = []
@@ -239,7 +228,7 @@ def expand_column_descriptor(desc: ColumnDescriptor, columns: list[str]) -> list
     return res
 
 
-def get_filein_command(line: int, options: FileInOptions, parsecontext: ParseContext) -> CommandArguments_filein:
+def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> CommandArguments_filein:
     cmd = CommandArguments_filein(
         filenames=options.filenames,
         # Check if the directory is absolute. If not, make it relative to the working directory.
@@ -814,7 +803,7 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
         if not files:
             raise ExecutionError(f"No files found in directory '{directory}' matching the specified filenames.")
 
-        imported_files: list[DataFile] = []
+        imported_files: list[DataPage] = []
         if context.options.debug or len(files) <= 8:
             # Single-threaded file reading, better for debugging and small number of files
             with logging_redirect_tqdm([context.logger]):
@@ -851,13 +840,13 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
 
         # Set the variable '.n' for each file (file index in the current import session)
         # Set the variable '.N' for each file (file index across all import sessions)
-        previous_file_count = len(context.datastore.files)
+        previous_file_count = len(context.datastore.pages)
         for n, df in enumerate(imported_files, start=1):
             df.meta['.n'] = n
             df.meta['.N'] = previous_file_count + n
 
     # Store imported files in the context
-    context.datastore.files.update({df.meta.name: df for df in imported_files})  # to check the error
+    context.datastore.pages.update({df.meta.name: df for df in imported_files})  # to check the error
     _total_size = sum(f.meta['.fs'] for f in imported_files)
     log.debug(
         f"Imported {len(imported_files)} files in {context.timers.get_ms('execution/filein'):0.2f} ms ({fmt.human(_total_size, "B", format="0.1f", order=1024)})."
@@ -910,7 +899,7 @@ def normalize_csv(s: str, re_sep: re.Pattern[str] | None) -> str:
     return re_sep.sub(' ', s)
 
 
-def read_file(file: Path, command: CommandArguments_filein, context: Context) -> DataFile:
+def read_file(file: Path, command: CommandArguments_filein, context: Context) -> DataPage:
     # Open the file, and read lines until the first non-comment line.
     # The last comment line is the header of the file.
     fileheader: list[str] = []
@@ -992,7 +981,7 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
         newdata[domain].columns.extend(c for c, _ in newcolexps)
         newdata[domain].data = newdata[domain].data.assign(**{c.name: e for c, e in newcolexps})  # type: ignore
 
-    return DataFile(
+    return DataPage(
         FileMetadata(
             path=file,
             name=file.name,
@@ -1000,3 +989,32 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
         ),
         newdata,
     )
+
+
+@dataclass(slots=True)
+class LocalContext_Filein(LocalContext):
+    ...
+
+
+@dataclass(slots=True)
+class Command_Filein(Command[CommandArguments_filein, LocalContext_Filein]):
+    @classmethod
+    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+        options = get_filein_options(tokens, parsecontext)
+        arguments = get_filein_command(options, parsecontext)
+        metadata = CommandMetadata(initialize_context=True, finalize_context=True, execution_context=True, execute_with='none')
+        return cls(
+            line=commandtoken.line or -1,
+            name=commandtoken.value,
+            args=arguments,
+            meta=metadata,
+        )
+
+    async def initialize(self, context: Context):
+        pass
+
+    async def finalize(self, context: Context) -> None:
+        pass
+
+    async def execute(self, context: Context) -> None:
+        execute_filein_command(self.args, context)

@@ -1,18 +1,25 @@
 import asyncio
-import inspect
 
-from typing import Sequence
+from typing import Sequence, Any
 
-from .grammar.transformer import Script, Command, CommandArguments
+from .grammar.transformer import Script, Command
 from .core.context import Context
 
-from .commands import execute_command, execute_directive
+from .commands import execute_directive
 
-async def execute_script_async(commands: Sequence[Command[CommandArguments]], context: Context) -> None:
+async def execute_script_async(commands: Sequence[Command[Any, Any]], context: Context) -> None:
     for command in commands:
-        maybe_coro = execute_command(command, context)
-        if inspect.iscoroutine(maybe_coro):
-            await maybe_coro # type: ignore # TODO remove when these will be coroutines
+        await command.initialize(context)
+
+        if command.meta.execute_with == 'none':
+            await command.execute(context)
+        elif command.meta.execute_with == 'sequential':
+            for page in context.datastore.pages.keys():
+                await command.execute_on(page, context)
+        else:
+            raise NotImplementedError(f"Execution mode '{command.meta.execute_with}' is not implemented")
+
+        await command.finalize(context)
 
 
 def execute_script(script: Script, context: Context) -> None:

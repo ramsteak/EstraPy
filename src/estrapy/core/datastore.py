@@ -63,11 +63,11 @@ class FileMetadata:
 
 
 @dataclass(slots=True)
-class DataFile:
+class DataPage:
     meta: FileMetadata
     domains: dict[Domain, DataDomain] = field(default_factory=dict[Domain, DataDomain])
 
 
 @dataclass(slots=True)
 class DataStore:
-    files: dict[str, DataFile] = field(default_factory=dict[str, DataFile])
+    pages: dict[str, DataPage] = field(default_factory=dict[str, DataPage])

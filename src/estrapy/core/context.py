@@ -74,3 +74,8 @@ class ParseContext:
 
     # Logger object for logging.
     logger: Logger
+
+@dataclass(slots=True)
+class LocalContext:
+    # To be subclassed for local context data.
+    pass

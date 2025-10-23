@@ -1,27 +1,64 @@
 import pandas as pd
 import numpy as np
+from lark import Token, Tree
 
 from dataclasses import dataclass
 from numpy import typing as npt
 from functools import partial
+from typing import Self, Callable
 
-from ..core.grammarclasses import CommandArguments, CommandMetadata
-from ..core.context import Context
-from ..grammar.commandparser import CommandParser
+from ..core.grammarclasses import CommandArguments, CommandMetadata, Command
+from ..core.context import Context, ParseContext, LocalContext
+from ..grammar.commandparser import CommandArgumentParser
 
 from ..core.datastore import Domain, Column, ColumnType
 
 
 @dataclass(slots=True)
-class CommandArguments_noise(CommandArguments):
+class CommandArguments_Noise(CommandArguments):
     x: str
     y: str
 
 
-metadata = CommandMetadata(chainable=True, requires_global_context=False, cpu_bound=True)
-parse_noise_command = CommandParser(CommandArguments_noise, metadata)
+parse_noise_command = CommandArgumentParser(CommandArguments_Noise)
 parse_noise_command.add_argument('x', '-x', type=str, default='E')
 parse_noise_command.add_argument('y', '-y', type=str, default='a')
+
+@dataclass(slots=True)
+class LocalContext_Noise(LocalContext):
+    expr: Callable[[pd.DataFrame], pd.Series]
+
+@dataclass(slots=True)
+class Command_Noise(Command[CommandArguments_Noise, LocalContext_Noise]):
+    @classmethod
+    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+        arguments = parse_noise_command.parse(commandtoken, tokens)
+        metadata = CommandMetadata(initialize_context=False, finalize_context=False, execution_context=False, execute_with='sequential')
+        return cls(
+            line=commandtoken.line or -1,
+            name=commandtoken.value,
+            args=arguments,
+            meta=metadata,
+        )
+    
+    async def initialize(self, context: Context) -> None:
+        expr = partial(estimate_noise, xcol=self.args.x, ycol=self.args.y, name='noise')
+        self.local = LocalContext_Noise(expr)
+    
+    async def execute_on(self, page: str, context: Context) -> None:
+        assert self.local is not None
+
+        pagedata = context.datastore.pages[page]
+        domain = pagedata.domains[Domain.RECIPROCAL]
+        noise = self.local.expr(domain.data)
+
+        col = Column('noise', None, ColumnType.DATA, self.local.expr)
+        # TODO: properly add column
+        domain.data['noise'] = noise
+        domain.columns.append(col)
+
+    async def finalize(self, context: Context) -> None:
+        pass
 
 
 def _estimate_noise_np(xy: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
@@ -44,19 +81,3 @@ def estimate_noise(df: pd.DataFrame, xcol: str, ycol: str, name: str) -> pd.Seri
     xy = df[[xcol, ycol]].to_numpy()
     noise = _estimate_noise_np(xy)
     return pd.Series(noise, index=df.index).rename(name)
-
-
-# Ready for chaining and parallel execution in the future
-# def single_file_noise(df: DataDomain, expr: Callable[[pd.DataFrame], pd.Series]) -> None:
-#     col = Column('noise', None, ColumnType.DATA, expr)
-#     df.data['noise'] = expr(df.data)
-#     df.columns.append(col)
-
-
-def execute_noise_command(command: CommandArguments_noise, context: Context) -> None:
-    expr = partial(estimate_noise, xcol=command.x, ycol=command.y, name='noise')
-    for _, file in context.datastore.files.items():
-        noise = expr(file.domains[Domain.RECIPROCAL].data)
-        col = Column('noise', None, ColumnType.DATA, expr)
-        file.domains[Domain.RECIPROCAL].data['noise'] = noise
-        file.domains[Domain.RECIPROCAL].columns.append(col)

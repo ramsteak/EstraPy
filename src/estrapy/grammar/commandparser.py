@@ -3,7 +3,7 @@ from lark import Token, Tree
 from dataclasses import dataclass, fields, MISSING
 from enum import Enum
 
-from ..core.grammarclasses import CommandArguments, CommandMetadata, Command
+from ..core.grammarclasses import CommandArguments
 from ..core.errors import ParseError
 from ..core.errors import ArgumentError, DuplicateArgumentError
 from ..core.context import ParseContext
@@ -123,14 +123,13 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
         case _:
             raise ArgumentError(f"Unknown action type '{action}' for argument '{destination}'.")
 
-class CommandParser(Generic[_T]):
-    def __init__(self, returnstruct: type[_T], metadata: CommandMetadata | Callable[[_T], CommandMetadata]) -> None:
+class CommandArgumentParser(Generic[_T]):
+    def __init__(self, returnstruct: type[_T]) -> None:
         # Check that returnstruct is a dataclass
         if not hasattr(returnstruct, '__dataclass_fields__'):
             raise TypeError('returnstruct must be a dataclass')
         
         self.command_returnstruct = returnstruct
-        self.command_metadata = metadata
         self._returnstruct_fields = {f.name:f for f in fields(returnstruct)}
 
         # Return type argument name -> ArgumentSpecification
@@ -206,9 +205,7 @@ class CommandParser(Generic[_T]):
             self.command_argnames[handle] = attr_name
     
 
-    def parse(self, commandtoken: Token, tokens: list[Token | Tree[Token]]) -> Command[_T]:
-        linenumber = commandtoken.line if commandtoken.line else 0
-
+    def parse(self, commandtoken: Token, tokens: list[Token | Tree[Token]]) -> _T:
         # Get default values from the dataclass, both from the dataclass itself
         # and from the ArgumentSpecifications. ArgumentSpecifications take precedence.
         defaults = _get_dataclass_defaults(self.command_returnstruct)
@@ -230,9 +227,7 @@ class CommandParser(Generic[_T]):
         
         output = self.command_returnstruct(**defaults)
 
-        metadata = self.command_metadata(output) if callable(self.command_metadata) else self.command_metadata
-    
-        return Command[_T](linenumber, commandtoken.value, output, metadata)
+        return output
     
 
     def _parse_token(self, kwargs: dict[str, Any], index: int, token: Token | Tree[Token]) -> None:
@@ -300,5 +295,5 @@ class CommandParser(Generic[_T]):
             case _:
                 raise ArgumentError(f"Unknown action '{action.action}' for argument '{action.destination}'")
 
-    def __call__(self, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[_T]:
+    def __call__(self, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> _T:
         return self.parse(commandtoken, tokens)
