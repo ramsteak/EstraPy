@@ -57,7 +57,7 @@ def _validate_nargs(nargs: int | str | tuple[Any,...]) -> None:
     match nargs:
         case int(n) if n >= 0:
             return
-        case '*' | '+' | '?':
+        case '*' | '+' | '?' | '*?' | '??' | '+?':
             return
         case [int(minn), int(maxn)] if minn >= 0 and maxn >= minn:
             return
@@ -143,9 +143,10 @@ class CommandArgumentParser(Generic[_T]):
         self._positional_arg_index = 0
         # Passed argument name (or position for positional args) -> return type argument name
         # This is used for lookup at parse time and duplicate detection at instantiation time
-        self.command_argnames: dict[str | int, str] = {}
+        self.command_posargs: list[str] = []
+        self.command_optflags: dict[str, str] = {}
     
-    def add_argument(self, attr_name: str | None, *arg_name: str, nargs: int | Literal['*', '?', '+'] | tuple[int,int] = 1,
+    def add_argument(self, attr_name: str | None, *arg_name: str, nargs: int | Literal['*', '*?', '?', '??', '+', '+?'] | tuple[int,int] = 1,
                      type: Callable[[str], Any] = str, default: Any = MISSING, default_factory: Callable[[], Any] = MISSING, # type: ignore
                      required: bool = False, destination: str | None = None,
                      action: ActionType | str = ActionType.STORE, const: Any = MISSING, accept: str | tuple[str, ...] | None = None) -> None:
@@ -172,21 +173,16 @@ class CommandArgumentParser(Generic[_T]):
         _validate_nargs(nargs)
 
         # Check for duplicate arg_name entries
-        for name in [a for a in arg_name if a in self.command_argnames]:
-            raise DuplicateArgumentError(f"Argument name '{name}' is already used for argument '{self.command_argnames[name]}'")
+        for name in [a for a in arg_name if a in self.command_optflags]:
+            raise DuplicateArgumentError(f"Argument name '{name}' is already used for argument '{self.command_optflags[name]}'")
 
         # Get the action for the given argument
         argument_action = _get_action_specification(destination, action, const)
-        argument_kind = _get_argtype_from_names(arg_name)
 
-        match argument_kind:
-            case 'value':
-                arg_handles = (self._positional_arg_index,)
-                self._positional_arg_index += 1
-            case 'option':
-                arg_handles = arg_name
-            case _: 
-                raise RuntimeError('Unknown program state')
+        if argument_action.action in {ActionType.STORE, ActionType.APPEND} and nargs == 0:
+            raise ArgumentError(f"Argument '{attr_name}': nargs cannot be 0 for STORE or APPEND actions.")
+        if argument_action.action in {ActionType.STORE_CONST, ActionType.APPEND_CONST} and nargs != 0:
+            raise ArgumentError(f"Argument '{attr_name}': nargs must be 0 for STORE_CONST or APPEND_CONST actions.")
         
         # Check that default and default_factory are not both given
         if default is not MISSING and default_factory is not MISSING:
@@ -204,8 +200,16 @@ class CommandArgumentParser(Generic[_T]):
         )
 
         self.command_arguments[attr_name] = argument_spec
-        for handle in arg_handles:
-            self.command_argnames[handle] = attr_name
+
+        match _get_argtype_from_names(arg_name):
+            case 'value':
+                self.command_posargs.append(attr_name)
+            case 'option':
+                opt_handles = arg_name
+                for handle in opt_handles:
+                    self.command_optflags[handle] = attr_name
+            case _: 
+                raise RuntimeError('Unknown program state')
     
 
     def parse(self, commandtoken: Token, tokens: list[Token | Tree[Token]]) -> _T:
@@ -219,11 +223,31 @@ class CommandArgumentParser(Generic[_T]):
             elif argspec.default_factory is not MISSING and argspec.default_factory is not None:
                 defaults[argname] = argspec.default_factory()
 
+        # Split positional and option tokens. Positional tokens always come first.
+        positional_tokens: list[Token] = []
+        option_tokens: list[Tree[Token]] = []
+        for token in tokens:
+            match token:
+                case Token(_, _):
+                    positional_tokens.append(token)
+                case Tree(Token('RULE', 'option'), _):
+                    option_tokens.append(token)
+                case Tree(Token() as t, _):
+                    raise ParseError('Invalid token', t)
+                case _:
+                    raise ParseError('Invalid token')
 
-        for idx, token in enumerate(tokens):
-            self._parse_token(defaults, idx, token)
-        
-        # Check all required arguments are present
+        # Parse positional tokens
+        for arg, value in self._parse_positionals(positional_tokens):
+            self._perform_action(defaults, arg.action, value)
+
+
+        # Parse option tokens
+        for option_token in option_tokens:
+            arg, value = self._parse_option(option_token)
+            self._perform_action(defaults, arg.action, value)
+
+
         for argname, argspec in self.command_arguments.items():
             if argspec.required and argname not in defaults:
                 raise ArgumentError(f"Argument '{argname}' is required but not provided.")
@@ -232,23 +256,111 @@ class CommandArgumentParser(Generic[_T]):
 
         return output
     
+    def _parse_positionals(self, tokens: list[Token]) -> list[tuple[ArgumentSpecification, Any]]:
+        arguments: list[tuple[ArgumentSpecification, Any]] = []
 
-    def _parse_token(self, kwargs: dict[str, Any], index: int, token: Token | Tree[Token]) -> None:
+        # This is so that we can get the next token if nargs > 1
+        _iter_idx_tokens = iter(enumerate(tokens))
+        # Represents the current positional argument index
+        posargs = (self.command_arguments[name] for name in self.command_posargs)
+        for arg in posargs:
+            values:list[Any] = []
+
+            match arg.nargs:
+                case int(n):
+                    for _ in range(n):
+                        token = None
+                        try:
+                            _, token = next(_iter_idx_tokens)
+                            values.append(arg.type(token.value))
+                        except StopIteration:
+                            raise ParseError(f"Argument '{arg.name}' expects {n} values, but got {len(values)}", tokens[-1])
+                        except Exception as e:
+                            raise ParseError(f"Error parsing argument '{arg.name}': {e}", token)
+                case '*':
+                    for _, token in _iter_idx_tokens:
+                        values.append(arg.type(token.value))
+                case '+':
+                    for _, token in _iter_idx_tokens:
+                        values.append(arg.type(token.value))
+                    if len(values) == 0:
+                        raise ParseError(f"Argument '{arg.name}' expects 1 or more values, but got 0", tokens[-1])
+                case '?':
+                    token = None
+                    try:
+                        _, token = next(_iter_idx_tokens)
+                        values.append(arg.type(token.value))
+                    except StopIteration:
+                        pass
+                    except Exception as e:
+                        raise ParseError(f"Error parsing argument '{arg.name}': {e}", token)
+                case '*?': # zero or more, release if error
+                    for _, token in _iter_idx_tokens:
+                        try:
+                            values.append(arg.type(token.value))
+                        except Exception:
+                            break
+                case '+?': # one or more, release if error
+                    token = None
+                    for _, token in _iter_idx_tokens:
+                        try:
+                            values.append(arg.type(token.value))
+                        except Exception:
+                            break
+                    if len(values) == 0:
+                        raise ParseError(f"Argument '{arg.name}' expects 1 or more values, but got 0", tokens[-1])
+                case '??': # zero or one, release if error
+                    token = None
+                    try:
+                        _, token = next(_iter_idx_tokens)
+                        values.append(arg.type(token.value))
+                    except StopIteration:
+                        pass
+                    except Exception:
+                        pass
+                case [int(minn), int(maxn)]:
+                    for _ in range(maxn):
+                        token = None
+                        try:
+                            _, token = next(_iter_idx_tokens)
+                            values.append(arg.type(token.value))
+                        except StopIteration:
+                            break
+                        except Exception as e:
+                            if len(values) < minn:
+                                raise ParseError(f"Error parsing argument '{arg.name}': {e}", token)
+                            break
+                    if not (minn <= len(values) <= maxn):
+                        raise ParseError(f"Argument '{arg.name}' expects between {minn} and {maxn} values, but got {len(values)}", tokens[-1])
+                case _:
+                    raise RuntimeError('Unknown program state')        
+
+            if arg.nargs == 1:
+                arguments.append((arg, values[0]))
+            elif arg.nargs in ('?', '??') and len(values) == 0:
+                arguments.append((arg, None))
+            elif arg.nargs in ('?', '??') and len(values) == 1:
+                arguments.append((arg, values[0]))
+            else:
+                arguments.append((arg, values))
+        return arguments
+
+    def _parse_option(self, token: Tree[Token]) -> tuple[ArgumentSpecification, Any]:
         match token:
-            case Token(tokenkind, str(value)): # positional argument. Check that index is in command_argnames
-                try:
-                    arg = self.command_arguments[self.command_argnames[index]]
-                except KeyError:
-                    raise ParseError(f"Unexpected positional argument at position {index}: '{value}'", token)
+            # case Token(tokenkind, str(value)): # positional argument. Check that index is in command_argnames
+            #     try:
+            #         arg = self.command_arguments[self.command_argnames[index]]
+            #     except KeyError:
+            #         raise ParseError(f"Unexpected positional argument at position {position}: '{value}'", token)
                 
-                if arg.accept is not None and tokenkind not in arg.accept:
-                    raise ParseError(f"Argument '{arg.name}' does not accept token of type '{tokenkind}' '{value}'", token)
+            #     if arg.accept is not None and tokenkind not in arg.accept:
+            #         raise ParseError(f"Argument '{arg.name}' does not accept token of type '{tokenkind}' '{value}'", token)
                 
-                self._perform_action(kwargs, arg.action, arg.type(value))
+            #     return arg, value
 
             case Tree(Token('RULE', 'option'), [Token('OPTION', str(optname)) as t, *values]):
                 try:
-                    arg = self.command_arguments[self.command_argnames[optname]]
+                    arg = self.command_arguments[self.command_optflags[optname]]
                 except KeyError:
                     raise ParseError(f"Unknown option '{optname}'", t)
                 
@@ -260,18 +372,18 @@ class CommandArgumentParser(Generic[_T]):
                 parsed_values = [arg.type(v.value) for v in values if isinstance(v, Token)]
 
                 match arg.nargs, len(parsed_values):
-                    case 1, 1: 
-                        self._perform_action(kwargs, arg.action, parsed_values[0])
+                    case 1, 1:
+                        return arg, parsed_values[0]
                     case int(n), m if n == m:
-                        self._perform_action(kwargs, arg.action, parsed_values)
+                        return arg, parsed_values
                     case [int(minn), int(maxn)], m if minn <= m <= maxn:
-                        self._perform_action(kwargs, arg.action, parsed_values)
+                        return arg, parsed_values
                     case '*', _:
-                        self._perform_action(kwargs, arg.action, parsed_values)
+                        return arg, parsed_values
                     case '+', m if m >= 1:
-                        self._perform_action(kwargs, arg.action, parsed_values)
+                        return arg, parsed_values
                     case '?', m if m <= 1:
-                        self._perform_action(kwargs, arg.action, parsed_values[0] if m == 1 else None)
+                        return arg, parsed_values[0] if m == 1 else None
                     case int(n), m:
                         raise ParseError(f"Argument '{arg.name}' expects {arg.nargs} values, but got {len(parsed_values)}", t)
                     case [int(minn), int(maxn)], m:
