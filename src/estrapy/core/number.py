@@ -57,3 +57,20 @@ def parse_number(s: str) -> Number:
     unit = parse_unit(unit_str) if unit_str else None
 
     return Number(sgn_str, num, unit)
+
+def parse_range(min_s: str, max_s: str) -> tuple[Number, Number]:
+    """Parse two strings into a tuple of Number objects representing a range.
+    To specify an open-ended range, use '..' as min_s or max_s."""
+    if min_s == '..':
+        min_num = Number(None, float('-inf'))
+    else:
+        min_num = parse_number(min_s)
+    
+    if max_s == '..':
+        max_num = Number(None, float('inf'))
+    else:
+        max_num = parse_number(max_s)
+    
+    if min_num.value > max_num.value:
+        raise ValueError(f"Invalid range: minimum '{min_s}' is greater than maximum '{max_s}'.")
+    return (min_num, max_num)
