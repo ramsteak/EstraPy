@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Callable, Any, Literal
+from typing import TypeVar, Generic, Callable, Any, Literal, Union, Protocol
 from lark import Token, Tree
 from dataclasses import dataclass, fields, MISSING
 from enum import Enum
@@ -25,12 +25,26 @@ class ActionSpecification:
     action: ActionType
     constant: Any = None
 
+class Callback_var(Protocol):
+    def __call__(self, *args: str) -> Any: ...
+
+Callback = Union[
+ Callable[[str], Any],
+ Callable[[str, str], Any],
+ Callable[[str, str, str], Any],
+ Callable[[str, str, str, str], Any],
+ Callable[[str, str, str, str, str], Any],
+ Callable[[str, str, str, str, str, str], Any],
+ Callable[[str, str, str, str, str, str, str], Any],
+ Callback_var
+]
 
 @dataclass(slots=True)
 class ArgumentSpecification:
     name: str
     action: ActionSpecification
     type: Callable[[str], Any] = str
+    types: Callback | None = None # For multiple types # type: ignore
     required: bool = False
     default: Any = None
     nargs: int | str | tuple[int, int] = 1
@@ -147,8 +161,8 @@ class CommandArgumentParser(Generic[_T]):
         self.command_optflags: dict[str, str] = {}
     
     def add_argument(self, attr_name: str | None, *arg_name: str, nargs: int | Literal['*', '*?', '?', '??', '+', '+?'] | tuple[int,int] = 1,
-                     type: Callable[[str], Any] = str, default: Any = MISSING, default_factory: Callable[[], Any] = MISSING, # type: ignore
-                     required: bool = False, destination: str | None = None,
+                     type: Callable[[str], Any] = str, types: Callback | None = None, default: Any = MISSING, # type: ignore
+                     default_factory: Callable[[], Any] = MISSING, required: bool = False, destination: str | None = None, # type: ignore
                      action: ActionType | str = ActionType.STORE, const: Any = MISSING, accept: str | tuple[str, ...] | None = None) -> None:
     
         if attr_name is None:
@@ -188,10 +202,13 @@ class CommandArgumentParser(Generic[_T]):
         if default is not MISSING and default_factory is not MISSING:
             raise ArgumentError("Cannot specify both default and default_factory.")
         
+        if types is not None:
+            type = str
         argument_spec = ArgumentSpecification(
             name=attr_name,
             action=argument_action,
             type=type,
+            types=types,
             required=required,
             default=default,
             nargs=nargs,
@@ -277,14 +294,17 @@ class CommandArgumentParser(Generic[_T]):
                             raise ParseError(f"Argument '{arg.name}' expects {n} values, but got {len(values)}", tokens[-1])
                         except Exception as e:
                             raise ParseError(f"Error parsing argument '{arg.name}': {e}", token)
+                    values = arg.types(*values) if arg.types is not None else values
                 case '*':
                     for _, token in _iter_idx_tokens:
                         values.append(arg.type(token.value))
+                    values = arg.types(*values) if arg.types is not None else values
                 case '+':
                     for _, token in _iter_idx_tokens:
                         values.append(arg.type(token.value))
                     if len(values) == 0:
                         raise ParseError(f"Argument '{arg.name}' expects 1 or more values, but got 0", tokens[-1])
+                    values = arg.types(*values) if arg.types is not None else values
                 case '?':
                     token = None
                     try:
@@ -309,6 +329,7 @@ class CommandArgumentParser(Generic[_T]):
                             break
                     if len(values) == 0:
                         raise ParseError(f"Argument '{arg.name}' expects 1 or more values, but got 0", tokens[-1])
+                    values = arg.types(*values) if arg.types is not None else values
                 case '??': # zero or one, release if error
                     token = None
                     try:
@@ -332,6 +353,7 @@ class CommandArgumentParser(Generic[_T]):
                             break
                     if not (minn <= len(values) <= maxn):
                         raise ParseError(f"Argument '{arg.name}' expects between {minn} and {maxn} values, but got {len(values)}", tokens[-1])
+                    values = arg.types(*values) if arg.types is not None else values
                 case _:
                     raise RuntimeError('Unknown program state')        
 
