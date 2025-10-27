@@ -13,7 +13,8 @@ from lark.exceptions import VisitError  # noqa: E402
 
 from . import __version__, __version_tuple__  # noqa: E402
 from .dispatcher import execute_script  # noqa: E402
-from .grammar import file_parser, EstraTransformer  # noqa: E402
+from .grammar import file_parser  # noqa: E402
+from .transformer import EstraTransformer
 from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
 from .core.errors import ParseError  # noqa: E402
 from .core.timers import TimerCollection  # noqa: E402

@@ -2,9 +2,9 @@ from lark import Transformer, Token
 from typing import Any
 
 
-from ..core.grammarclasses import Command, Script, Directive, CommandArguments, LocalContext
-from ..core.context import ParseContext
-from ..commands import parse_command, parse_directive
+from .core.grammarclasses import Command, Script, Directive, CommandArguments, LocalContext
+from .core.context import ParseContext
+from .commands import parse_command, parse_directive
 
 
 class EstraTransformer(Transformer[Any, Script]):
