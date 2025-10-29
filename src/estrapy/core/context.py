@@ -72,10 +72,8 @@ class ParseContext:
     # Paths object containing all relevant paths.
     paths: Paths
 
+    # Timers object containing all relevant timers.
+    timers: TimerCollection
+
     # Logger object for logging.
     logger: Logger
-
-@dataclass(slots=True)
-class LocalContext:
-    # To be subclassed for local context data.
-    pass
