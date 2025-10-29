@@ -4,8 +4,10 @@ from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
 from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence
+from collections import deque
 
 from .number import Number, parse_number, Unit
+from .edges import edges
 
 _K = TypeVar('_K')
 _V = TypeVar('_V')
@@ -318,10 +320,105 @@ def parse_edge(edge: str) -> Number:
         else:
             shift = 0.0
 
-        from xraydb import xray_edge  # type: ignore
+        edgename = f'{element}.{edge}'
+        if edgename in edges:
+            return Number(None, edges[edgename] + shift, Unit.EV)
 
+        # Use xraydb to get the edge energy if everything else fails
+        from xraydb import xray_edge  # type: ignore
         try:
             edge_energy: float = xray_edge(element, edge).energy  # type: ignore
-            return Number(edge_energy + shift, Unit.EV)
+            return Number(edge_energy + shift, Unit.EV) # type: ignore
         except ValueError:
             raise ValueError(f"Invalid element or edge: '{element}.{edge}'")
+
+_T = TypeVar('_T')
+class peekable(Iterator[_T], Generic[_T]):
+    def __init__(self, iterator: Iterator[_T] | Iterable[_T]) -> None:
+        self._iterator = iter(iterator)
+        self._buffer: deque[_T] = deque()
+        self._iterator_exhausted = False
+    
+    def __iter__(self) -> Self:
+        return self
+
+    def __next__(self) -> _T:
+        if self._buffer:
+            return self._buffer.popleft()
+        try:
+            return next(self._iterator)
+        except StopIteration:
+            self._iterator_exhausted = True
+            raise
+    
+    def peek(self) -> _T:
+        """Peek at the next item without consuming it. Returns the next item. If there are no more items, raises StopIteration."""
+        if self._buffer:
+            return self._buffer[0]
+        try:
+            item = next(self._iterator)
+            self._buffer.append(item)
+        except StopIteration:
+            self._iterator_exhausted = True
+            raise
+        return item
+    
+    def peek_n(self, n: int) -> list[_T]:
+        """Peek at the next n items without consuming them. Returns a list of the next n items. If there are not enough items, returns the available ones."""
+        try:
+            while len(self._buffer) < n or n < 1:
+                item = next(self._iterator)
+                self._buffer.append(item)
+        except StopIteration:
+            self._iterator_exhausted = True
+        return list(self._buffer)[:n]
+    
+    def next(self) -> _T:
+        """Get the next item, consuming it. If there are no more items, raises StopIteration."""
+        return self.__next__()
+    
+    def next_n(self, n: int) -> list[_T]:
+        """Get the next n items, consuming them. Returns a list of the next n items. If there are not enough items, returns the available ones."""
+        items: list[_T] = []
+        try:
+            for _ in range(n):
+                items.append(self.__next__())
+        except StopIteration:
+            self._iterator_exhausted = True
+        return items
+    
+    def pushback(self, item: _T) -> None:
+        """Push an item back to the front of the iterator."""
+        self._buffer.appendleft(item)
+
+    def pushback_n(self, items: Iterable[_T]) -> None:
+        """Push multiple items back to the front of the iterator."""
+        for item in reversed(list(items)):
+            self._buffer.appendleft(item)
+
+    def __bool__(self) -> bool:
+        """Return True if there are more items to iterate over, False otherwise."""
+        try:
+            self.peek()
+            return True
+        except StopIteration:
+            return False
+
+    def __str__(self) -> str:
+        if self._buffer:
+            return f'[{str(list(self._buffer))[1:-1]}{', <...>' if not self._iterator_exhausted else ''}]'
+        if self._iterator_exhausted:
+            return '[<>]'
+        return '[<...>]'
+    
+    def __repr__(self) -> str:
+        if self._buffer:
+            return f'peekable([{repr(list(self._buffer))[1:-1]}{', <...>' if not self._iterator_exhausted else ''}])'
+        if self._iterator_exhausted:
+            return 'peekable([<>])'
+        return 'peekable([<...>])'
+
+    def close(self) -> None:
+        """Close the underlying iterator if it has a close method."""
+        if hasattr(self._iterator, 'close'):
+            self._iterator.close() # type: ignore
