@@ -235,12 +235,11 @@ def main() -> None:
             raise ValueError(
                 f"The input file version {'.'.join(map(str, file_version))} is higher than the program version {__version__}. Please update the program."
             )
-
         parsed_tree = file_parser.parse(input_file_data)  # type: ignore
 
         # Transform the parse tree into a more manageable structure
         try:
-            parsecontext = ParseContext(context.paths, context.logger.getChild('parser'))
+            parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'))
             transformer = EstraTransformer(parsecontext)
             t_tree = transformer.transform(parsed_tree)
         except VisitError as ve:
