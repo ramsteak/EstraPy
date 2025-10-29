@@ -16,16 +16,20 @@ class CommandArguments_Edge(CommandArguments):
     search: Number
     delta: Number
 
+
 parse_edge_command = CommandArgumentParser(CommandArguments_Edge)
 parse_edge_command.add_argument('mode', type=str, required=False, default=None)
 parse_edge_command.add_argument('energy', '--energy', '--E0', '-E', type=parse_edge, required=False, default=None)
 parse_edge_command.add_argument('search', '--search', type=parse_edge, required=False, default=None)
 parse_edge_command.add_argument('delta', '--delta', '-d', type=parse_number, required=False, default=None)
 
+
 @dataclass(slots=True)
 class Command_Edge(Command[CommandArguments_Edge]):
     @classmethod
-    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+    def parse(
+        cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
+    ) -> Self:
         arguments = parse_edge_command(commandtoken, tokens, parsecontext)
         return cls(
             line=commandtoken.line or -1,
@@ -33,6 +37,6 @@ class Command_Edge(Command[CommandArguments_Edge]):
             args=arguments,
         )
 
-    def execute_on(self, page: str, context: Context) -> None:
-        ...  # Implement the execution logic for the 'edge' command here
-    
+    def execute_on(
+        self, page: str, context: Context
+    ) -> None: ...  # Implement the execution logic for the 'edge' command here

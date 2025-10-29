@@ -326,19 +326,23 @@ def parse_edge(edge: str) -> Number:
 
         # Use xraydb to get the edge energy if everything else fails
         from xraydb import xray_edge  # type: ignore
+
         try:
             edge_energy: float = xray_edge(element, edge).energy  # type: ignore
-            return Number(edge_energy + shift, Unit.EV) # type: ignore
+            return Number(edge_energy + shift, Unit.EV)  # type: ignore
         except ValueError:
             raise ValueError(f"Invalid element or edge: '{element}.{edge}'")
 
+
 _T = TypeVar('_T')
+
+
 class peekable(Iterator[_T], Generic[_T]):
     def __init__(self, iterator: Iterator[_T] | Iterable[_T]) -> None:
         self._iterator = iter(iterator)
         self._buffer: deque[_T] = deque()
         self._iterator_exhausted = False
-    
+
     def __iter__(self) -> Self:
         return self
 
@@ -350,7 +354,7 @@ class peekable(Iterator[_T], Generic[_T]):
         except StopIteration:
             self._iterator_exhausted = True
             raise
-    
+
     def peek(self) -> _T:
         """Peek at the next item without consuming it. Returns the next item. If there are no more items, raises StopIteration."""
         if self._buffer:
@@ -362,7 +366,7 @@ class peekable(Iterator[_T], Generic[_T]):
             self._iterator_exhausted = True
             raise
         return item
-    
+
     def peek_n(self, n: int) -> list[_T]:
         """Peek at the next n items without consuming them. Returns a list of the next n items. If there are not enough items, returns the available ones."""
         try:
@@ -372,11 +376,11 @@ class peekable(Iterator[_T], Generic[_T]):
         except StopIteration:
             self._iterator_exhausted = True
         return list(self._buffer)[:n]
-    
+
     def next(self) -> _T:
         """Get the next item, consuming it. If there are no more items, raises StopIteration."""
         return self.__next__()
-    
+
     def next_n(self, n: int) -> list[_T]:
         """Get the next n items, consuming them. Returns a list of the next n items. If there are not enough items, returns the available ones."""
         items: list[_T] = []
@@ -386,7 +390,7 @@ class peekable(Iterator[_T], Generic[_T]):
         except StopIteration:
             self._iterator_exhausted = True
         return items
-    
+
     def pushback(self, item: _T) -> None:
         """Push an item back to the front of the iterator."""
         self._buffer.appendleft(item)
@@ -410,7 +414,7 @@ class peekable(Iterator[_T], Generic[_T]):
         if self._iterator_exhausted:
             return '[<>]'
         return '[<...>]'
-    
+
     def __repr__(self) -> str:
         if self._buffer:
             return f'peekable([{repr(list(self._buffer))[1:-1]}{', <...>' if not self._iterator_exhausted else ''}])'
@@ -421,4 +425,4 @@ class peekable(Iterator[_T], Generic[_T]):
     def close(self) -> None:
         """Close the underlying iterator if it has a close method."""
         if hasattr(self._iterator, 'close'):
-            self._iterator.close() # type: ignore
+            self._iterator.close()  # type: ignore

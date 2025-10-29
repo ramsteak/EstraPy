@@ -182,7 +182,6 @@ class TimerCollection:
         """Returns a context manager that starts the stopwatch with the given
         name when entering the context, and stops it when exiting."""
         timer = self.new(name)
-        # timer = self._timers.setdefault(name, Timer())
         return TimerContextManager(timer)
 
     def table_format(self, unit: Literal['s', 'ms', 'us', 'ns'] = 's') -> str:

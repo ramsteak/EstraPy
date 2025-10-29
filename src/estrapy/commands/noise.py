@@ -24,17 +24,20 @@ parse_noise_command = CommandArgumentParser(CommandArguments_Noise)
 parse_noise_command.add_argument('x', '--xaxiscol', type=str, default='E')
 parse_noise_command.add_argument('y', '--yaxiscol', type=str, default='a')
 
+
 @dataclass(slots=True)
 class Command_Noise(Command[CommandArguments_Noise]):
     @classmethod
-    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+    def parse(
+        cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
+    ) -> Self:
         arguments = parse_noise_command(commandtoken, tokens, parsecontext)
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
         )
-    
+
     def execute(self, context: Context) -> None:
         expr = partial(estimate_noise, xcol=self.args.x, ycol=self.args.y, name='noise')
 

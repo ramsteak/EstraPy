@@ -5,6 +5,7 @@ from typing import Self, Generic, TypeVar, Any
 
 from .context import ParseContext, Context
 
+
 @dataclass(slots=True)
 class Directive: ...
 
@@ -12,7 +13,9 @@ class Directive: ...
 @dataclass(slots=True)
 class CommandArguments: ...
 
+
 _A = TypeVar('_A', bound=CommandArguments, covariant=True)
+
 
 @dataclass(slots=True)
 class Command(Generic[_A]):
@@ -21,12 +24,9 @@ class Command(Generic[_A]):
     args: _A
 
     @classmethod
-    def parse(cls, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
-        ...
+    def parse(cls, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self: ...
 
-    def execute(self, context: Context) -> None:
-        ...
-    
+    def execute(self, context: Context) -> None: ...
 
 
 class Script(NamedTuple):

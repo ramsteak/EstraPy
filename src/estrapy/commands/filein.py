@@ -73,7 +73,9 @@ class CommandArguments_filein(CommandArguments):
     )
 
     # Signals to be calculated from the imported columns. The
-    signals: list[tuple[ColumnDescription, Domain, Expr]] = field(default_factory=list[tuple[ColumnDescription, Domain, Expr]])
+    signals: list[tuple[ColumnDescription, Domain, Expr]] = field(
+        default_factory=list[tuple[ColumnDescription, Domain, Expr]]
+    )
 
 
 @dataclass(slots=True)
@@ -294,11 +296,11 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
 
     if options.xanes is not ...:
         columnselector = parse_column_descriptor(options.xanes)
-        column = ColumnDescription(name='mu', unit=None, type=ColumnKind.DATA) # TODO: add default label
+        column = ColumnDescription(name='mu', unit=None, type=ColumnKind.DATA)  # TODO: add default label
         cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.exafs is not ...:
         columnselector = parse_column_descriptor(options.exafs)
-        column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA) # TODO: add default label
+        column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA)  # TODO: add default label
         cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.xaneserror is not ...:
@@ -371,7 +373,7 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
     match options.reciprocal_reference_signal_mode__:
         case 'calc_referencetransmission':
             importer: Expr = lambda df: (np.log10(df['I1'] / df['I2'])).rename('ref')  # type: ignore  # noqa: E731
-            column = ColumnDescription(name='ref', unit=None, type=ColumnKind.DATA, deps=['I1','I2'], calc=importer)
+            column = ColumnDescription(name='ref', unit=None, type=ColumnKind.DATA, deps=['I1', 'I2'], calc=importer)
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_referencetransmission':
             assert options.referencetransmission is not ..., 'Invalid program state: #Xvlkkp7Wyz'
@@ -385,7 +387,9 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
     if options.fourierreal is not ... and options.fourierimaginary is not ...:
         # real/imaginary specified as pure columns. Calculate f = real + i*imaginary
         importer: Expr = lambda df: (df['fourierreal'] + 1j * df['fourierimaginary']).rename('f')  # noqa: E731
-        column = ColumnDescription(name='fourier', unit=None, type=ColumnKind.DATA, deps=['fourierreal','fourierimaginary'], calc=importer)
+        column = ColumnDescription(
+            name='fourier', unit=None, type=ColumnKind.DATA, deps=['fourierreal', 'fourierimaginary'], calc=importer
+        )
         cmd.signals.append((column, Domain.FOURIER, importer))
     elif options.fouriermagnitude is not ... and options.fourierphase is not ...:
         # magnitude/phase specified as pure columns. Calculate f = magnitude * (cos(phase) + i * sin(phase))
@@ -393,7 +397,9 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
         importer: Expr = lambda df: (  # noqa: E731
             df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))
         ).rename('f')
-        column = ColumnDescription(name='fourier', unit=None, type=ColumnKind.DATA, deps=['fouriermagnitude','fourierphase'], calc=importer)
+        column = ColumnDescription(
+            name='fourier', unit=None, type=ColumnKind.DATA, deps=['fouriermagnitude', 'fourierphase'], calc=importer
+        )
         cmd.signals.append((column, Domain.FOURIER, importer))
 
     # TODO: fourier errors
@@ -936,7 +942,7 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             # Check if the number of header items matches the number of data columns. If so, set leadingheader to 0, else to 1
             if len(headerline.split()) == len(dat.columns):
                 leadingheader = 0
-                headerline = headerline.removeprefix("#")
+                headerline = headerline.removeprefix('#')
             else:
                 leadingheader = 1
         else:
@@ -970,16 +976,14 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     )
 
     # Get data from extracted columns
-    newdata:dict[Domain, DataDomain] = {}
+    newdata: dict[Domain, DataDomain] = {}
     for domain, columns in extractedcolumns.groups():
         datadomain = DataDomain()
 
         for column, data in columns:
             datadomain.add_column_data(column.name, column, data)
-        
+
         newdata[domain] = datadomain
-
-
 
     # newdata = {
     #     domain: DataDomain([c for c, _ in columns], pd.DataFrame(c for _, c in columns).T)
@@ -1004,11 +1008,12 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     )
 
 
-
 @dataclass(slots=True)
 class Command_Filein(Command[CommandArguments_filein]):
     @classmethod
-    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+    def parse(
+        cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
+    ) -> Self:
         options = get_filein_options(tokens, parsecontext)
         arguments = get_filein_command(options, parsecontext)
         return cls(

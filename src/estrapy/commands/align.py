@@ -9,7 +9,7 @@ from ..core.context import Context, ParseContext
 from ..core.number import Number, parse_number, parse_range
 from ..grammar.commandparser import CommandArgumentParser
 from ..core.misc import parse_edge
-    
+
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Shift(CommandArguments):
@@ -17,6 +17,7 @@ class SubCommandArguments_Align_Shift(CommandArguments):
     resolution: Number
     shift: Number
     derivative: int
+
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Calc(CommandArguments):
@@ -38,7 +39,13 @@ sub_calc.add_argument('search', '--search', '--sE0', type=parse_edge, required=F
 sub_calc.add_argument('delta', '--delta', '-d', type=parse_number, required=False, default=None)
 
 sub_shift = CommandArgumentParser(SubCommandArguments_Align_Shift, name='shift')
-sub_shift.add_argument('range', types=parse_range, nargs=2, required=False, default=(Number(None, -np.inf, None), Number(None, np.inf, None)))
+sub_shift.add_argument(
+    'range',
+    types=parse_range,
+    nargs=2,
+    required=False,
+    default=(Number(None, -np.inf, None), Number(None, np.inf, None)),
+)
 sub_shift.add_argument('resolution', '--resolution', '--res', type=parse_number, required=False, default=1.0)
 sub_shift.add_argument('shift', '--shift', '-s', type=parse_number, required=False, default=0.0)
 sub_shift.add_argument('derivative', '--derivative', '--deriv', type=int, required=False, default=1)
@@ -51,7 +58,9 @@ parse_align_command.add_subparser('shift', sub_shift, 'mode')
 @dataclass(slots=True)
 class Command_Align(Command[CommandArguments_Align]):
     @classmethod
-    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+    def parse(
+        cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
+    ) -> Self:
         arguments = parse_align_command(commandtoken, tokens, parsecontext)
         return cls(
             line=commandtoken.line or -1,
@@ -59,5 +68,4 @@ class Command_Align(Command[CommandArguments_Align]):
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
-        ...  # Implement the execution logic for the 'align' command here
+    def execute(self, context: Context) -> None: ...  # Implement the execution logic for the 'align' command here

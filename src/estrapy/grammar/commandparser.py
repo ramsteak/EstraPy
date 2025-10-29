@@ -13,6 +13,7 @@ from ..core.misc import peekable
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
 _T = TypeVar('_T', bound=CommandArguments)
 
+
 class ActionType(Enum):
     STORE = 'store'
     STORE_CONST = 'store_const'
@@ -21,11 +22,13 @@ class ActionType(Enum):
     APPEND = 'append'
     APPEND_CONST = 'append_const'
 
+
 @dataclass(slots=True)
 class ActionSpecification:
     destination: str
     action: ActionType
     constant: Any = None
+
 
 @dataclass(slots=True, frozen=True)
 class NargsSpecification:
@@ -45,34 +48,39 @@ class NargsSpecification:
 class Callback_var(Protocol):
     def __call__(self, *args: str) -> Any: ...
 
+
 Callback = Union[
- Callable[[str], Any],
- Callable[[str, str], Any],
- Callable[[str, str, str], Any],
- Callable[[str, str, str, str], Any],
- Callable[[str, str, str, str, str], Any],
- Callable[[str, str, str, str, str, str], Any],
- Callable[[str, str, str, str, str, str, str], Any],
- Callback_var
+    Callable[[str], Any],
+    Callable[[str, str], Any],
+    Callable[[str, str, str], Any],
+    Callable[[str, str, str, str], Any],
+    Callable[[str, str, str, str, str], Any],
+    Callable[[str, str, str, str, str, str], Any],
+    Callable[[str, str, str, str, str, str, str], Any],
+    Callback_var,
 ]
+
 
 @dataclass(slots=True)
 class ArgumentSpecification:
     name: str
     action: ActionSpecification
     type: Callable[[str], Any] = str
-    types: Callback | None = None # For multiple types # type: ignore
+    types: Callback | None = None  # For multiple types # type: ignore
     required: bool = False
     default: Any = None
-    nargs: NargsSpecification = NargsSpecification(1,1,False,True)
+    nargs: NargsSpecification = NargsSpecification(1, 1, False, True)
     accept: tuple[str, ...] | None = None
     default_factory: Callable[[], Any] | None = None
 
-def _validate_nargs(nargs: int | str | tuple[int|None|EllipsisType,int|None|EllipsisType]) -> NargsSpecification:
+
+def _validate_nargs(
+    nargs: int | str | tuple[int | None | EllipsisType, int | None | EllipsisType],
+) -> NargsSpecification:
     """Validate the nargs parameter. Raises ArgumentError if invalid."""
     match nargs:
         case int(n) if n >= 0:
-            return NargsSpecification(min=n, max=n, soft=False, single=(n==1))
+            return NargsSpecification(min=n, max=n, soft=False, single=(n == 1))
         case [int(minn), int(maxn)] if minn >= 0 and maxn >= minn:
             return NargsSpecification(min=minn, max=maxn, soft=False, single=False)
         case [None, int(maxn)] if maxn >= 0:
@@ -96,7 +104,10 @@ def _validate_nargs(nargs: int | str | tuple[int|None|EllipsisType,int|None|Elli
         case '??' | [EllipsisType(), 1]:
             return NargsSpecification(min=0, max=1, soft=True, single=True)
         case _:
-            raise ArgumentError(f"nargs must be a positive integer, one of '*', '+', '?', or a tuple of two positive integers (min, max) with min <= max, not '{nargs}'")
+            raise ArgumentError(
+                f"nargs must be a positive integer, one of '*', '+', '?', or a tuple of two positive integers (min, max) with min <= max, not '{nargs}'"
+            )
+
 
 def _get_argtype_from_names(arg_names: tuple[str, ...]) -> Literal['option', 'value']:
     """Determine if the argument is an option or value based on its names.
@@ -106,7 +117,10 @@ def _get_argtype_from_names(arg_names: tuple[str, ...]) -> Literal['option', 'va
     elif len(arg_names) == 0:
         return 'value'
     else:
-        raise ArgumentError("All argument names must start with '-' for option arguments. No argument names for value arguments are required.")
+        raise ArgumentError(
+            "All argument names must start with '-' for option arguments. No argument names for value arguments are required."
+        )
+
 
 def _get_action_specification(destination: str, action: ActionType | str, const: Any) -> ActionSpecification:
     """Get the ActionSpecification for the given argument parameters."""
@@ -115,7 +129,7 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
             action = ActionType(action)
         except ValueError:
             raise ArgumentError(f"Unknown action type '{action}' for argument '{destination}'.")
-    
+
     match action:
         case ActionType.STORE:
             return ActionSpecification(
@@ -125,7 +139,7 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
             )
         case ActionType.STORE_CONST:
             if const is MISSING:
-                raise ArgumentError("Constant value must be provided for STORE_CONST action.")
+                raise ArgumentError('Constant value must be provided for STORE_CONST action.')
             return ActionSpecification(
                 destination=destination,
                 action=ActionType.STORE_CONST,
@@ -151,7 +165,7 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
             )
         case ActionType.APPEND_CONST:
             if const is MISSING:
-                raise ArgumentError("Constant value must be provided for APPEND_CONST action.")
+                raise ArgumentError('Constant value must be provided for APPEND_CONST action.')
             return ActionSpecification(
                 destination=destination,
                 action=ActionType.APPEND_CONST,
@@ -160,15 +174,16 @@ def _get_action_specification(destination: str, action: ActionType | str, const:
         case _:
             raise ArgumentError(f"Unknown action type '{action}' for argument '{destination}'.")
 
+
 class CommandArgumentParser(Generic[_T]):
-    def __init__(self, returnstruct: type[_T], name: str|None = None) -> None:
+    def __init__(self, returnstruct: type[_T], name: str | None = None) -> None:
         # Check that returnstruct is a dataclass
         if not hasattr(returnstruct, '__dataclass_fields__'):
             raise TypeError('returnstruct must be a dataclass')
-        
+
         self.name = name
         self.dataclass_type = returnstruct
-        self._fields = {f.name:f for f in fields(returnstruct)}
+        self._fields = {f.name: f for f in fields(returnstruct)}
 
         # Return type argument name -> ArgumentSpecification
         # Unnamed arguments are stored with a progressive index as key
@@ -181,42 +196,51 @@ class CommandArgumentParser(Generic[_T]):
         self.command_optflags: dict[str, str] = {}
 
         # Subparsers of the main command parser
-        self.subparsers: dict[str, CommandArgumentParser[Any]] = {} # name -> parser
-        self.subparser_destinations: dict[str, str] = {} # name -> destination in returnstruct
+        self.subparsers: dict[str, CommandArgumentParser[Any]] = {}  # name -> parser
+        self.subparser_destinations: dict[str, str] = {}  # name -> destination in returnstruct
 
         self.parent: None | CommandArgumentParser[Any] = None
 
-    
-    def add_argument(self, field: str | None, *flags: str, nargs: int | Literal['*', '*?', '?', '??', '+', '+?'] | tuple[int,int] = 1,
-                     type: Callable[[str], Any] = str, types: Callback | None = None, default: Any = MISSING, # type: ignore
-                     default_factory: Callable[[], Any] = MISSING, required: bool = False, dest: str | None = None, # type: ignore
-                     action: ActionType | str = ActionType.STORE, const: Any = MISSING, accept: str | tuple[str, ...] | None = None) -> None:
-    
+    def add_argument(
+        self,
+        field: str | None,
+        *flags: str,
+        nargs: int | Literal['*', '*?', '?', '??', '+', '+?'] | tuple[int, int] = 1,
+        type: Callable[[str], Any] = str,
+        types: Callback | None = None,
+        default: Any = MISSING,  # type: ignore
+        default_factory: Callable[[], Any] = MISSING,
+        required: bool = False,
+        dest: str | None = None,  # type: ignore
+        action: ActionType | str = ActionType.STORE,
+        const: Any = MISSING,
+        accept: str | tuple[str, ...] | None = None,
+    ) -> None:
         # ------------------------------------------------------------------------------------------------------
         # Resolve destination and name
         if field is None:
             if dest is None:
-                raise ArgumentError("Destination must be given for unnamed arguments.")
+                raise ArgumentError('Destination must be given for unnamed arguments.')
             # Assign a progressive attr name when not given.
             self._unnamed_arg_index += 1
             field = f'unnamed_arg_{self._unnamed_arg_index}'
         else:
             # If field is given, destination defaults to field, and cannot be given.
             if dest is not None and dest != field:
-                raise ArgumentError("Destination cannot be given when field is specified.")
+                raise ArgumentError('Destination cannot be given when field is specified.')
             dest = field
             # If field is given, check that it exists in the dataclass_type and that it's not already defined.
             if field not in self._fields:
                 raise ArgumentError(f"Argument '{field}' does not exist in {self.dataclass_type.__name__}.")
             if field in self.arguments:
                 raise DuplicateArgumentError(f"Argument '{field}' is already defined.")
-        
+
         # ------------------------------------------------------------------------------------------------------
         # Validate nargs and defaults
         _nargs = _validate_nargs(nargs)
 
         if default is not MISSING and default_factory is not MISSING:
-            raise ArgumentError("Cannot specify both default and default_factory.")
+            raise ArgumentError('Cannot specify both default and default_factory.')
 
         # ------------------------------------------------------------------------------------------------------
         # Check for duplicate flag entries
@@ -224,7 +248,9 @@ class CommandArgumentParser(Generic[_T]):
             if not name.startswith('-'):
                 raise ArgumentError(f"Invalid flag name '{name}': option flags must start with '-'")
             if name in self.command_optflags:
-                raise DuplicateArgumentError(f"Flag name '{name}' is already used for argument '{self.command_optflags[name]}'")
+                raise DuplicateArgumentError(
+                    f"Flag name '{name}' is already used for argument '{self.command_optflags[name]}'"
+                )
 
         # ------------------------------------------------------------------------------------------------------
         # Build ArgumentSpecification for this argument
@@ -234,7 +260,7 @@ class CommandArgumentParser(Generic[_T]):
             raise ArgumentError(f"Argument '{field}': nargs cannot be 0 for STORE or APPEND actions.")
         if action_spec.action in {ActionType.STORE_CONST, ActionType.APPEND_CONST} and nargs != 0:
             raise ArgumentError(f"Argument '{field}': nargs must be 0 for STORE_CONST or APPEND_CONST actions.")
-        
+
         argument_spec = ArgumentSpecification(
             name=field,
             action=action_spec,
@@ -258,9 +284,9 @@ class CommandArgumentParser(Generic[_T]):
                 opt_handles = flags
                 for handle in opt_handles:
                     self.command_optflags[handle] = field
-            case _: 
+            case _:
                 raise RuntimeError('Unknown argument type')
-    
+
     def add_subparser(self, name: str, parser: 'CommandArgumentParser[Any]', dest: str) -> None:
         # ------------------------------------------------------------------------------------------------------
         # Validate destination and flags
@@ -285,11 +311,10 @@ class CommandArgumentParser(Generic[_T]):
         argument_spec = ArgumentSpecification(
             name=dest,
             action=action_spec,
-            type=lambda x: x, # type: ignore
+            type=lambda x: x,  # type: ignore
             required=True,
         )
         self.arguments[dest] = argument_spec
-
 
     def parse(self, commandtoken: Token, tokens: peekable[Token | Tree[Token]]) -> _T:
         kwargs: dict[str, Any] = {}
@@ -320,7 +345,7 @@ class CommandArgumentParser(Generic[_T]):
             __t = tokens.peek()
             while isinstance(__t, Tree):
                 __t = __t.children[0]
-            
+
             # Attempt to parse first token as subparser
             result = self._parse_subparser(tokens)
             if result is not None:
@@ -353,31 +378,31 @@ class CommandArgumentParser(Generic[_T]):
 
             # None matched, so this argument parser is finished and we exit
             break
-    
+
         for argname, argspec in self.arguments.items():
             if argspec.required and argname not in kwargs:
                 raise ArgumentError(f"Argument '{argname}' is required but not provided.")
-        
+
         output = self.dataclass_type(**kwargs)
         return output
 
     def _parse_subparser(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | None:
         if not self.subparsers:
             return None
-        
+
         next_token = next(tokens, None)
         if next_token is None:
             return None
-        
+
         # Subparser is triggered by a positional token matching a subparser name
         if not isinstance(next_token, Token):
             tokens.pushback(next_token)
             return None
-        
+
         if next_token.value not in self.subparsers:
             tokens.pushback(next_token)
             return None
-        
+
         # --------------------------------------------------------------------------------------
         # Parse subparser
         subp = self.subparsers[next_token.value]
@@ -387,11 +412,11 @@ class CommandArgumentParser(Generic[_T]):
 
         return self.arguments[dest], parsed
 
-    def _parse_option(self, tokens: peekable[Token|Tree[Token]]) -> tuple[ArgumentSpecification, Any] | None:
+    def _parse_option(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | None:
         __t = tokens.peek()
         while isinstance(__t, Tree):
             __t = __t.children[0]
-        
+
         # Option is triggered by a Tree with Tree(Token('RULE', 'option'), [...])
         # Match used to destructure and refuse invalid tokens
         token = next(tokens, None)
@@ -404,12 +429,12 @@ class CommandArgumentParser(Generic[_T]):
                     tokens.pushback(token)
                     return None
                 arg_spec = self.arguments[arg_name]
-                
+
                 # Handle STORE_CONST / APPEND_CONST directly
                 if arg_spec.action.action in (ActionType.STORE_CONST, ActionType.APPEND_CONST):
                     tokens.pushback_n(subtokens)
                     return arg_spec, arg_spec.action.constant
-                
+
                 # Parse values according to nargs
                 sub_tokens = peekable(subtokens)
                 value = self._consume_tokens_for_nargs(sub_tokens, arg_spec.nargs, arg_spec.type, arg_spec.accept)
@@ -426,34 +451,42 @@ class CommandArgumentParser(Generic[_T]):
             case _:
                 tokens.pushback(token)
                 return None
-            
+
         ...
 
-    def _parse_positional(self, tokens: peekable[Token | Tree[Token]], posargs: Iterator[ArgumentSpecification]) -> tuple[ArgumentSpecification, Any] | None:
+    def _parse_positional(
+        self, tokens: peekable[Token | Tree[Token]], posargs: Iterator[ArgumentSpecification]
+    ) -> tuple[ArgumentSpecification, Any] | None:
         arg_spec = next(posargs, None)
         if arg_spec is None:
             return None
         __t = tokens.peek()
         while isinstance(__t, Tree):
             __t = __t.children[0]
-        
+
         try:
             value = self._consume_tokens_for_nargs(tokens, arg_spec.nargs, arg_spec.type, arg_spec.accept)
         except ParseError as pe:
             if not arg_spec.required:
                 return None
             raise pe from None
-                
+
         if arg_spec.types is not None and not arg_spec.nargs.single:
             try:
                 value = arg_spec.types(*value)
             except Exception as e:
                 raise ParseError(f"Error parsing argument '{arg_spec.name}': {e}", __t) from e
-        
+
         return arg_spec, value
 
-    def _consume_tokens_for_nargs(self, tokens: peekable[Token | Tree[Token]], nargs_spec: NargsSpecification, _type: Callable[[str], Any], accept: tuple[str, ...] | None = None) -> list[Any] | Any:
-        values:list[Any] = []
+    def _consume_tokens_for_nargs(
+        self,
+        tokens: peekable[Token | Tree[Token]],
+        nargs_spec: NargsSpecification,
+        _type: Callable[[str], Any],
+        accept: tuple[str, ...] | None = None,
+    ) -> list[Any] | Any:
+        values: list[Any] = []
         __tokens: list[Token] = []
         __t = tokens.peek()
         while isinstance(__t, Tree):
@@ -471,24 +504,26 @@ class CommandArgumentParser(Generic[_T]):
             try:
                 val = _type(token.value)
             except Exception:
-            # Soft mode: stop consuming and leave token on stack
+                # Soft mode: stop consuming and leave token on stack
                 if nargs_spec.soft:
                     break
                 else:
                     tokens.pushback_n(__tokens)
                     raise ParseError(f"Failed to parse token '{token.value}' as {_type}", token) from None
-            
+
             values.append(val)
-            __tokens.append(tokens.next()) # type: ignore
+            __tokens.append(tokens.next())  # type: ignore
 
             if nargs_spec.max is not None and len(values) >= nargs_spec.max:
                 break
-        
+
         # Validate number of consumed tokens
         if not nargs_spec.inrange(len(values)):
             tokens.pushback_n(__tokens)
-            raise ParseError(f"Expected between {nargs_spec.min} and {nargs_spec.max} values, but got {len(values)}", __t)
-        
+            raise ParseError(
+                f'Expected between {nargs_spec.min} and {nargs_spec.max} values, but got {len(values)}', __t
+            )
+
         if nargs_spec.single:
             return values[0] if values else None
         return values
@@ -505,7 +540,7 @@ class CommandArgumentParser(Generic[_T]):
                 kwargs.setdefault(action.destination, []).append(action.constant)
             case _:
                 raise ArgumentError(f"Unknown action '{action.action}' for argument '{action.destination}'")
-    
+
     @property
     def is_root(self) -> bool:
         return self.parent is None
@@ -516,16 +551,15 @@ class CommandArgumentParser(Generic[_T]):
 
         if not self.is_root:
             return struct
-        
-        
+
         if _tokens:
             match _tokens.next():
                 case Token() as t:
-                    raise ParseError("Unexpected extra tokens after parsing command.", t)
+                    raise ParseError('Unexpected extra tokens after parsing command.', t)
                 case Tree(Token() as t, _):
-                    raise ParseError("Unexpected extra tokens after parsing command.", t)
+                    raise ParseError('Unexpected extra tokens after parsing command.', t)
                 case _:
-                    raise ParseError("Unexpected extra tokens after parsing command.")
-        
+                    raise ParseError('Unexpected extra tokens after parsing command.')
+
         _tokens.close()
         return struct

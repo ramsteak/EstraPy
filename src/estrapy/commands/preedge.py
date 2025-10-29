@@ -8,6 +8,7 @@ from ..core.context import Context, ParseContext
 from ..grammar.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range
 
+
 @dataclass(slots=True)
 class CommandArguments_Preedge(CommandArguments):
     range: tuple[Number, Number]
@@ -28,16 +29,19 @@ parse_preedge_command.add_argument('x', '--xaxiscol', type=str, default='E')
 parse_preedge_command.add_argument('y', '--yaxiscol', type=str, default='a')
 parse_preedge_command.add_argument('n', '--newyaxiscol', type=str, default='a')
 
+
 @dataclass(slots=True)
 class Command_Preedge(Command[CommandArguments_Preedge]):
     @classmethod
-    def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
+    def parse(
+        cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
+    ) -> Self:
         arguments = parse_preedge_command(commandtoken, tokens, parsecontext)
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
         )
-    
+
     def execute_on(self, page: str, context: Context) -> None:
         pass
