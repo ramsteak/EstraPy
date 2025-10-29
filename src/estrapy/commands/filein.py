@@ -14,11 +14,11 @@ from os import cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.errors import CommandSyntaxError, ExecutionError
-from ..core.grammarclasses import CommandArguments, Command, CommandMetadata
+from ..core.grammarclasses import CommandArguments, Command
 from ..core.number import Number, parse_number, Unit
-from ..core.datastore import FileMetadata, DataDomain, Domain, Column, ColumnType, DataPage
+from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
 from ..core.misc import peek, Bag, fmt
-from ..core.context import Context, ParseContext, LocalContext
+from ..core.context import Context, ParseContext
 
 import pandas as pd
 import numpy as np
@@ -31,7 +31,7 @@ ColumnRange: TypeAlias = tuple[Column_id, Column_id]
 # 1,3,5..7  -> [1,3,(5,7)]
 # 1..5      -> [(1,5)]
 # A         -> ['A']
-ColumnDescriptor: TypeAlias = list[Column_id | ColumnRange]
+ColumnSelector: TypeAlias = list[Column_id | ColumnRange]
 
 # An imported column is calculated from other columns. The first element is a
 # tuple of imported column names to be used to calculate it, and the second is
@@ -68,12 +68,12 @@ class CommandArguments_filein(CommandArguments):
 
     # What columns are to be imported. The tuple stores the new column name as
     # first element and the data column name (or range of columns) as second element.
-    columns: list[tuple[Column, Domain, ColumnDescriptor]] = field(
-        default_factory=list[tuple[Column, Domain, ColumnDescriptor]]
+    columns: list[tuple[ColumnDescription, Domain, ColumnSelector]] = field(
+        default_factory=list[tuple[ColumnDescription, Domain, ColumnSelector]]
     )
 
     # Signals to be calculated from the imported columns. The
-    signals: list[tuple[Column, Domain, Expr]] = field(default_factory=list[tuple[Column, Domain, Expr]])
+    signals: list[tuple[ColumnDescription, Domain, Expr]] = field(default_factory=list[tuple[ColumnDescription, Domain, Expr]])
 
 
 @dataclass(slots=True)
@@ -195,9 +195,9 @@ def _assert_flag_not_assigned_set(options: FileInOptions, option: str, optiontok
     setattr(options, option, value)
 
 
-def parse_column_descriptor(t: Token) -> ColumnDescriptor:
+def parse_column_descriptor(t: Token) -> ColumnSelector:
     s = str(t.value)
-    desc: ColumnDescriptor = []
+    desc: ColumnSelector = []
     for part in s.split(','):
         match part.split('..'):
             case [str(one)]:
@@ -209,7 +209,7 @@ def parse_column_descriptor(t: Token) -> ColumnDescriptor:
     return desc
 
 
-def expand_column_descriptor(desc: ColumnDescriptor, columns: list[str]) -> list[str]:
+def expand_column_descriptor(desc: ColumnSelector, columns: list[str]) -> list[str]:
     res: list[str] = []
     for item in desc:
         match item:
@@ -240,144 +240,144 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
 
     # Only one reciprocal axis can be specified, thanks to reciprocal_axis_flag__
     if options.energy is not ...:
-        columndescriptor = parse_column_descriptor(options.energy)
-        column = Column(name='E', unit=Unit.EV, type=ColumnType.AXIS)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.energy)
+        column = ColumnDescription(name='E', unit=Unit.EV, type=ColumnKind.AXIS, labl='Energy [eV]')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     elif options.wavevector is not ...:
-        columndescriptor = parse_column_descriptor(options.wavevector)
-        column = Column(name='k', unit=Unit.K, type=ColumnType.AXIS)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.wavevector)
+        column = ColumnDescription(name='k', unit=Unit.K, type=ColumnKind.AXIS, labl='Wavevector [1/Å]')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     elif options.qvector is not ...:
-        columndescriptor = parse_column_descriptor(options.qvector)
-        column = Column(name='q', unit=Unit.K, type=ColumnType.AXIS)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.qvector)
+        column = ColumnDescription(name='q', unit=Unit.K, type=ColumnKind.AXIS, labl='Wavevector [1/Å]')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.rspace is not ...:
-        columndescriptor = parse_column_descriptor(options.rspace)
-        column = Column(name='R', unit=Unit.A, type=ColumnType.AXIS)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.rspace)
+        column = ColumnDescription(name='R', unit=Unit.A, type=ColumnKind.AXIS, labl='R-space [Å]')
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     # Check reciprocal domain columns
     if options.beamintensity is not ...:
-        columndescriptor = parse_column_descriptor(options.beamintensity)
-        column = Column(name='I0', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.beamintensity)
+        column = ColumnDescription(name='I0', unit=None, type=ColumnKind.DATA, labl='Beam Intensity')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.sampleintensity is not ...:
-        columndescriptor = parse_column_descriptor(options.sampleintensity)
-        column = Column(name='I1', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.sampleintensity)
+        column = ColumnDescription(name='I1', unit=None, type=ColumnKind.DATA, labl='Sample Intensity')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.samplefluorescence is not ...:
-        columndescriptor = parse_column_descriptor(options.samplefluorescence)
-        column = Column(name='If', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.samplefluorescence)
+        column = ColumnDescription(name='If', unit=None, type=ColumnKind.DATA, labl='Sample Fluorescence')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.referenceintensity is not ...:
-        columndescriptor = parse_column_descriptor(options.referenceintensity)
-        column = Column(name='I2', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.referenceintensity)
+        column = ColumnDescription(name='I2', unit=None, type=ColumnKind.DATA, labl='Reference Intensity')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.beamintensityerror is not ...:
-        columndescriptor = parse_column_descriptor(options.beamintensityerror)
-        column = Column(name='sI0', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.beamintensityerror)
+        column = ColumnDescription(name='sI0', unit=None, type=ColumnKind.ERROR, labl='Beam Intensity Error')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.sampleintensityerror is not ...:
-        columndescriptor = parse_column_descriptor(options.sampleintensityerror)
-        column = Column(name='sI1', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.sampleintensityerror)
+        column = ColumnDescription(name='sI1', unit=None, type=ColumnKind.ERROR, labl='Sample Intensity Error')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.samplefluorescenceerror is not ...:
-        columndescriptor = parse_column_descriptor(options.samplefluorescenceerror)
-        column = Column(name='sIf', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.samplefluorescenceerror)
+        column = ColumnDescription(name='sIf', unit=None, type=ColumnKind.ERROR, labl='Sample Fluorescence Error')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.referenceintensityerror is not ...:
-        columndescriptor = parse_column_descriptor(options.referenceintensityerror)
-        column = Column(name='sI2', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.referenceintensityerror)
+        column = ColumnDescription(name='sI2', unit=None, type=ColumnKind.ERROR, labl='Reference Intensity Error')
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.xanes is not ...:
-        columndescriptor = parse_column_descriptor(options.xanes)
-        column = Column(name='mu', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.xanes)
+        column = ColumnDescription(name='mu', unit=None, type=ColumnKind.DATA) # TODO: add default label
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.exafs is not ...:
-        columndescriptor = parse_column_descriptor(options.exafs)
-        column = Column(name='chi', unit=None, type=ColumnType.DATA)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.exafs)
+        column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA) # TODO: add default label
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.xaneserror is not ...:
-        columndescriptor = parse_column_descriptor(options.xaneserror)
-        column = Column(name='mu', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.xaneserror)
+        column = ColumnDescription(name='smu', unit=None, type=ColumnKind.ERROR)
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
     if options.exafserror is not ...:
-        columndescriptor = parse_column_descriptor(options.exafserror)
-        column = Column(name='chi', unit=None, type=ColumnType.ERROR)
-        cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+        columnselector = parse_column_descriptor(options.exafserror)
+        column = ColumnDescription(name='schi', unit=None, type=ColumnKind.ERROR)
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
 
     if options.fourierreal is not ... and options.fourierimaginary is not ...:
-        columndescriptor = parse_column_descriptor(options.fourierreal)
-        column = Column(name='fourierreal', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
-        columndescriptor = parse_column_descriptor(options.fourierimaginary)
-        column = Column(name='fourierimaginary', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fourierreal)
+        column = ColumnDescription(name='fourierreal', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
+        columnselector = parse_column_descriptor(options.fourierimaginary)
+        column = ColumnDescription(name='fourierimaginary', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     if options.fouriermagnitude is not ...:
-        columndescriptor = parse_column_descriptor(options.fouriermagnitude)
-        column = Column(name='fouriermagnitude', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fouriermagnitude)
+        column = ColumnDescription(name='fouriermagnitude', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
     if options.fourierphase is not ...:
-        columndescriptor = parse_column_descriptor(options.fourierphase)
-        column = Column(name='fourierphase', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fourierphase)
+        column = ColumnDescription(name='fourierphase', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     if options.fourierrealerror is not ...:
-        columndescriptor = parse_column_descriptor(options.fourierrealerror)
-        column = Column(name='fourierrealerror', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fourierrealerror)
+        column = ColumnDescription(name='fourierrealerror', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
     if options.fourierimaginaryerror is not ...:
-        columndescriptor = parse_column_descriptor(options.fourierimaginaryerror)
-        column = Column(name='fourierimaginaryerror', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fourierimaginaryerror)
+        column = ColumnDescription(name='fourierimaginaryerror', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     if options.fouriermagnitudeerror is not ...:
-        columndescriptor = parse_column_descriptor(options.fouriermagnitudeerror)
-        column = Column(name='fouriermagnitudeerror', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fouriermagnitudeerror)
+        column = ColumnDescription(name='fouriermagnitudeerror', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
     if options.fourierphaseerror is not ...:
-        columndescriptor = parse_column_descriptor(options.fourierphaseerror)
-        column = Column(name='fourierphaseerror', unit=None, type=ColumnType.TEMP)
-        cmd.columns.append((column, Domain.FOURIER, columndescriptor))
+        columnselector = parse_column_descriptor(options.fourierphaseerror)
+        column = ColumnDescription(name='fourierphaseerror', unit=None, type=ColumnKind.TEMP)
+        cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     # Setup all signals and relative functions
     match options.reciprocal_sample_signal_mode__:
         case 'calc_fluorescence':
             importer: Expr = lambda df: (df['If'] / df['I0']).rename('a')  # noqa: E731
-            column = Column(name='a', unit=None, type=ColumnType.DATA, calc=importer)
+            column = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA, deps=['If', 'I0'], calc=importer)
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_fluorescence':
             assert options.fluorescence is not ..., 'Invalid program state: #MPylXTU7xl'
-            columndescriptor = parse_column_descriptor(options.fluorescence)
-            column = Column(name='a', unit=None, type=ColumnType.DATA)
-            cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+            columnselector = parse_column_descriptor(options.fluorescence)
+            column = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA)
+            cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
         case 'calc_transmission':
             importer: Expr = lambda df: (np.log10(df['I0'] / df['I1'])).rename('a')  # type: ignore  # noqa: E731
-            column = Column(name='a', unit=None, type=ColumnType.DATA, calc=importer)
+            column = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA, deps=['I0', 'I1'], calc=importer)
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_transmission':
             assert options.transmission is not ..., 'Invalid program state: #qGBvcHeGhS'
-            columndescriptor = parse_column_descriptor(options.transmission)
-            column = Column(name='a', unit=None, type=ColumnType.DATA)
-            cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+            columnselector = parse_column_descriptor(options.transmission)
+            column = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA)
+            cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
         case _:
             assert False, 'Invalid program state: #k5Ay58oM6V'
 
     match options.reciprocal_reference_signal_mode__:
         case 'calc_referencetransmission':
             importer: Expr = lambda df: (np.log10(df['I1'] / df['I2'])).rename('ref')  # type: ignore  # noqa: E731
-            column = Column(name='ref', unit=None, type=ColumnType.DATA, calc=importer)
+            column = ColumnDescription(name='ref', unit=None, type=ColumnKind.DATA, deps=['I1','I2'], calc=importer)
             cmd.signals.append((column, Domain.RECIPROCAL, importer))
         case 'raw_referencetransmission':
             assert options.referencetransmission is not ..., 'Invalid program state: #Xvlkkp7Wyz'
-            columndescriptor = parse_column_descriptor(options.referencetransmission)
-            column = Column(name='ref', unit=None, type=ColumnType.DATA)
-            cmd.columns.append((column, Domain.RECIPROCAL, columndescriptor))
+            columnselector = parse_column_descriptor(options.referencetransmission)
+            column = ColumnDescription(name='ref', unit=None, type=ColumnKind.DATA)
+            cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
         case _:
             assert False, 'Invalid program state: #Cxcis9JxTS'
 
@@ -385,7 +385,7 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
     if options.fourierreal is not ... and options.fourierimaginary is not ...:
         # real/imaginary specified as pure columns. Calculate f = real + i*imaginary
         importer: Expr = lambda df: (df['fourierreal'] + 1j * df['fourierimaginary']).rename('f')  # noqa: E731
-        column = Column(name='fourier', unit=None, type=ColumnType.DATA, calc=importer)
+        column = ColumnDescription(name='fourier', unit=None, type=ColumnKind.DATA, deps=['fourierreal','fourierimaginary'], calc=importer)
         cmd.signals.append((column, Domain.FOURIER, importer))
     elif options.fouriermagnitude is not ... and options.fourierphase is not ...:
         # magnitude/phase specified as pure columns. Calculate f = magnitude * (cos(phase) + i * sin(phase))
@@ -393,7 +393,7 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
         importer: Expr = lambda df: (  # noqa: E731
             df['fouriermagnitude'] * (np.cos(df['fourierphase']) + 1j * np.sin(df['fourierphase']))
         ).rename('f')
-        column = Column(name='fourier', unit=None, type=ColumnType.DATA, calc=importer)
+        column = ColumnDescription(name='fourier', unit=None, type=ColumnKind.DATA, deps=['fouriermagnitude','fourierphase'], calc=importer)
         cmd.signals.append((column, Domain.FOURIER, importer))
 
     # TODO: fourier errors
@@ -694,7 +694,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                     raise CommandSyntaxError('The shift option requires a numeric argument.', o)
                 # Shift can only have eV as unit
                 if shift.unit is None:
-                    shift = Number(shift.value, Unit.EV)
+                    shift = Number(shift.sign, shift.value, Unit.EV)
                 elif shift.unit != Unit.EV:
                     raise CommandSyntaxError('The shift option only supports eV as unit.', o)
                 _assert_option_not_assigned_set(options, 'shift', t, o)
@@ -878,7 +878,7 @@ def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
 
 def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
     vars: dict[str, str | int | Number] = {
-        f'.f{i+1}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)
+        f'.f{i}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)
     }
     vars['.fn'] = file.name
     vars['.f'] = file.stem
@@ -958,28 +958,41 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             file_variables[var] = val
 
     # Get the specified columns and store them in their respective domains
-    extractedcolumns = Bag[Domain, tuple[Column, pd.Series]].from_iter(
+    extractedcolumns = Bag[Domain, tuple[ColumnDescription, pd.Series]].from_iter(
         (
             domain,
             (column, dat[expand_column_descriptor(descriptor, dat.columns.to_list())].mean(axis=1).rename(column.name)),
         )
         for column, domain, descriptor in command.columns
     )
-    signalcolumns = Bag[Domain, tuple[Column, Expr]].from_iter(
+    signalcolumns = Bag[Domain, tuple[ColumnDescription, Expr]].from_iter(
         (domain, (column, expr)) for column, domain, expr in command.signals
     )
 
     # Get data from extracted columns
-    newdata = {
-        domain: DataDomain([c for c, _ in columns], pd.DataFrame(c for _, c in columns).T)
-        for domain, columns in extractedcolumns.groups()
-    }
+    newdata:dict[Domain, DataDomain] = {}
+    for domain, columns in extractedcolumns.groups():
+        datadomain = DataDomain()
+
+        for column, data in columns:
+            datadomain.add_column_data(column.name, column, data)
+        
+        newdata[domain] = datadomain
+
+
+
+    # newdata = {
+    #     domain: DataDomain([c for c, _ in columns], pd.DataFrame(c for _, c in columns).T)
+    #     for domain, columns in extractedcolumns.groups()
+    # }
     # Compute and store the new signals in their respective domains
     for domain, newcolexps in signalcolumns.groups():
         if domain not in newdata:
             raise ExecutionError(f'Cannot compute signal in domain {domain} without any columns.')
-        newdata[domain].columns.extend(c for c, _ in newcolexps)
-        newdata[domain].data = newdata[domain].data.assign(**{c.name: e for c, e in newcolexps})  # type: ignore
+        for newcolexp, _ in newcolexps:
+            newdata[domain].add_column(newcolexp.name, newcolexp)
+        # newdata[domain].columns.extend(c for c, _ in newcolexps)
+        # newdata[domain].data = newdata[domain].data.assign(**{c.name: e for c, e in newcolexps})  # type: ignore
 
     return DataPage(
         FileMetadata(
@@ -991,30 +1004,18 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     )
 
 
-@dataclass(slots=True)
-class LocalContext_Filein(LocalContext):
-    ...
-
 
 @dataclass(slots=True)
-class Command_Filein(Command[CommandArguments_filein, LocalContext_Filein]):
+class Command_Filein(Command[CommandArguments_filein]):
     @classmethod
     def parse(cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
         options = get_filein_options(tokens, parsecontext)
         arguments = get_filein_command(options, parsecontext)
-        metadata = CommandMetadata(initialize_context=True, finalize_context=True, execution_context=True, execute_with='none')
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
-            meta=metadata,
         )
 
-    async def initialize(self, context: Context):
-        pass
-
-    async def finalize(self, context: Context) -> None:
-        pass
-
-    async def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> None:
         execute_filein_command(self.args, context)
