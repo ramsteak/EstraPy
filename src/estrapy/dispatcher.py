@@ -1,30 +1,17 @@
-import asyncio
-
-from typing import Sequence, Any
-
-from .grammar.transformer import Script, Command
-from .core.context import Context
+from typing import Literal, TypeAlias
 
 from .commands import execute_directive
+from .core.grammarclasses import Script
+from .core.context import Context
 
-async def execute_script_async(commands: Sequence[Command[Any, Any]], context: Context) -> None:
-    for command in commands:
-        await command.initialize(context)
-
-        if command.meta.execute_with == 'none':
-            await command.execute(context)
-        elif command.meta.execute_with == 'sequential':
-            for page in context.datastore.pages.keys():
-                await command.execute_on(page, context)
-        else:
-            raise NotImplementedError(f"Execution mode '{command.meta.execute_with}' is not implemented")
-
-        await command.finalize(context)
-
+SectionKind: TypeAlias = Literal['none', 'sequential', 'threads', 'processes']
 
 def execute_script(script: Script, context: Context) -> None:
     # Directives are fast, so we execute them sequentially. They are not performed per-file.
-    for directive in script.directives:
-        execute_directive(directive, context)
+    with context.timers.time('execution/directives'):
+        for directive in script.directives:
+            execute_directive(directive, context)
 
-    asyncio.run(execute_script_async(script.commands, context))
+    for command in script.commands:
+        with context.timers.time(f'execution/{command.name} (line {command.line})'):
+            command.execute(context)
