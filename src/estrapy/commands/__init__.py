@@ -1,15 +1,16 @@
 from lark import Token, Tree
-from ..core.grammarclasses import Directive, CommandArguments, Command, LocalContext
-from ..core.errors import CommandSyntaxError
-from ..core.number import parse_number
-from ..core.context import ParseContext
 
 from .directives import Directive_define, Directive_clear, execute_directive
-
 from .filein import Command_Filein
 from .align import Command_Align
 from .noise import Command_Noise
 from .preedge import Command_Preedge
+from .edge import Command_Edge
+
+from ..core.grammarclasses import Directive, CommandArguments, Command
+from ..core.errors import CommandSyntaxError
+from ..core.number import parse_number
+from ..core.context import ParseContext
 
 __all__ = [
     'parse_directive',
@@ -44,7 +45,7 @@ def parse_directive(directive: list[Token | Tree[Token]], parsecontext: ParseCon
             raise CommandSyntaxError('Invalid directive syntax')
 
 
-def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments, LocalContext]:
+def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments]:
     match command:
         # Command filein ---------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'filein') as t, *args]:
@@ -52,6 +53,9 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         # Command align ----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'align') as t, *args]:
             return Command_Align.parse(t, args, parsecontext)
+        # Command edge -----------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'edge') as t, *args]:
+            return Command_Edge.parse(t, args, parsecontext)
         # Command noise ----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'noise') as t, *args]:
             return Command_Noise.parse(t, args, parsecontext)
