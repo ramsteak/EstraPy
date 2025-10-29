@@ -130,6 +130,12 @@ class TimerCollection:
         does not exist, raises KeyError."""
         return self._timers[name].total
 
+    def new(self, name: str) -> Timer:
+        """Create a new stopwatch with the given name."""
+        for ancestor in self._ancestors(name):
+            self._timers.setdefault(ancestor, Timer())
+        return self._timers[name]
+
     def start(self, name: str, *, already_started_at: int | None = None):
         """Start the stopwatch with the given name. If the stopwatch does not
         exist, it is created.
@@ -175,7 +181,8 @@ class TimerCollection:
     def time(self, name: str) -> TimerContextManager:
         """Returns a context manager that starts the stopwatch with the given
         name when entering the context, and stops it when exiting."""
-        timer = self._timers.setdefault(name, Timer())
+        timer = self.new(name)
+        # timer = self._timers.setdefault(name, Timer())
         return TimerContextManager(timer)
 
     def table_format(self, unit: Literal['s', 'ms', 'us', 'ns'] = 's') -> str:
