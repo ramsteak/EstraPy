@@ -33,11 +33,6 @@ class Command_Edge(Command[CommandArguments_Edge]):
             args=arguments,
         )
 
-    def initialize(self, context: Context):
-        pass
-
     def execute_on(self, page: str, context: Context) -> None:
         ...  # Implement the execution logic for the 'edge' command here
     
-    def finalize(self, context: Context) -> None:
-        pass

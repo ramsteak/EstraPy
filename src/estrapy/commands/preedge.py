@@ -39,11 +39,5 @@ class Command_Preedge(Command[CommandArguments_Preedge]):
             args=arguments,
         )
     
-    def initialize(self, context: Context) -> None:
-        pass
-    
     def execute_on(self, page: str, context: Context) -> None:
-        pass
-
-    def finalize(self, context: Context) -> None:
         pass
