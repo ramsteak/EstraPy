@@ -1,7 +1,8 @@
 import re
+import numpy as np
 
 from enum import Enum
-from typing import NamedTuple
+from dataclasses import dataclass
 from unicodedata import normalize
 
 
@@ -25,8 +26,8 @@ def parse_unit(s: str) -> Unit | None:
         case _:
             return None
 
-
-class Number(NamedTuple):
+@dataclass(slots=True, frozen=True)
+class Number:
     sign: str | None
     value: float
     unit: Unit | None = None
@@ -62,12 +63,12 @@ def parse_range(min_s: str, max_s: str) -> tuple[Number, Number]:
     """Parse two strings into a tuple of Number objects representing a range.
     To specify an open-ended range, use '..' as min_s or max_s."""
     if min_s == '..':
-        min_num = Number(None, float('-inf'))
+        min_num = Number(None, -np.inf, None)
     else:
         min_num = parse_number(min_s)
     
     if max_s == '..':
-        max_num = Number(None, float('inf'))
+        max_num = Number(None, np.inf, None)
     else:
         max_num = parse_number(max_s)
     
