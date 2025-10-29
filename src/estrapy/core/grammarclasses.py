@@ -1,9 +1,9 @@
 from typing import NamedTuple
 from lark import Token, Tree
 from dataclasses import dataclass
-from typing import Self, Generic, TypeVar, Any, Literal
+from typing import Self, Generic, TypeVar, Any
 
-from .context import ParseContext, Context, LocalContext
+from .context import ParseContext, Context
 
 @dataclass(slots=True)
 class Directive: ...
@@ -27,40 +27,24 @@ class CommandArguments: ...
 # A command that has finalize set to True requires the full context during finalization.
 # Commands that have execution set to True require the full context during execution
 #    e.g. align shift
-@dataclass(slots=True)
-class CommandMetadata:
-    initialize_context: bool
-    finalize_context: bool
-    execution_context: bool
-    execute_with: Literal['none', 'sequential', 'threads', 'processes'] = 'sequential'
 
 _A = TypeVar('_A', bound=CommandArguments, covariant=True)
-_L = TypeVar('_L', bound=LocalContext, covariant=True)
 
 @dataclass(slots=True)
-class Command(Generic[_A, _L]):
+class Command(Generic[_A]):
     line: int
     name: str
     args: _A
-    meta: CommandMetadata
-    local: _L | None = None
 
     @classmethod
     def parse(cls, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self:
         ...
 
-    async def initialize(self, context: Context):
-        ...
-    async def finalize(self, context: Context) -> None:
-        ...
-
-    async def execute(self, context: Context) -> None:
-        ...
-    async def execute_on(self, page: str, context: Context) -> None:
+    def execute(self, context: Context) -> None:
         ...
     
 
 
 class Script(NamedTuple):
     directives: list[Directive]
-    commands: list[Command[Any, Any]]
+    commands: list[Command[Any]]
