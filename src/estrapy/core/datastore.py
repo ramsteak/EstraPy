@@ -1,4 +1,5 @@
 import pandas as pd
+from numpy import typing as npt
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -64,18 +65,22 @@ class DataDomain:
         data = column.calc(self.data.loc[:, resolved_deps].rename(columns=dict(zip(resolved_deps, column.deps))))
         self.add_column_data(name, column, data)
 
-    def add_column_data(self, name: str, column: ColumnDescription, data: pd.Series) -> None:
+    def add_column_data(self, name: str, column: ColumnDescription | None, data: pd.Series | npt.ArrayLike) -> None:
         """Adds a column to the domain, ignoring the calc attribute of the column
         (i.e. expensive calculations that are already done)."""
-        # Ensure that, if the column name already exists, unit matches
-        if name in self.columns:
-            for ecol in self.columns[name]:
-                if ecol.desc.unit != column.unit:
-                    raise ValueError(
-                        f"Column '{name}' already exists with different unit ({ecol.desc.unit} != {column.unit})."
-                    )
+        # Ensure that, if the column name already exists, unit matches.
+        # If column is None, use the previous column description, without deps and calc.
+        if column is None:
+            column = self.columns[name][-1].desc.__replace__(deps=[], calc=None)
         else:
-            self.columns[name] = []
+            if name in self.columns:
+                for ecol in self.columns[name]:
+                    if ecol.desc.unit != column.unit:
+                        raise ValueError(
+                            f"Column '{name}' already exists with different unit ({ecol.desc.unit} != {column.unit})."
+                        )
+            else:
+                self.columns[name] = []
 
         # Resolve dependencies
         resolved_deps = self._resolve_columns(column.deps)
@@ -136,6 +141,10 @@ class FileMetadata:
             setattr(self, key, value)
         else:
             self._dict[key] = value
+    
+    def __contains__(self, key: str) -> bool:
+        """Check if a metadata key exists. Also check if the key is an attribute of the class."""
+        return hasattr(self, key) or key in self._dict
 
 
 @dataclass(slots=True)
