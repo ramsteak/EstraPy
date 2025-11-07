@@ -796,7 +796,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
 
 
 def execute_filein_command(command: CommandArguments_filein, context: Context) -> None:
-    log = context.logger.getChild('filein')
+    log = context.logger.getChild('command.filein')
     with context.timers.time('execution/filein'):
         # Get filename list from the given folder and filenames
         directory = command.directory or context.paths.workingdir
@@ -854,7 +854,7 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
     # Store imported files in the context
     context.datastore.pages.update({df.meta.name: df for df in imported_files})  # to check the error
     _total_size = sum(f.meta['.fs'] for f in imported_files)
-    log.debug(
+    log.info(
         f"Imported {len(imported_files)} files in {context.timers.get_ms('execution/filein'):0.2f} ms ({fmt.human(_total_size, "B", format="0.1f", order=1024)})."
     )
 
