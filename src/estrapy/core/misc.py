@@ -1,13 +1,8 @@
-import re
-
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
 from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence
 from collections import deque
-
-from .number import Number, parse_number, Unit
-from .edges import edges
 
 _K = TypeVar('_K')
 _V = TypeVar('_V')
@@ -201,6 +196,7 @@ class fmt(StaticUtility):
         def poly(
             p: Sequence[float],
             *,
+            floatfmt: str='',
             sep: str = ' ',
             var: str = 'x',
             order: Literal[-1, +1] = 1,
@@ -208,7 +204,7 @@ class fmt(StaticUtility):
         ) -> str:
             """Convert a list of polynomial coefficients to a human-readable string."""
             coeff = list(enumerate(p)) if poly_order > 0 else list(enumerate(reversed(p)))
-            pieces = [f'{a}{var}{fmt.sup(e)}' for e, a in coeff]
+            pieces = [f'{format(a, floatfmt)}{var}{fmt.sup(e)}' for e, a in coeff]
             return sep.join(pieces if order > 0 else reversed(pieces))
 
     class sub:
@@ -295,43 +291,6 @@ class fmt(StaticUtility):
                 lines.append('|' + '|'.join('-' * col_widths[j] for j in range(len(row))) + '|')
         return '\n'.join(lines)
 
-
-def parse_edge(edge: str) -> Number:
-    """Parse an edge string and return the energy edge in eV.
-    The edge string can be shifted by a number.
-    Examples:
-        - Pd.K -> K edge of Pd
-        - Fe.L3+10eV -> L3 edge of Fe shifted by +10 eV
-        - Cu.M5-5eV -> M5 edge of Cu shifted by -5 eV
-    """
-    try:
-        return parse_number(edge)
-    except ValueError:
-        m = re.match(r'^([A-Za-z]+)(?:\.([A-Za-z0-9+]+))(.*)', edge)
-        if m is None:
-            raise ValueError(f"Invalid edge format: '{edge}'")
-
-        element, edge, shift = m.groups()
-        if shift != '':
-            shift = parse_number(shift)
-            if shift.unit not in (None, Unit.EV):
-                raise ValueError('Edge shift must be in eV.')
-            shift = shift.value
-        else:
-            shift = 0.0
-
-        edgename = f'{element}.{edge}'
-        if edgename in edges:
-            return Number(None, edges[edgename] + shift, Unit.EV)
-
-        # Use xraydb to get the edge energy if everything else fails
-        from xraydb import xray_edge  # type: ignore
-
-        try:
-            edge_energy: float = xray_edge(element, edge).energy  # type: ignore
-            return Number(edge_energy + shift, Unit.EV)  # type: ignore
-        except ValueError:
-            raise ValueError(f"Invalid element or edge: '{element}.{edge}'")
 
 
 _T = TypeVar('_T')
@@ -426,3 +385,46 @@ class peekable(Iterator[_T], Generic[_T]):
         """Close the underlying iterator if it has a close method."""
         if hasattr(self._iterator, 'close'):
             self._iterator.close()  # type: ignore
+
+
+def fuzzy_match(string: str, options: Iterable[str], /) -> str | None:
+    """Perform a fuzzy match of a string against a list of options. Returns the best matching option.
+    The matching is case-insensitive, ignores underscores, hyphens and spaces.
+    
+    In order to match, a string must not contain any character that is not in the option,
+    and the characters must appear in the same order.
+
+    >>> options = ['fouriertransform', 'background', 'postedge']
+    >>> target = 'fou-tran'
+    >>> fuzzy_match(target, options)
+    'fouriertransform'
+
+    """
+    
+    _options = {o.casefold(): o for o in list(options)}
+    target = string.casefold()
+
+    if target in _options:
+        return _options[target]
+    
+    scores: dict[str, float] = {}
+    for option in _options:
+        idxs: list[int] = []
+        for char in target:
+            pos = option.find(char, idxs[-1] + 1 if idxs else 0)
+            if pos == -1:
+                idxs.clear()
+                break
+            idxs.append(pos)
+
+        if not idxs:
+            continue
+        scores[option] = sum([
+            idxs[0],
+            sum(a-b-1 for a,b in zip(idxs[1:], idxs[:-1])),
+            1-1/(len(option))
+        ])
+    
+    if not scores:
+        return None
+    return _options[min(scores, key=scores.get)] # type: ignore
