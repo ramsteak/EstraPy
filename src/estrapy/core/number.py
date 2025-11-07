@@ -5,6 +5,8 @@ from enum import Enum
 from dataclasses import dataclass
 from unicodedata import normalize
 
+from .edges import edges
+
 
 class Unit(Enum):
     EV = 'eV'
@@ -34,10 +36,11 @@ class Number:
     unit: Unit | None = None
 
     def __format__(self, format_spec: str) -> str:
-        return f"{self.value:{format_spec}}{self.unit.value if self.unit else ''}"
+        return f"{self.sign if self.sign == '+' else ''}{self.value:{format_spec}}{self.unit.value if self.unit else ''}"
 
     def __str__(self) -> str:
-        return f"{self.value}{self.unit.value if self.unit else ''}"
+        # Add '+' sign for positive numbers. Negative numbers already have '-' sign in str(self.value)
+        return f"{self.sign if self.sign == '+' else ''}{self.value}{self.unit.value if self.unit else ''}"
 
 
 def parse_number(s: str) -> Number:
@@ -60,6 +63,51 @@ def parse_number(s: str) -> Number:
 
     return Number(sgn_str, num, unit)
 
+def try_parse_number(s: str) -> Number | str:
+    """Try to parse a string into a Number object. If parsing fails, return the original string."""
+    try:
+        return parse_number(s)
+    except ValueError:
+        return s
+
+
+def parse_edge(edge: str) -> Number:
+    """Parse an edge string and return the energy edge in eV.
+    The edge string can be shifted by a number.
+    Examples:
+        - Pd.K -> K edge of Pd
+        - Fe.L3+10eV -> L3 edge of Fe shifted by +10 eV
+        - Cu.M5-5eV -> M5 edge of Cu shifted by -5 eV
+    """
+    try:
+        return parse_number(edge)
+    except ValueError:
+        m = re.match(r'^([A-Za-z]+)(?:\.([A-Za-z0-9]+))([+-].*)?', edge)
+        if m is None:
+            raise ValueError(f"Invalid edge format: '{edge}'")
+
+        element, edge, shift = m.groups()
+        if shift is not None:
+            shift = parse_number(shift)
+            if shift.unit not in (None, Unit.EV):
+                raise ValueError('Edge shift must be in eV.')
+            shift = shift.value
+        else:
+            shift = 0.0
+
+        edgename = f'{element}.{edge}'
+        if edgename in edges:
+            return Number(None, edges[edgename] + shift, Unit.EV)
+
+        # Use xraydb to get the edge energy if everything else fails
+        from xraydb import xray_edge  # type: ignore
+
+        try:
+            edge_energy: float = xray_edge(element, edge).energy  # type: ignore
+            return Number(edge_energy + shift, Unit.EV)  # type: ignore
+        except ValueError:
+            raise ValueError(f"Invalid element or edge: '{element}.{edge}'")
+
 
 def parse_range(min_s: str, max_s: str) -> tuple[Number, Number]:
     """Parse two strings into a tuple of Number objects representing a range.
@@ -67,12 +115,12 @@ def parse_range(min_s: str, max_s: str) -> tuple[Number, Number]:
     if min_s == '..':
         min_num = Number(None, -np.inf, None)
     else:
-        min_num = parse_number(min_s)
+        min_num = parse_edge(min_s)
 
     if max_s == '..':
         max_num = Number(None, np.inf, None)
     else:
-        max_num = parse_number(max_s)
+        max_num = parse_edge(max_s)
 
     if min_num.value > max_num.value:
         raise ValueError(f"Invalid range: minimum '{min_s}' is greater than maximum '{max_s}'.")
