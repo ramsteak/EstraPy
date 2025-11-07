@@ -66,6 +66,10 @@ class Context:
     # DataStore object containing all loaded data files.
     datastore: DataStore = field(default_factory=DataStore)
 
+    # overwrite __repr__ to avoid printing the entire context in debug logs
+    def __repr__(self) -> str:
+        return f'Context(projectname={self.projectname}, paths={self.paths}, options={self.options}, ...)'
+
 
 @dataclass(slots=True)
 class ParseContext:
