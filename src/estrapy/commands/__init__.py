@@ -3,9 +3,14 @@ from lark import Token, Tree
 from .directives import Directive_define, Directive_clear, execute_directive
 from .filein import Command_Filein
 from .align import Command_Align
+from .edge import Command_Edge
 from .noise import Command_Noise
 from .preedge import Command_Preedge
-from .edge import Command_Edge
+from .postedge import Command_Postedge
+from .normalize import Command_Normalize
+from .background import Command_Background
+from .fourier import Command_Fourier
+from .fit import Command_Fit
 
 from ..core.grammarclasses import Directive, CommandArguments, Command
 from ..core.errors import CommandSyntaxError
@@ -62,6 +67,21 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         # Command preedge --------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'preedge') as t, *args]:
             return Command_Preedge.parse(t, args, parsecontext)
+        # Command postedge -------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'postedge') as t, *args]:
+            return Command_Postedge.parse(t, args, parsecontext)
+        # Command normalize ------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'normalize') as t, *args]:
+            return Command_Normalize.parse(t, args, parsecontext)
+        # Command background ------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'background') as t, *args]:
+            return Command_Background.parse(t, args, parsecontext)
+        # Command fourier --------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'fourier') as t, *args]:
+            return Command_Fourier.parse(t, args, parsecontext)
+        # Command fit ------------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'fit') as t, *args]:
+            return Command_Fit.parse(t, args, parsecontext)
         # Unknown command --------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as c, *args]:
             raise CommandSyntaxError(f"Unknown command '{name}'", c)
