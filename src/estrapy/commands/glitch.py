@@ -181,11 +181,14 @@ class Deglitch(CommandHandler):
                 case Finder_Force():
                     g[:] = idx
                 case Finder_Variance(width, pvalue):
-                    # Estimate the std as median of stds
-                    std = pd.Series(i,x).rolling(len(X) // width, center=True).std().median()
+                    # Estimate the std as median of stds if there are enough points
+                    if len(x) // width < 4:
+                        std = pd.Series(i,x).std()
+                    else:
+                        std = pd.Series(i,x).rolling(len(x) // width, center=True).std().median()
                     u = norm.ppf(1-pvalue/2) * std
 
-                    g[idx] = np.abs(i) > u
+                    g[idx] = np.abs(i - np.mean(i)) > u
                 case Finder_Smooth(width, fraction, pvalue):
                     # Assume I0 is represented by a low frequency trend
                     #    I0 = I0' + eps
@@ -194,7 +197,10 @@ class Deglitch(CommandHandler):
                     y = i-b
 
                     # Estimate the std as median of stds
-                    std = pd.Series(y,x).rolling(len(X) // width, center=True).std().median()
+                    if len(x) // width < 4:
+                        std = pd.Series(y,x).std()
+                    else:
+                        std = pd.Series(y,x).rolling(len(x) // width, center=True).std().median()
                     u = norm.ppf(1-pvalue/2) * std
                     g[idx] = np.abs(y) > u
                     pass
@@ -206,7 +212,10 @@ class Deglitch(CommandHandler):
                     b = poly(x)
                     y = i-b
                     # Estimate the std as median of stds
-                    std = pd.Series(y,x).rolling(len(X) // width, center=True).std().median()
+                    if len(x) // width < 4:
+                        std = pd.Series(y,x).std()
+                    else:
+                        std = pd.Series(y,x).rolling(len(x) // width, center=True).std().median()
                     u = norm.ppf(1-pvalue/2) * std
 
                     g[idx] = np.abs(y) > u
@@ -225,7 +234,10 @@ class Deglitch(CommandHandler):
                     y = i - ii
                     b = ii
                     # Estimate the std as median of stds
-                    std = pd.Series(y,x).rolling(len(X) // 10, center=True).std().median()
+                    if len(x) // 10 < 4:
+                        std = pd.Series(y,x).std()
+                    else:
+                        std = pd.Series(y,x).rolling(len(x) // 10, center=True).std().median()
                     u = norm.ppf(1-pvalue/2) * std
                     g[idx] = np.abs(y) > u
             

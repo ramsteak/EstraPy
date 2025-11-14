@@ -47,7 +47,7 @@ def main():
     parser.add_argument(
         "--no-cache", action="store_true", help="Does not read or store from the cache."
     )
-    parser.add_argument("--vars", nargs="+", help="Sets runtime variables, accessed as %1% or ${1} in the input file.")
+    parser.add_argument("--vars", nargs="+", help="Sets runtime variables, accessed as TODO") # TODO fix here
 
     args = parser.parse_args()
 
