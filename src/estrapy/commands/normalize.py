@@ -18,7 +18,7 @@ parse_normalize_command.add_argument('factor', '--factor', type=try_parse_number
 
 
 @dataclass(slots=True)
-class Command_Normalize(Command[CommandArguments_Normalize]):
+class Command_Normalize(Command[CommandArguments_Normalize, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext

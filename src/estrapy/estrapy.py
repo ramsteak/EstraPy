@@ -45,7 +45,7 @@ def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.L
         log_file.parent.mkdir(parents=True, exist_ok=True)
 
         file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
-        file_handler.setLevel(log_level)
+        file_handler.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter('[%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         file_handler.setFormatter(file_formatter)
         handlers.append(file_handler)
@@ -61,7 +61,7 @@ def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.L
     handlers.append(console_handler)
 
     logger = logging.getLogger('estrapy')
-    logger.setLevel(log_level)
+    logger.setLevel(logging.DEBUG)
     for handler in handlers:
         logger.addHandler(handler)
 
@@ -291,7 +291,8 @@ def entry_point() -> None:
     try:
         main()
     except Exception as e:
-        if logging.getLogger('estrapy').isEnabledFor(logging.DEBUG):
+        hw = logging.getLogger('estrapy').handlers
+        if all(h.level == logging.DEBUG for h in hw):
             import traceback
 
             traceback.print_exc()

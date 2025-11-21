@@ -41,6 +41,22 @@ class CollectionDict(Collection[_K], Generic[_K, _V, _C], ABC):
         if key not in self._data:
             self._data[key] = self._make_container()
         self._add_value_to_container(self._data[key], value)
+    
+    def add_empty(self, key: _K) -> None:
+        """Ensure that the key exists in the collection dict with an empty container."""
+        if key not in self._data:
+            self._data[key] = self._make_container()
+    
+    def remove_empty(self, key: _K) -> None:
+        """Remove the key from the collection dict if its container is empty."""
+        if key in self._data and not self._data[key]:
+            del self._data[key]
+    
+    def cull_empty(self) -> None:
+        """Remove all keys from the collection dict whose containers are empty."""
+        keys_to_remove = [k for k, v in self._data.items() if not v]
+        for k in keys_to_remove:
+            del self._data[k]
 
     @abstractmethod
     def _add_value_to_container(self, container: _C, value: _V) -> None:

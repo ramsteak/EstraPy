@@ -38,7 +38,7 @@ parse_postedge_command.add_argument(None, '--k-axis', '-k', action='store_const'
 parse_postedge_command.add_argument('kweight', '--kweight', type=float, default=0)
 
 @dataclass(slots=True)
-class Command_Postedge(Command[CommandArguments_Postedge]):
+class Command_Postedge(Command[CommandArguments_Postedge, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
@@ -62,7 +62,7 @@ class Command_Postedge(Command[CommandArguments_Postedge]):
 
             match self.args.range[0]:
                 case Number(sign=None, value=value, unit=_) if value == -np.inf:
-                    idx_l = np.full(len(df), True)
+                    idx_l = np.full(len(df), True, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_l = df['E'] >= val
                 case Number(sign=_, value=val, unit=Unit.EV):
@@ -73,7 +73,7 @@ class Command_Postedge(Command[CommandArguments_Postedge]):
                     raise ValueError(f'Invalid range start "{self.args.range[0]}" for postedge correction.')
             match self.args.range[1]:
                 case Number(sign=None, value=value, unit=_) if value == np.inf:
-                    idx_u = np.full(len(df), True)
+                    idx_u = np.full(len(df), True , dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_u = df['E'] <= val
                 case Number(sign=_, value=val, unit=Unit.EV):

@@ -136,9 +136,10 @@ def fourier(
 ) -> npt.NDArray[np.complexfloating]:
     dx = np.diff(x)
     yl, yr = y[:-1] * dx, y[1:] * dx
-    result = np.zeros(len(r), dtype=np.complex128)
+    nr = len(r)
+    result = np.zeros(nr, dtype=np.complex128)
     
-    for j in prange(len(r)):
+    for j in prange(nr):
         real, imag = 0.0, 0.0
         for i in range(len(x) - 1):
             FTl = 2 * x[i] * r[j]

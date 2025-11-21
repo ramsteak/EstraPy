@@ -5,11 +5,8 @@ import re
 from typing import Any
 from pathlib import Path
 
-from ..core.fitmodel import Variable, Phase, ExafsModel, validate_model
+from ..core.fit.fitmodel import VariableSpec, PhaseSpec, ExafsModelSpecification
 from ..core.misc import peekable
-
-
-legacyfile = "C:/Users/Marco/Desktop/Dottore/1Anno/2025-10-03-Analisi_peirong/analisi/16_Pd.PdO.PdSSZ_run9_ex/fitexa_abc_param.inp"
 
 re_varline = re.compile(r"^\s*(\d+)\'\s*(\w+)\s*\'\s*([\d\.\-e\+]+)\s+([\d\.\-e\+]+)(?:\s+([\d\.\-e\+]+)\s+([\d\.\-e\+]+))?\s*$")
 
@@ -130,7 +127,7 @@ def _parse_all_phases_block(lines: peekable[str], numphases: int) -> list[dict[s
         phases.append(phase)
     return phases
 
-def _resolve_var_reference(ref: str | int | tuple[int, float], variables: dict[int, Variable]) -> str:
+def _resolve_var_reference(ref: str | int | tuple[int, float], variables: dict[int, VariableSpec]) -> str:
     """Resolve variable reference (or calculation) to variable name or expression string."""
     match ref:
         case str(calc):
@@ -153,7 +150,7 @@ def _resolve_var_reference(ref: str | int | tuple[int, float], variables: dict[i
         case _:
             raise ValueError(f"Invalid variable reference: {ref}")
 
-def load_model_from_legacy(path: Path) -> ExafsModel:
+def load_model_from_legacy(path: Path) -> ExafsModelSpecification:
     # The file follows a fixed rigid structure (in this comment, lines starting with ! are descriptive):
     # *** comment line (maybe optional)
     #! start of the variable block, can be variable in length
@@ -199,8 +196,8 @@ def load_model_from_legacy(path: Path) -> ExafsModel:
     _fitp = _parse_fitp_block(lines)
     _phss = _parse_all_phases_block(lines, numphases = _fitp['num_phases'])
 
-    variables:dict[int, Variable] = {
-        varnum:Variable(
+    variables:dict[int, VariableSpec] = {
+        varnum:VariableSpec(
             name=varname,
             initial=init,
             step=step,
@@ -208,7 +205,7 @@ def load_model_from_legacy(path: Path) -> ExafsModel:
             fix=(step == 0.0)
     ) for varnum, varname, init, step, lower, upper in _vars}
 
-    phases = [Phase(
+    phases = [PhaseSpec(
         name = f"phase{i+1}",
         position = Path(p['feff_path']),
         N = _resolve_var_reference(p['multiplicity'], variables),
@@ -220,13 +217,13 @@ def load_model_from_legacy(path: Path) -> ExafsModel:
     )
               for i,p in enumerate(_phss)]
     # Convert parsed data into new model structure
-    model = ExafsModel(
+    model = ExafsModelSpecification(
         kind = 'feff',
         phasesroot = path.parent,
         variables = list(variables.values()),
         phases = phases,
+        modelfile = path,
     )
-    validate_model(path, model)
 
     with open(Path(path).with_suffix('.estramodel'), 'w') as f:
         yaml.safe_dump(model.to_dict(), f, indent=4, encoding='utf-8', allow_unicode=True)

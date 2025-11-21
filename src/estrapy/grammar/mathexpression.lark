@@ -1,0 +1,46 @@
+?start: comp
+
+?comp: compchain
+     | arith
+
+compchain: arith comp_op arith                                  -> compchain1
+         | arith comp_op arith comp_op arith  -> compchain2
+
+comp_op: "=="  -> eq
+       | "!="  -> ne
+       | "<"   -> lt
+       | "<="  -> le
+       | ">"   -> gt
+       | ">="  -> ge
+
+
+?arith: adnd
+
+?adnd: term
+     | adnd "+" term   -> add
+     | adnd "-" term   -> sub
+
+?term: factor
+     | term "*" factor -> mul
+     | term "/" factor -> div
+
+?factor: power
+       | "-" factor    -> neg
+
+?power: atom
+      | atom "^" power -> pow
+      | atom "**" power -> pow
+
+?atom: NUMBER           -> number
+     | CNAME            -> var
+     | func
+     | "(" arith ")"
+
+?func: CNAME "(" [args] ")"
+
+?args: arith ("," arith)*
+
+%import common.CNAME
+%import common.NUMBER
+%import common.WS_INLINE
+%ignore WS_INLINE

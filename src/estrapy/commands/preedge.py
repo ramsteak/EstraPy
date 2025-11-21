@@ -28,7 +28,7 @@ parse_preedge_command.add_argument(None, '--cubic', '-c', action='store_const', 
 
 
 @dataclass(slots=True)
-class Command_Preedge(Command[CommandArguments_Preedge]):
+class Command_Preedge(Command[CommandArguments_Preedge, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
@@ -48,6 +48,8 @@ class Command_Preedge(Command[CommandArguments_Preedge]):
             # TODO: Check that the columns exist and (if needed) E0 is set
             df = domain.get_columns_data(['E', 'e', 'a'])
             match self.args.range[0]:
+                case Number(sign=None, value=val, unit=_) if val == -np.inf:
+                    idx_l = np.full(len(df), True, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_l = df['E'] >= val
                 case Number(sign=_, value=val, unit=Unit.EV):
@@ -55,8 +57,10 @@ class Command_Preedge(Command[CommandArguments_Preedge]):
                 case Number(sign=_, value=val, unit=Unit.K):
                     idx_l = df['k'] >= val
                 case _:
-                    raise ValueError(f'Invalid range start "{self.args.range[0]}" for postedge correction.')
+                    raise ValueError(f'Invalid range start "{self.args.range[0]}" for preedge correction.')
             match self.args.range[1]:
+                case Number(sign=None, value=val, unit=_) if val == np.inf:
+                    idx_u = np.full(len(df), True, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_u = df['E'] <= val
                 case Number(sign=_, value=val, unit=Unit.EV):
@@ -64,7 +68,7 @@ class Command_Preedge(Command[CommandArguments_Preedge]):
                 case Number(sign=_, value=val, unit=Unit.K):
                     idx_u = df['k'] <= val
                 case _:
-                    raise ValueError(f'Invalid range end "{self.args.range[1]}" for postedge correction.')
+                    raise ValueError(f'Invalid range end "{self.args.range[1]}" for preedge correction.')
             
             _region = df[idx_l & idx_u]
             poly = np.polyfit(_region['e'], _region['a'], deg=self.args.degree)

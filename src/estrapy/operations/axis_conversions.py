@@ -11,10 +11,39 @@ _N = TypeVar('_N', bound=npt.ArrayLike)
 # Conversion functions between energy (E) and wave vector (k).
 # k is allowed to be negative to represent direction; physically, k is always
 # non-negative and negative values should be culled.
+
+def rt(v: _N) -> _N:
+    """Square root function that preserves the sign of the input."""
+    # this implementation is faster for small arrays (200 < size < 40_000)
+    return np.sign(v) * np.sqrt(np.abs(v)) # type: ignore
+    # this implementation is faster for large arrays (size > 40_000) (and oddly enough very small arrays with size < 200)
+    # out = np.abs(v)
+    # np.sqrt(out, out=out)
+    # np.copysign(out, v, out=out)
+    # return out  # type: ignore
+
+def sq(v: _N) -> _N:
+    """Square function that preserves the sign of the input."""
+    # This implementation is always faster
+    out = np.abs(v)
+    out *= v
+    return out # type: ignore
+
 def E_to_k(v: _N, E0: float) -> _N:
-    return SCONST * np.sqrt(np.abs(v - E0)) * np.sign(v-E0) # type: ignore
+    """Convert energy E to k given energy shift E0."""
+    return SCONST * rt(v - E0) # type: ignore
+
 def k_to_E(v: _N, E0: float) -> _N:
-    return KICNST * np.sign(v) * v**2 + E0  # type: ignore
+    """Convert k to energy E given energy shift E0."""
+    return KICNST * sq(v) + E0  # type: ignore
+
+def k_to_k1(v: _N, de: float) -> _N:
+    """Convert k to shifted k1 given energy shift de.
+    Positive de shifts E1 to a lower value."""
+    tmp = sq(v)
+    tmp += de * KCONST # type: ignore
+    return rt(tmp) # type: ignore
+
 
 class Nyquist:
     @staticmethod

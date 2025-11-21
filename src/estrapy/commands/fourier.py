@@ -35,7 +35,7 @@ parse_fourier_command.add_argument('apodizerp', '--parameter', '-p', type=float,
 
 
 @dataclass(slots=True)
-class Command_Fourier(Command[CommandArguments_Fourier]):
+class Command_Fourier(Command[CommandArguments_Fourier, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext

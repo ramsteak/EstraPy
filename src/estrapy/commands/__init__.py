@@ -11,8 +11,10 @@ from .normalize import Command_Normalize
 from .background import Command_Background
 from .fourier import Command_Fourier
 from .fit import Command_Fit
+from .save import Command_Save
+from .cut import Command_Cut
 
-from ..core.grammarclasses import Directive, CommandArguments, Command
+from ..core.grammarclasses import Directive, CommandArguments, Command, CommandResult
 from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
 from ..core.context import ParseContext
@@ -50,7 +52,7 @@ def parse_directive(directive: list[Token | Tree[Token]], parsecontext: ParseCon
             raise CommandSyntaxError('Invalid directive syntax')
 
 
-def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments]:
+def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext) -> Command[CommandArguments, CommandResult]:
     match command:
         # Command filein ---------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'filein') as t, *args]:
@@ -82,6 +84,12 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         # Command fit ------------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'fit') as t, *args]:
             return Command_Fit.parse(t, args, parsecontext)
+        # Command save -----------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'save') as t, *args]:
+            return Command_Save.parse(t, args, parsecontext)
+        # Command cut ------------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'cut') as t, *args]:
+            return Command_Cut.parse(t, args, parsecontext)
         # Unknown command --------------------------------------------------------------------------
         case [Token('COMMANDNAME', str(name)) as c, *args]:
             raise CommandSyntaxError(f"Unknown command '{name}'", c)

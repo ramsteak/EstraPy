@@ -26,7 +26,7 @@ parse_noise_command.add_argument('y', '--yaxiscol', type=str, default='a')
 
 
 @dataclass(slots=True)
-class Command_Noise(Command[CommandArguments_Noise]):
+class Command_Noise(Command[CommandArguments_Noise, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext

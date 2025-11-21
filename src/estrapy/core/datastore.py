@@ -125,6 +125,7 @@ class DataDomain:
 class FileMetadata:
     path: Path
     name: str
+    header: str
     _dict: dict[str, Any] = field(default_factory=dict[str, Any])
 
     def __getitem__(self, key: str) -> Any:

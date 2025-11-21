@@ -13,9 +13,8 @@ from ..grammar.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, Unit
 from ..operations.fourier import apodizer_functions
 from ..core.misc import fuzzy_match
-from ..core.fitmodel import ExafsModel, load_model_from_yaml
-
-
+from ..core.fit.fitmodel import ExafsModel
+from ..core.datastore import Domain
 
 @dataclass(slots=True)
 class CommandArguments_Fit(CommandArguments):
@@ -26,7 +25,7 @@ class CommandArguments_Fit(CommandArguments):
     apodizer: str
     apodizerp: float
 
-    # to be filled after parsing. If none after parsing, raise error.
+    # to be filled after parsing. If still None after parsing, raise error.
     model: ExafsModel = None  # type: ignore
 
 parse_fit_command = CommandArgumentParser(CommandArguments_Fit)
@@ -41,14 +40,14 @@ parse_fit_command.add_argument('apodizerp', '--parameter', '-p', type=float, req
 
 
 @dataclass(slots=True)
-class Command_Fit(Command[CommandArguments_Fit]):
+class Command_Fit(Command[CommandArguments_Fit, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
         arguments = parse_fit_command(commandtoken, tokens, parsecontext)
 
-        # Validate parameters
+        # Validate parameters --------------------------------------------------------------
         if arguments.krange[0].unit != Unit.K or arguments.krange[1].unit != Unit.K:
             raise ValueError('Fit krange must be specified in k units.')
         if arguments.krange[0].value < 0.0:
@@ -70,17 +69,11 @@ class Command_Fit(Command[CommandArguments_Fit]):
             else:
                 raise ValueError(f"Unknown apodizer function '{arguments.apodizer}'. Available options are: {', '.join(apodizer_functions)}.")
 
-        # Resolve and read model
+        # Resolve and read model ---------------------------------------------------------------
         if not arguments.modelpath.is_absolute():
             arguments.modelpath = (parsecontext.paths.workingdir / arguments.modelpath).resolve()
         
-        try:
-            _, model = load_model_from_yaml(arguments.modelpath)
-            # TODO check version
-        except ValueError:
-            from ..legacy.model import load_model_from_legacy
-            model = load_model_from_legacy(arguments.modelpath)
-
+        model = ExafsModel.load(arguments.modelpath)
         arguments.model = model
 
         return cls(
@@ -90,4 +83,15 @@ class Command_Fit(Command[CommandArguments_Fit]):
         )
 
     def execute(self, context: Context) -> None:
-        pass
+        log = context.logger.getChild('command.fit')
+        log.info(f'Fitting model from {self.args.modelpath}')
+        
+        for name, page in context.datastore.pages.items():
+            log.debug(f'Fitting page: {name}')
+            domain = page.domains[Domain.RECIPROCAL]
+            krange = (
+                self.args.krange[0].value,
+                self.args.krange[1].value
+            )
+            df = domain.get_columns_data(['k', 'chi'])
+            self.args.model.fit_k(df['k'].to_numpy(), df['chi'].to_numpy(), krange, self.args.kweight)

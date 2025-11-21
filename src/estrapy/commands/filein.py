@@ -58,7 +58,7 @@ class CommandArguments_filein(CommandArguments):
     directory: Path
 
     # Variable to sort the data by
-    sortby: str
+    sortby: list[str]
 
     # Variables to be defined on the imported data
     vars: dict[str, str | Number | int] = field(default_factory=dict[str, str | Number | int])
@@ -112,6 +112,10 @@ class FileInOptions:
     xanes: Token | EllipsisType = ...
     # --exafs <columns> | --chi <columns>
     exafs: Token | EllipsisType = ...
+    # --kchi <columns>
+    kchi: Token | EllipsisType = ...
+    # --k2chi <columns>
+    k2chi: Token | EllipsisType = ...
     # --fouriermagnitude <columns> | --fm <columns>
     fouriermagnitude: Token | EllipsisType = ...
     # --fourierphase <columns> | --fp <columns>
@@ -166,7 +170,7 @@ class FileInOptions:
     # ---------------------- Importer options ----------------------
     importeroptions = ImporterOptions()
 
-    sortby: str | EllipsisType = ...  # Default sort by filename (.fn)
+    sortby: list[str] | EllipsisType = ...  # Default sort by filename (.fn)
 
     # TODO: check if all required options are used and actually set and checked in the code
 
@@ -235,7 +239,7 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
         filenames=options.filenames,
         # Check if the directory is absolute. If not, make it relative to the working directory.
         directory=Path(options.directory.value) if options.directory is not ... else parsecontext.paths.workingdir,
-        sortby=options.sortby if options.sortby is not ... else '.fn',
+        sortby=options.sortby if options.sortby is not ... else ['.fc'],
         vars=options.vars,
         importeroptions=options.importeroptions,
     )
@@ -302,6 +306,23 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
         columnselector = parse_column_descriptor(options.exafs)
         column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA)  # TODO: add default label
         cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
+    elif options.kchi is not ...:
+        columnselector = parse_column_descriptor(options.kchi)
+        column = ColumnDescription(name='kchi', unit=None, type=ColumnKind.DATA)  # TODO: add default label
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
+
+        importer: Expr = lambda df: (df['kchi'] / df['k']).rename('chi')  # noqa: E731
+        column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA, deps=['k', 'kchi'], calc=importer)
+        cmd.signals.append((column, Domain.RECIPROCAL, importer))
+
+    elif options.k2chi is not ...:
+        columnselector = parse_column_descriptor(options.k2chi)
+        column = ColumnDescription(name='k2chi', unit=None, type=ColumnKind.DATA)  # TODO: add default label
+        cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
+
+        importer: Expr = lambda df: (df['k2chi'] / (df['k'] ** 2)).rename('chi')  # noqa: E731
+        column = ColumnDescription(name='chi', unit=None, type=ColumnKind.DATA, deps=['k', 'k2chi'], calc=importer)
+        cmd.signals.append((column, Domain.RECIPROCAL, importer))
 
     if options.xaneserror is not ...:
         columnselector = parse_column_descriptor(options.xaneserror)
@@ -367,8 +388,8 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
             columnselector = parse_column_descriptor(options.transmission)
             column = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA)
             cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
-        case _:
-            assert False, 'Invalid program state: #k5Ay58oM6V'
+        # case _: TODO: check if needed
+        #     assert False, 'Invalid program state: #k5Ay58oM6V'
 
     match options.reciprocal_reference_signal_mode__:
         case 'calc_referencetransmission':
@@ -380,8 +401,8 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
             columnselector = parse_column_descriptor(options.referencetransmission)
             column = ColumnDescription(name='ref', unit=None, type=ColumnKind.DATA)
             cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
-        case _:
-            assert False, 'Invalid program state: #Cxcis9JxTS'
+        # case _: TODO: check if needed
+        #     assert False, 'Invalid program state: #Cxcis9JxTS'
 
     # Add complex number recovery (from real/imaginary or magnitude/phase) if fourier columns are specified
     if options.fourierreal is not ... and options.fourierimaginary is not ...:
@@ -568,6 +589,14 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                 'option', [Token('OPTION', '--exafs' | '--chi') as t, Token('STRING' | 'INTEGER', str() | int()) as o]
             ):
                 _assert_option_not_assigned_set(options, 'exafs', t, o)
+            case Tree(
+                'option', [Token('OPTION', '--kchi') as t, Token('STRING' | 'INTEGER', str() | int()) as o]
+            ):
+                _assert_option_not_assigned_set(options, 'kchi', t, o)
+            case Tree(
+                'option', [Token('OPTION', '--k2chi') as t, Token('STRING' | 'INTEGER', str() | int()) as o]
+            ):
+                _assert_option_not_assigned_set(options, 'k2chi', t, o)
 
             case Tree(
                 'option',
@@ -718,8 +747,16 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                 if name in options.vars:
                     raise CommandSyntaxError(f"The variable '{name}' has already been defined.", n)
                 options.vars[name] = parse_number(v.value)
-            case Tree('option', [Token('OPTION', '--sortby') as t, Token('STRING', str(name)) as n]):
-                _assert_option_not_assigned_set(options, 'sortby', t, n.value)
+            case Tree('option', [Token('OPTION', '--sortby') as t, *n]):
+                if len(n) == 0:
+                    raise CommandSyntaxError('The sortby option requires at least one argument.', t)
+                for token in n:
+                    if not isinstance(token, Token):
+                        raise CommandSyntaxError('The sortby option requires string arguments.')
+                    if token.type != 'STRING':
+                        raise CommandSyntaxError('The sortby option requires string arguments.', token)
+                    
+                _assert_option_not_assigned_set(options, 'sortby', t, n)
             case Tree('option', [Token('OPTION', '--format'), Token('STRING', str(kind)) as k, Token() as v]):
                 match kind.lower(), v:
                     case 'decimal' | 'dec', Token('STRING', str(dec)) if len(dec) == 1:
@@ -820,7 +857,8 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
                         if data.meta.path.is_relative_to(command.directory)
                         else data.meta.path
                     )
-                    log.debug(f"Imported file '{_f}'")
+                    # TODO: restore logging with correct log levels
+                    # log.debug(f"Imported file '{_f}'")
 
                     imported_files.append(data)
         else:
@@ -838,11 +876,14 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
                         if data.meta.path.is_relative_to(command.directory)
                         else data.meta.path
                     )
-                    log.debug(f"Imported file '{_f}'")
+                    # TODO: restore logging with correct log levels
+                    # log.debug(f"Imported file '{_f}'")
                     imported_files.append(data)
 
         # Sort by the given sortby variable
-        imported_files.sort(key=lambda df: df.meta[command.sortby])
+        def varorder(dp: DataPage) -> tuple[str|float|int, ...]:
+            return tuple(dp.meta[v] for v in command.sortby)
+        imported_files.sort(key=varorder)
 
         # Set the variable '.n' for each file (file index in the current import session)
         # Set the variable '.N' for each file (file index across all import sessions)
@@ -883,19 +924,27 @@ def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
 
 
 def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
-    vars: dict[str, str | int | Number] = {
-        f'.f{i}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)
-    }
-    vars['.fn'] = file.name
-    vars['.f'] = file.stem
-    vars['.fe'] = file.suffix[1:] if file.suffix.startswith('.') else file.suffix
+    # Define vars dict to store all variables
+    vars: dict[str, str | int | Number] = {}
+
+    # Add parts of the filename separated by underscores as .f1, .f2, ...
+    vars.update({f'.f{i}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)})
+
+    # Add parent directory parts as .fd1, .fd2, ... where .fd is the immediate parent
+    # Technically both .fd and .fd0 are the immediate parent
     vars['.fd'] = file.parent.name
-    vars['.fp'] = str(file)
+    vars.update({f'.fd{i}': part for i, part in enumerate(reversed(file.parent.parts))})
+    
+    # Add other filename variables
+    vars['.fn'] = file.name                     # Full filename with extension
+    vars['.f'] = file.stem                      # Filename without extension
+    vars['.fe'] = file.suffix.removeprefix(".") # File extension without dot
+    vars['.fp'] = str(file)                     # Full file path
     stat = file.stat()
-    vars['.fs'] = stat.st_size
-    vars['.ta'] = int(stat.st_atime)
-    vars['.tc'] = int(stat.st_birthtime)
-    vars['.tm'] = int(stat.st_mtime)
+    vars['.fs'] = stat.st_size                  # File size in bytes
+    vars['.fa'] = int(stat.st_atime)            # Last access time
+    vars['.fc'] = int(stat.st_birthtime)        # Creation time
+    vars['.fm'] = int(stat.st_mtime)            # Last modification time
     return vars
 
 
@@ -1003,13 +1052,14 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             path=file,
             name=file.name,
             _dict=file_variables,
+            header="\n".join(fileheader[:-1]), # Exclude the last header line which is the column names
         ),
         newdata,
     )
 
 
 @dataclass(slots=True)
-class Command_Filein(Command[CommandArguments_filein]):
+class Command_Filein(Command[CommandArguments_filein, None]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext

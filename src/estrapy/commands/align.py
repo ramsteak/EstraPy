@@ -1,26 +1,21 @@
 import numpy as np
+
 from numpy import typing as npt
-import pandas as pd
-
-from concurrent.futures import ThreadPoolExecutor
-
+from logging import Logger
+from scipy.interpolate import make_interp_spline, BSpline # type: ignore missing stub
 from dataclasses import dataclass
 from lark import Token, Tree
 from typing import Self
+from functools import partial
 
-from ..core.grammarclasses import CommandArguments, Command
+from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.datastore import Domain, DataPage, ColumnDescription, ColumnKind
 from ..core.number import Number, parse_number, parse_range, Unit, parse_edge
+from ..core.threaded import execute_threaded
 from ..grammar.commandparser import CommandArgumentParser
-from ..operations.edge_detection import correlation_edge_detection
+from ..operations.edge_detection import correlation_edge_detection, SlidingL2Result
 
-def _set_reference_shift(page: DataPage, edge_energy: float | None, shift_energy: float) -> None:
-    if edge_energy is not None:
-        page.meta['refE0'] = edge_energy
-    domain = page.domains[Domain.RECIPROCAL]
-    E_column = ColumnDescription('E', Unit.EV, ColumnKind.AXIS, deps=['E'], calc=lambda df, shift=shift_energy: df['E'] - shift, labl='Energy [eV]')
-    domain.add_column('E', E_column)
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Shift(CommandArguments):
@@ -64,7 +59,49 @@ parse_align_command.add_subparser('shift', sub_shift, 'mode')
 
 
 @dataclass(slots=True)
-class Command_Align(Command[CommandArguments_Align]):
+class SubCommandResult_Align_Shift(CommandResult):
+    e_range: tuple[float, float]
+    results: dict[str, SlidingL2Result]
+
+CommandResult_Align = SubCommandResult_Align_Shift
+
+def _get_shift_axis(range: tuple[float, float], resolution: float) -> npt.NDArray[np.floating]:
+    return np.arange(range[0], range[1] + resolution, resolution)
+
+def _get_interpolator_splines_for_pages(pages: dict[str, DataPage], range: tuple[float, float], dom: Domain, xcol:str, ycol:str, log: Logger) -> dict[str, BSpline]:
+    splines: dict[str, BSpline] = {}
+    for name, page in pages.items():
+        domain = page.domains[dom]
+        df = domain.get_columns_data([xcol, ycol])
+        index = (df[xcol] >= range[0]) & (df[xcol] <= range[1])
+
+        region = df[index]
+        if not region.size:
+            log.warning(f'No data in the specified range for page {name}. It will be skipped, this may lead to further errors. Consider adjusting the range.')
+            continue
+
+        spline:BSpline = make_interp_spline(region[xcol], region[ycol], k=3) # type: ignore
+        spline.extrapolate = True
+
+        splines[name] = spline
+
+    return splines
+
+def _compute_l2_shift_from_data(data: npt.NDArray[np.floating], name: str, reference: npt.NDArray[np.floating], derivative: int, slide_amount: int, resolution: float, log: Logger) -> SlidingL2Result:
+    result = correlation_edge_detection(data, reference, derivative, slide_amount, resolution)
+    log.debug(f'Calculated shift for page {name}: {result.x:0.4f} eV')
+    return result
+
+def _apply_shift_to_page(page: DataPage, edge_energy: float | None, shift_energy: float) -> None:
+    if edge_energy is not None:
+        page.meta['refE0'] = edge_energy
+
+    domain = page.domains[Domain.RECIPROCAL]
+    E_column = ColumnDescription('E', Unit.EV, ColumnKind.AXIS, deps=['E'], calc=lambda df, shift=shift_energy: df['E'] - shift, labl='Energy [eV]')
+    domain.add_column('E', E_column)
+
+@dataclass(slots=True)
+class Command_Align(Command[CommandArguments_Align, CommandResult_Align]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
@@ -76,58 +113,53 @@ class Command_Align(Command[CommandArguments_Align]):
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
-        log = context.logger.getChild('command.align')
-
+    def execute(self, context: Context) -> CommandResult_Align:
         match self.args.mode:
             case SubCommandArguments_Align_Calc():
-                ...
-            case SubCommandArguments_Align_Shift(range, resolution, shift, derivative, energy):
-                log.debug(f'Aligning spectra with correlation method in range [{range[0]!s}, {range[1]!s}], resolution {resolution!s}, shift {shift!s}, derivative {derivative}, energy {energy}')
-                # TODO: import is costly
-                from scipy.interpolate import make_interp_spline, BSpline # type: ignore
-
-                # Prepare data
-                min_e, max_e = range[0].value - shift.value, range[1].value + shift.value
-                new_e = np.arange(min_e, max_e + resolution.value, resolution.value)
-                slide = int(shift.value // resolution.value)
-
-                # Dict of [original data, interpolator spline]
-                _data: dict[str, tuple[pd.DataFrame, BSpline]] = {}
-                for name, page in context.datastore.pages.items():
-                    domain = page.domains[Domain.RECIPROCAL]
-                    df = domain.get_columns_data(['E', 'ref'])
-                    _region = df[df['E'].between(min_e,max_e)] # type: ignore
-                    if not _region.size:
-                        log.warning(f'No data in the specified range for page {name}. Skipping.')
-                        continue
-                    spline:BSpline = make_interp_spline(_region['E'], _region['ref'], k=3) # type: ignore
-                    spline.extrapolate = True
-                    _data[name] = (_region, spline)
-
-                log.debug('Calculating average reference spectrum for alignment.')
-                dat_0:dict[str, npt.NDArray[np.floating]] = {name:spline(new_e) for name, (_, spline) in _data.items()}
-                ref_0: npt.NDArray[np.floating] = np.average([*dat_0.values()], axis=0)
-
-                if len(context.datastore.pages) >= 24 and context.options.debug is False:
-                    with ThreadPoolExecutor(max_workers=4) as executor:
-                        shifts = [executor.submit(correlation_edge_detection, d, ref_0, derivative, slide, resolution.value) for _,d in dat_0.items()]
-                    shifts = {name:shift_future.result() for name, shift_future in zip(dat_0.keys(), shifts)}
-                else:
-                    shifts = {
-                        name:correlation_edge_detection(d, ref_0, derivative, slide, resolution.value)
-                        for name,d in dat_0.items()
-                    }
-                
-                log.debug('Applying calculated shifts to spectra.')
-
-                for name, page in context.datastore.pages.items():
-                    if name not in shifts:
-                        continue
-                    domain = page.domains[Domain.RECIPROCAL]
-                    _set_reference_shift(page, energy.value if energy is not None else None, shifts[name])
-                    log.debug(f'Set reference shift to {shifts[name]:0.4f} eV for page {name}')
-                    pass
-                log.info('Aligned all spectra using correlation method.')
+                raise NotImplementedError('Align calc method not implemented yet.')
+            
+            case SubCommandArguments_Align_Shift():
+                return self._execute_shift(self.args.mode, context)
             case _:
                 raise NotImplementedError(f"Unknown mode {self.args.mode} in align command.")
+    
+    def _execute_shift(self, args: SubCommandArguments_Align_Shift, context: Context) -> SubCommandResult_Align_Shift:
+        log = context.logger.getChild('command.align.shift')
+
+        log.debug(f'Aligning spectra with correlation method in range [{args.range[0]!s}, {args.range[1]!s}], resolution {args.resolution!s}, shift {args.shift!s}, derivative {args.derivative}, energy {args.energy}')
+
+        range = args.range[0].value - args.shift.value, args.range[1].value + args.shift.value
+        new_e = _get_shift_axis(range, args.resolution.value)
+
+        log.debug('Preparing interpolator splines for all pages.')
+        page_splines = _get_interpolator_splines_for_pages(context.datastore.pages, range, Domain.RECIPROCAL, 'E', 'ref', log)
+
+        log.debug('Generating interpolated data for all pages.')
+        page_interpolated: dict[str, npt.NDArray[np.floating]] = {name: spline(new_e) for name, spline in page_splines.items()}
+
+        log.debug('Calculating average reference spectrum for alignment.')
+        average_reference = np.average([*page_interpolated.values()], axis=0)
+
+        slide_amount = int(args.shift.value // args.resolution.value)
+        compute = partial(_compute_l2_shift_from_data,
+                        reference = average_reference,
+                        derivative = args.derivative,
+                        slide_amount = slide_amount,
+                        resolution = args.resolution.value,
+                        log = log
+                    )
+        threaded = len(context.datastore.pages) >= 24 and context.options.debug is False
+        log.debug(f'Executing shift calculations {"with" if threaded else "without"} threading for {len(context.datastore.pages)} pages.')
+        slidenorm = execute_threaded(compute, page_interpolated, argkind = 's', threaded = threaded, pass_key_as='name')
+
+        refE0 = args.energy.value if args.energy is not None else None
+        for name,result in slidenorm.items():
+            _apply_shift_to_page(context.datastore.pages[name], refE0, result.x)
+            log.debug(f'Applied shift of {result.x:0.4f} eV to page {name}.')
+        
+        log.info('Aligned all spectra using correlation method.')
+
+        return SubCommandResult_Align_Shift(
+            e_range = (args.range[0].value, args.range[1].value),
+            results = slidenorm
+        )

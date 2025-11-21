@@ -6,13 +6,14 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 from functools import partial
-from concurrent.futures import ThreadPoolExecutor
+from logging import Logger
 
-from ..core.grammarclasses import CommandArguments, Command
+from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.threaded import execute_threaded
 from ..core.context import Context, ParseContext
 from ..grammar.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, Unit, parse_number
-from ..core.datastore import Domain, ColumnDescription, ColumnKind
+from ..core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
 from ..operations.fourier import flattop_window, fourier
 
 
@@ -56,7 +57,13 @@ parse_background_command.add_subparser('fourier', sub_fourier, 'mode')
 parse_background_command.add_subparser('polynomial', sub_polynomial, 'mode')
 parse_background_command.add_subparser('splinenodes', sub_spline_nodes, 'mode')
 
-def _background_fourier(xy: npt.NDArray[np.floating], range: tuple[float,float], cutoff: float, kweight: float) -> npt.NDArray[np.floating]:
+@dataclass(slots=True)
+class SubCommandResult_Background_Fourier(CommandArguments):
+    fourier_axis: npt.NDArray[np.floating]
+    fourier_window: npt.NDArray[np.floating]
+    page_fourier: dict[str, npt.NDArray[np.complexfloating]]
+
+def _compute_background_fourier(xy: npt.NDArray[np.floating], name: str, range: tuple[float,float], cutoff: float, kweight: float, log: Logger) -> npt.NDArray[np.floating]:
     # If range is infinite, set the window to be the width of the data
     range = (range[0] if range[0] != -np.inf else xy[0,0], range[1] if range[1] != np.inf else xy[-1,0])
     idx = (xy[:,0] >= range[0]) & (xy[:,0] <= range[1])
@@ -71,82 +78,110 @@ def _background_fourier(xy: npt.NDArray[np.floating], range: tuple[float,float],
     
     bkg = np.zeros_like(xy[:,0])
     bkg[idx] = b
+    log.debug(f'Computed Fourier background for page {name} in range [{range[0]:0.2f}, {range[1]:0.2f}]')
     return bkg
 
-def _background_polynomial(xy: npt.NDArray[np.floating], range: tuple[float, float], degree: int, kweight: float) -> npt.NDArray[np.floating]:
+def _background_polynomial(xy: npt.NDArray[np.floating], name: str, range: tuple[float, float], degree: int, kweight: float, log: Logger) -> npt.NDArray[np.floating]:
     idx = (xy[:,0] >= range[0]) & (xy[:,0] <= range[1])
     x, y = xy[idx,0], xy[idx,1]
 
     coeffs = np.polyfit(x, y * x ** kweight, degree)
     p = np.poly1d(coeffs)
+    log.debug(f'Computed Polynomial background for page {name} in range [{range[0]}k, {range[1]}k] with degree {degree}')
     return p(xy[:,0]) / (xy[:,0] ** kweight)
 
 # def _background_spline_nodes(xy: npt.NDArray[np.floating], range: tuple[float, float]) -> npt.NDArray[np.floating]:...
 
+def _remove_background(page: DataPage, bkg: npt.NDArray[np.floating]) -> None:
+    domain = page.domains[Domain.RECIPROCAL]
+    bkgcol = ColumnDescription(name='bkg', type=ColumnKind.DATA, unit=None, labl='Background')
+    domain.add_column_data('bkg', bkgcol, bkg)
+    chicol = ColumnDescription(name='chi', type=ColumnKind.DATA, unit=None, deps=['bkg', 'chi'], calc=lambda df: df['chi'] - df['bkg'], labl='EXAFS signal')
+    domain.add_column('chi', chicol)
+
 @dataclass(slots=True)
-class Command_Background(Command[CommandArguments_Background]):
+class CommandResult_Background(CommandResult):
+    ...
+
+@dataclass(slots=True)
+class Command_Background(Command[CommandArguments_Background, CommandResult_Background]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
         arguments = parse_background_command(commandtoken, tokens, parsecontext)
+
+        if arguments.range[0].unit is not Unit.K or arguments.range[1].unit is not Unit.K:
+            raise ValueError('Background range must be specified in k units.')
+        
+        # Validate subcommand arguments
+        match arguments.mode:
+            case SubCommandArguments_Background_Fourier(rmax=rmax):
+                if rmax.unit is not Unit.A:
+                    raise ValueError('Background Fourier rmax must be specified in Angstroms.')
+            case SubCommandArguments_Background_Polynomial(degree=degree):
+                if degree < 0:
+                    raise ValueError('Background Polynomial degree must be non-negative.')
+            case _:
+                pass
+        
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
         )
+    
+    def _execute_fourier(self, args: SubCommandArguments_Background_Fourier, range: tuple[Number,Number], context: Context) -> None:
+        log = context.logger.getChild('command.background.fourier')
+        log.debug(f'Calculating background with Fourier method in range [{range[0]!s}, {range[1]!s}], rmax {args.rmax!s}, kweight {args.kweight}')
 
-    def execute(self, context: Context) -> None:
-        log = context.logger.getChild('command.background')
-        # TODO: transfer unit check to parsing
-        if self.args.range[0].unit is not Unit.K or self.args.range[1].unit is not Unit.K:
-            raise ValueError('Background range must be specified in k units.')
-        range = (self.args.range[0].value, self.args.range[1].value)
+        k_range = (range[0].value, range[1].value)
 
-        match self.args.mode:
-            case SubCommandArguments_Background_Fourier(rmax=rmax, kweight=kweight):
-                # check units
-                if not rmax.unit == Unit.A:
-                    raise ValueError(f'Background Fourier rmax must be in Angstroms, got {rmax.unit}')
-                background_method = partial(_background_fourier, range=range, cutoff=rmax.value, kweight=kweight)
-                method_name = 'fourier'
-            case SubCommandArguments_Background_Polynomial(degree=degree, kweight=kweight):
-                background_method = partial(_background_polynomial, range=range, degree=degree, kweight=kweight)
-                method_name = 'polynomial'
-            # case SubCommandArguments_Background_SplineNodes(nodes=nodes, kweight=kweight):
-            #     background_method = _background_spline_nodes
-            case _:
-                raise ValueError('Invalid background mode')
-            
-        dat = {name:page.domains[Domain.RECIPROCAL].get_columns_data(['k', 'chi']).to_numpy() for name,page in context.datastore.pages.items()}
+        log.debug('Preparing data for all pages.')
+        page_fulldata: dict[str, npt.NDArray[np.floating]] = {
+            name:page.domains[Domain.RECIPROCAL].get_columns_data(['k', 'chi']).to_numpy()
+            for name,page in context.datastore.pages.items()
+        }
+
+        log.debug('Calculating background for all pages.')
+        compute = partial(_compute_background_fourier, range=k_range, cutoff=args.rmax.value, kweight=args.kweight, log=log)
         
-        if len(context.datastore.pages) >= 12 and context.options.debug is False:
-            
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                bkgs = [executor.submit(background_method, d) for _,d in dat.items()]
-            bkgs = {name:bkg.result() for name, bkg in zip(context.datastore.pages.keys(), bkgs)}
-        else:
-            bkgs = {
-                name:background_method(d)
-                for name,d in dat.items()
-            }
+        threaded = len(context.datastore.pages) >= 12 and context.options.debug is False
+        page_background = execute_threaded(compute, page_fulldata, argkind='s', threaded=threaded, pass_key_as='name')
 
         for name, page in context.datastore.pages.items():
-            domain = page.domains[Domain.RECIPROCAL]
-            # # TODO: Check that the columns exist and (if needed) E0 is set
+            _remove_background(page, page_background[name])
+        log.info(f'Calculated background for {len(context.datastore.pages)} spectra using fourier method.')
 
-            # df = domain.get_columns_data(['k', 'chi'])
 
-            # bkg = background_method(df.to_numpy())
-            domain.add_column_data(
-                'bkg',
-                ColumnDescription(
-                    name='bkg',
-                    type=ColumnKind.DATA,
-                    unit=None,
-                    labl='Background'
-                ),
-                bkgs[name]
-            )
-            domain.add_column_data('chi',None,dat[name][:,1] - bkgs[name])
-        log.info(f'Calculated background for {len(context.datastore.pages)} spectra using {method_name} method.')
+    def _execute_polynomial(self, args: SubCommandArguments_Background_Polynomial, range: tuple[Number,Number], context: Context) -> None:
+        log = context.logger.getChild('command.background.polynomial')
+        log.debug(f'Calculating background with Polynomial method in range [{range[0]!s}, {range[1]!s}], degree {args.degree}, kweight {args.kweight}')
+
+        k_range = (range[0].value, range[1].value)
+
+        log.debug('Preparing data for all pages.')
+        page_fulldata: dict[str, npt.NDArray[np.floating]] = {
+            name:page.domains[Domain.RECIPROCAL].get_columns_data(['k', 'chi']).to_numpy()
+            for name,page in context.datastore.pages.items()
+        }
+
+        log.debug('Calculating background for all pages.')
+        compute = partial(_background_polynomial, range=k_range, degree=args.degree, kweight=args.kweight, log=log)
+        
+        threaded = len(context.datastore.pages) >= 24 and context.options.debug is False
+        page_background = execute_threaded(compute, page_fulldata, argkind='s', threaded=threaded, pass_key_as='name')
+
+        for name, page in context.datastore.pages.items():
+            _remove_background(page, page_background[name])
+        log.info(f'Calculated background for {len(context.datastore.pages)} spectra using polynomial method.')
+
+    def execute(self, context: Context) -> CommandResult_Background:
+        match self.args.mode:
+            case SubCommandArguments_Background_Fourier():
+                self._execute_fourier(self.args.mode, self.args.range, context)
+            case SubCommandArguments_Background_Polynomial():
+                self._execute_polynomial(self.args.mode, self.args.range, context)
+            case _:
+                raise ValueError('Invalid background mode')
+        return CommandResult_Background()

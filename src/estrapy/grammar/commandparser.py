@@ -209,7 +209,7 @@ class CommandArgumentParser(Generic[_T]):
         type: Callable[[str], Any] = str,
         types: Callback | None = None,
         default: Any = MISSING,  # type: ignore
-        default_factory: Callable[[], Any] = MISSING,
+        default_factory: Callable[[], Any] = MISSING, # type: ignore
         required: bool = False,
         dest: str | None = None,  # type: ignore
         action: ActionType | str = ActionType.STORE,

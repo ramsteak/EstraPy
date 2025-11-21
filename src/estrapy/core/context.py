@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
 from typing import Any
+from datetime import datetime
 
 from .timers import TimerCollection
 from .datastore import DataStore
@@ -62,6 +63,10 @@ class Context:
 
     # Variables defined in the script.
     vars: dict[str, Any] = field(default_factory=dict[str, Any])
+
+    # Datetime when the program started (used for output, does not change during
+    # execution and context creation is accurate enough).
+    starttime: datetime = field(default_factory=datetime.now)
 
     # DataStore object containing all loaded data files.
     datastore: DataStore = field(default_factory=DataStore)

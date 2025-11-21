@@ -22,7 +22,7 @@ def execute_directive(directive: Directive, context: Context) -> None:
             context.vars[name] = value
         case Directive_clear():
             # Clear output directory of all files
-            for file in context.paths.outputdir.glob('*'):
+            for file in context.paths.outputdir.glob('**'):
                 try:
                     if file.is_file():
                         file.unlink(missing_ok=True)
@@ -33,6 +33,18 @@ def execute_directive(directive: Directive, context: Context) -> None:
                     _file = file.relative_to(context.paths.outputdir)
                     getLogger('estrapy.directives').warning(
                         f"Could not delete file '{_file}' from output directory '{context.paths.outputdir.stem}' due to permission error."
+                    )
+            # After first pass, only empty directories remain
+            for dir in context.paths.outputdir.glob('**'):
+                if dir == context.paths.outputdir:
+                    continue
+                try:
+                    if dir.is_dir():
+                        dir.rmdir()
+                except OSError:
+                    _dir = dir.relative_to(context.paths.outputdir)
+                    getLogger('estrapy.directives').warning(
+                        f"Could not delete directory '{_dir}' from output directory '{context.paths.outputdir.stem}' because it is not empty."
                     )
         case _:
             raise NotImplementedError(f"Directive '{directive}' execution not implemented.")
