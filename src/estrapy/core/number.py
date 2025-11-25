@@ -23,8 +23,10 @@ def parse_unit(s: str) -> Unit | None:
             return Unit.EV
         case 'a' | 'ang' | 'angstrom':
             return Unit.A
-        case 'k' | 'wavevector' | 'a-1' | '1/angstrom' | 'a^-1' | 'a1':  # result of normalization from a⁻¹
+        case 'k' | 'wavevector' | 'a-1' | '/a' | 'a^-1' | 'a1' | '/angstrom':  # result of normalization from a⁻¹
             return Unit.K
+        case '.' | '' | '_' | '-':
+            return None
         case _:
             raise ValueError(f"Unknown unit: '{s}'")
 
@@ -69,7 +71,7 @@ SI_MULTIPLIERS: dict[str, float] = {
 }
 SI_MULTIPLIER_OPTIONS = ''.join(SI_MULTIPLIERS)
 RE_NUMBER = re.compile(
-    r'^(([+-])?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)(?:([' + SI_MULTIPLIER_OPTIONS + r'])?([a-zA-ZåÅ/\^⁻¹1-]+))?$'
+    r'^(([+-])?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)(?:(/?[' + SI_MULTIPLIER_OPTIONS + r'])?([a-zA-ZåÅ/\^⁻¹1\._-]+))?$'
 )
 def parse_number(s: str) -> Number:
     """Parse a string into a Number object."""
