@@ -1050,7 +1050,7 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     return DataPage(
         FileMetadata(
             path=file,
-            name=file.name,
+            name=file.stem,
             _dict=file_variables,
             header="\n".join(fileheader[:-1]), # Exclude the last header line which is the column names
         ),
