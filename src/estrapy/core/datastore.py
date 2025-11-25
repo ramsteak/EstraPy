@@ -134,6 +134,13 @@ class FileMetadata:
         if hasattr(self, key):
             return getattr(self, key)
         return self._dict[key]
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a metadata value by key. Returns default if the key does not exist.
+        Also check if the key is an attribute of the class."""
+        if hasattr(self, key):
+            return getattr(self, key)
+        return self._dict.get(key, default)
 
     def __setitem__(self, key: str, value: Any) -> None:
         """Set a metadata value by key. If the key is an attribute of the class,
