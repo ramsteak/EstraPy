@@ -26,7 +26,7 @@ def parse_unit(s: str) -> Unit | None:
         case 'k' | 'wavevector' | 'a-1' | '1/angstrom' | 'a^-1' | 'a1':  # result of normalization from a⁻¹
             return Unit.K
         case _:
-            return None
+            raise ValueError(f"Unknown unit: '{s}'")
 
 
 @dataclass(slots=True, frozen=True)
@@ -42,22 +42,47 @@ class Number:
         # Add '+' sign for positive numbers. Negative numbers already have '-' sign in str(self.value)
         return f"{self.sign if self.sign == '+' else ''}{self.value}{self.unit.value if self.unit else ''}"
 
-
+SI_MULTIPLIERS: dict[str, float] = {
+    # 'Q': 1e30,  # Useless
+    # 'R': 1e27,  # Useless
+    # 'Y': 1e24,  # Useless
+    # 'Z': 1e21,  # Useless
+    # 'E': 1e18,  # Useless
+    # 'P': 1e15,  # Useless
+    # 'T': 1e12,  # Useless
+    'G': 1e9,
+    'M': 1e6,
+    'k': 1e3,
+    'd': 1e-1,
+    'c': 1e-2,
+    'm': 1e-3,
+    'u': 1e-6,  # Useless
+    'µ': 1e-6, 'μ': 1e-6, # Micro sign variations
+    # 'n': 1e-9,  # Useless
+    # 'p': 1e-12, # Useless
+    # 'f': 1e-15, # Useless
+    # 'a': 1e-18, # Useless
+    # 'z': 1e-21, # Useless
+    # 'y': 1e-24, # Useless
+    # 'r': 1e-27, # Useless
+    # 'q': 1e-30, # Useless
+}
+SI_MULTIPLIER_OPTIONS = ''.join(SI_MULTIPLIERS)
+RE_NUMBER = re.compile(
+    r'^(([+-])?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)(?:([' + SI_MULTIPLIER_OPTIONS + r'])?([a-zA-ZåÅ/\^⁻¹1-]+))?$'
+)
 def parse_number(s: str) -> Number:
     """Parse a string into a Number object."""
     s = s.strip()
     if not s:
         raise ValueError('Empty string cannot be parsed as a number.')
 
-    m = re.match(
-        r'^(([+-])?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)(?:([GMkdcm])?([a-zA-ZåÅ/\^⁻¹1-]+))?$',
-        s,
-    )
+    m = RE_NUMBER.match(s)
     if m is None:
         raise ValueError(f"String '{s}' is not a valid number format.")
 
     num_str, sgn_str, mult_str, unit_str = m.groups()
-    mult = {'G': 1e9, 'M': 1e6, 'k': 1e3, 'd': 1e-1, 'c': 1e-2, 'm': 1e-3}.get(mult_str, 1)
+    mult = SI_MULTIPLIERS.get(mult_str, 1)
     num = float(num_str) * mult
     unit = parse_unit(unit_str) if unit_str else None
 
