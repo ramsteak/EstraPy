@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
-from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence
+from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence, Protocol
 from collections import deque
 
 _K = TypeVar('_K')
@@ -41,6 +41,13 @@ class CollectionDict(Collection[_K], Generic[_K, _V, _C], ABC):
         if key not in self._data:
             self._data[key] = self._make_container()
         self._add_value_to_container(self._data[key], value)
+    
+    def adds(self, key: _K, values: Iterable[_V]) -> None:
+        """Add multiple values to the collection for the given key."""
+        if key not in self._data:
+            self._data[key] = self._make_container()
+        for value in values:
+            self._add_value_to_container(self._data[key], value)
     
     def add_empty(self, key: _K) -> None:
         """Ensure that the key exists in the collection dict with an empty container."""
@@ -88,6 +95,10 @@ class CollectionDict(Collection[_K], Generic[_K, _V, _C], ABC):
         """Return the number of keys in the collection dict."""
         return len(self._data)
 
+    def count_keys(self) -> int:
+        """Return the number of keys in the collection dict."""
+        return len(self._data)
+
     def count(self, key: _K | EllipsisType = ...) -> int:
         """Return the number of values for a given key, or the total number of values if key is not provided."""
         if key is ...:
@@ -131,6 +142,11 @@ class CollectionDict(Collection[_K], Generic[_K, _V, _C], ABC):
         if key in self._data:
             return self._data[key]
         return self._make_container()
+    
+    def set(self, key: _K, values: _C) -> None:
+        """Set the collection of values for a given key. Overwrites any existing collection,
+        does not check for the type of the collection."""
+        self._data[key] = values
 
     @abstractmethod
     def copy(self) -> 'CollectionDict[_K, _V, _C]':
@@ -444,3 +460,15 @@ def fuzzy_match(string: str, options: Iterable[str], /) -> str | None:
     if not scores:
         return None
     return _options[min(scores, key=scores.get)] # type: ignore
+
+class SupportsEq(Protocol):
+    def __eq__(self, other: Any) -> bool: ...
+
+def eq(items: Iterable[SupportsEq]) -> bool:
+    """Check if all items in an iterable are equal."""
+    iterator = iter(items)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == other for other in iterator)
