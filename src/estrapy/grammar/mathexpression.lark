@@ -31,8 +31,11 @@ comp_op: "=="  -> eq
       | atom "^" power -> pow
       | atom "**" power -> pow
 
+ENAME: /[a-zA-Z._.]\w*/
+
 ?atom: NUMBER           -> number
      | CNAME            -> var
+     | ENAME            -> evar
      | func
      | "(" arith ")"
 

@@ -33,8 +33,10 @@ class MathExpressionCompiler(Transformer[Token, str]):
     """This transformer compiles a mathematical expression parse tree into a Python expression string."""
     def number(self, n: list[Token]) -> str:
         return n[0].value
-    def var(self, n: list[Token]):
+    def var(self, n: list[Token]) -> str:
         return f"{n[0].value}"
+    def evar(self, n: list[Token]) -> str:
+        return f"{n[0].value.replace('.', '_')}"
     
     def add(self, args: list[Token | str]):
         return f"({args[0]} + {args[1]})"
