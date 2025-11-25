@@ -31,6 +31,8 @@ FLOAT_U: FLOAT_ /[a-zA-Z]+/
 // FLOAT_U: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[a-zA-Z]+/
 FLOAT: FLOAT_ | FLOAT_U
 
+EXIT: "exit" | "quit"
+
 COMMANDNAME: /[^\s#"'%-][^\s#%"']*/
 
 SHORT_OPTION: /-[a-zA-Z]+/
@@ -49,7 +51,9 @@ _NL: (/\r?\n[\t ]*/ | SH_COMMENT)+
 
 // -------- RULES --------
 
-start: _NL* directive* command*
+start: _NL* directive* (exit_stmt | command)*
+
+exit_stmt: EXIT _NL+
 
 ?number: INTEGER | FLOAT
 ?commandname: COMMANDNAME

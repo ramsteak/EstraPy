@@ -23,6 +23,9 @@ class EstraTransformer(Transformer[Any, Script]):
             directives=[item for item in items if isinstance(item, Directive)],
             commands=[item for item in items if isinstance(item, Command)],
         )
+    
+    def exit_stmt(self, items: list[Any]) -> Token:
+        raise StopIteration("Exit statement encountered.")
 
     def ESCAPED_STRING(self, item: Token) -> Token:
         # Convert escaped string to normal string by removing quotes and unescaping
