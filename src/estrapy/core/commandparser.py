@@ -4,11 +4,11 @@ from dataclasses import dataclass, fields, MISSING
 from types import EllipsisType
 from enum import Enum
 
-from ..core.grammarclasses import CommandArguments
-from ..core.errors import ParseError
-from ..core.errors import ArgumentError, DuplicateArgumentError
-from ..core.context import ParseContext
-from ..core.misc import peekable
+from .grammarclasses import CommandArguments
+from .errors import ParseError
+from .errors import ArgumentError, DuplicateArgumentError
+from .context import ParseContext
+from .misc import peekable
 
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
 _T = TypeVar('_T', bound=CommandArguments)
@@ -555,6 +555,8 @@ class CommandArgumentParser(Generic[_T]):
         if _tokens:
             match _tokens.next():
                 case Token() as t:
+                    raise ParseError('Unexpected extra tokens after parsing command.', t)
+                case Tree(Token(), [Token() as t, *_]):
                     raise ParseError('Unexpected extra tokens after parsing command.', t)
                 case Tree(Token() as t, _):
                     raise ParseError('Unexpected extra tokens after parsing command.', t)

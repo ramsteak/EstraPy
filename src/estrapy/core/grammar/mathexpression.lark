@@ -32,8 +32,10 @@ comp_op: "=="  -> eq
       | atom "**" power -> pow
 
 ENAME: /[a-zA-Z._.]\w*/
+INFINITY.2: /infinity|inf|Inf|INF/
 
 ?atom: NUMBER           -> number
+     | INFINITY         -> infinity
      | CNAME            -> var
      | ENAME            -> evar
      | func

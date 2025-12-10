@@ -1,5 +1,7 @@
+from lark import Lark, Tree, Token
 from lark.indenter import Indenter
 
+from ._loader import load_grammar
 
 class EstraIndenter(Indenter):
     @property
@@ -25,3 +27,17 @@ class EstraIndenter(Indenter):
     @property
     def tab_len(self) -> int:
         return 4
+
+grammar_data = load_grammar("estrapyparser.lark")
+
+file_parser = Lark(
+    grammar_data,
+    parser='lalr',
+    start='start',
+    postlex=EstraIndenter(),
+    propagate_positions=True,
+)
+
+def parse_estrapy_file(filecontent: str) -> Tree[Token]:
+    """Parse an EstraPy file content into a parse tree."""
+    return file_parser.parse(filecontent) # pyright: ignore[reportUnknownMemberType]

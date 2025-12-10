@@ -1,11 +1,10 @@
 import numpy as np
 from numpy import typing as npt
-from importlib.resources import files, as_file
 from lark import Lark, Transformer, Token, Tree
-
 from dataclasses import dataclass
-
 from typing import Any, Self, Protocol, Generic, TypeVar
+
+from ._loader import load_grammar
 
 ALLOWED_FUNCTIONS = {
     'sin', 'cos', 'tan',
@@ -15,12 +14,7 @@ ALLOWED_FUNCTIONS = {
     'sqrt', 'abs',
 }
 
-if __name__ == '__main__':
-    from pathlib import Path
-    grammar_data = (Path(__file__).parent / "mathexpression.lark").read_text()
-else:
-    with as_file(files("estrapy.grammar") / "mathexpression.lark") as grammar_path:
-        grammar_data = grammar_path.read_text()
+grammar_data = load_grammar("mathexpression.lark")
 
 mathexpression_parser = Lark(
     grammar_data,
@@ -33,6 +27,8 @@ class MathExpressionCompiler(Transformer[Token, str]):
     """This transformer compiles a mathematical expression parse tree into a Python expression string."""
     def number(self, n: list[Token]) -> str:
         return n[0].value
+    def infinity(self, n: list[Token]) -> str:
+        return "np.inf"
     def var(self, n: list[Token]) -> str:
         return f"{n[0].value}"
     def evar(self, n: list[Token]) -> str:

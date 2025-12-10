@@ -24,14 +24,16 @@ SH_COMMENT: /#[^\n]*/
 %import common.WS
 %ignore WS
 
-INTEGER.2: /[0-9]+(?![\w\.\,])/
+// I don't remember why I specified the negative lookahead for `\w` `.` and `,`.
+// Converted to positive lookahead for end of number or whitespace or comment.
+INTEGER.2: /[0-9]+(?=$|\s|#)/
 
-FLOAT_: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/
-FLOAT_U: FLOAT_ /[a-zA-Z]+/
-// FLOAT_U: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?[a-zA-Z]+/
-FLOAT: FLOAT_ | FLOAT_U
+_FLOAT_N: /[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/
+_FLOAT_U: _FLOAT_N /[a-zA-Z]+/
 
-EXIT: "exit" | "quit"
+FLOAT: _FLOAT_N /(?=$|\s|#)/
+     | _FLOAT_U /(?=$|\s|#)/
+
 
 COMMANDNAME: /[^\s#"'%-][^\s#%"']*/
 
@@ -51,9 +53,8 @@ _NL: (/\r?\n[\t ]*/ | SH_COMMENT)+
 
 // -------- RULES --------
 
-start: _NL* directive* (exit_stmt | command)*
+start: _NL* directive* command*
 
-exit_stmt: EXIT _NL+
 
 ?number: INTEGER | FLOAT
 ?commandname: COMMANDNAME

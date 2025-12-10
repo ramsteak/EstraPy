@@ -5,8 +5,8 @@ import re
 from typing import Any
 from pathlib import Path
 
-from ..core.fit.fitmodel import VariableSpec, PhaseSpec, ExafsModelSpecification
-from ..core.misc import peekable
+from .fitmodel import VariableSpec, PhaseSpec, ExafsModelSpecification
+from ..misc import peekable
 
 re_varline = re.compile(r"^\s*(\d+)\'\s*(\w+)\s*\'\s*([\d\.\-e\+]+)\s+([\d\.\-e\+]+)(?:\s+([\d\.\-e\+]+)\s+([\d\.\-e\+]+))?\s*$")
 
@@ -200,7 +200,6 @@ def load_model_from_legacy(path: Path) -> ExafsModelSpecification:
         varnum:VariableSpec(
             name=varname,
             initial=init,
-            step=step,
             bounds=[lower, upper] if lower is not None and upper is not None else None,
             fix=(step == 0.0)
     ) for varnum, varname, init, step, lower, upper in _vars}
