@@ -1,0 +1,27 @@
+?start: figspec
+
+figspec: INT ( ":" axispos size_spec?)?
+
+axispos: INT "." INT
+
+?size_spec: "[" size_elem "]"
+
+?size_elem: xy_size
+         | wh_size
+
+xy_size: FLOAT "x" FLOAT           -> xy_both
+       | FLOAT "x"                 -> xy_left
+       | "x" FLOAT                 -> xy_right
+
+?wh_size: w_size                    -> wh_w
+        | h_size                    -> wh_h
+        | w_size h_size             -> wh_w_h
+        | h_size w_size             -> wh_h_w
+
+?w_size: "w" FLOAT
+?h_size: "h" FLOAT
+
+%import common.INT
+%import common.SIGNED_FLOAT -> FLOAT   // accept .5 and exponents
+%import common.WS
+%ignore WS
