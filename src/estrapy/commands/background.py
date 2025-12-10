@@ -11,7 +11,7 @@ from logging import Logger
 from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.threaded import execute_threaded
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, Unit, parse_number
 from ..core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
 from ..operations.fourier import flattop_window, fourier

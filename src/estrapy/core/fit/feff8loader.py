@@ -12,6 +12,7 @@ class FeffPath:
     reff: float
     rnrmav: float
     edge: float
+    file: Path
     data: pd.DataFrame = field(default_factory=pd.DataFrame)
     interp: dict[str,BSpline] = field(default_factory=dict[str,BSpline])
 
@@ -45,5 +46,6 @@ def load_path(path: Path) -> FeffPath:
             rnrmav=rnrmav,
             edge=edge,
             data=data,
-            interp=interp
+            interp=interp,
+            file=path,
         )

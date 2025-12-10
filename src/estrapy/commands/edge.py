@@ -13,7 +13,7 @@ from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.number import Number, parse_number, Unit, parse_range, parse_edge
 from ..core.threaded import execute_threaded
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..operations.edge_detection import correlation_edge_detection, SlidingL2Result
 from ..operations.axis_conversions import E_to_k
 

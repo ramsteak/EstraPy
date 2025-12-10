@@ -4,6 +4,8 @@ from types import EllipsisType
 from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence, Protocol
 from collections import deque
 
+from .number import Number, parse_number
+
 _K = TypeVar('_K')
 _V = TypeVar('_V')
 _C = TypeVar('_C', bound=Collection[Any])
@@ -472,3 +474,16 @@ def eq(items: Iterable[SupportsEq]) -> bool:
     except StopIteration:
         return True
     return all(first == other for other in iterator)
+
+
+def guess_type(s: str) -> str | Number | int:
+    # Try to guess if the string is an integer, a number with unit, or just a string
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return parse_number(s)
+    except ValueError:
+        pass
+    return s

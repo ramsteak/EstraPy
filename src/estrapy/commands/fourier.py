@@ -7,7 +7,7 @@ from typing import Self
 
 from ..core.grammarclasses import CommandArguments, Command
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, parse_number, Unit
 from ..operations.fourier import fourier, apodizer_functions, flattop_window
 from ..operations.axis_conversions import Nyquist

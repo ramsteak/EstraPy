@@ -9,11 +9,12 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Union, Self, Literal
 from mashumaro import DataClassDictMixin
 from collections import OrderedDict
+from scipy.optimize import least_squares, OptimizeResult #, approx_fprime # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from scipy.optimize._numdiff import approx_derivative # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
 
-from ...operations.fourier import flattop_window, fourier
-from ...core.misc import Sack
 from .feff8loader import FeffPath, load_path
-from ...grammar.mathexpressions import Expression
+from ..misc import Sack
+from ..grammar.mathexpressions import Expression
 from ...operations.axis_conversions import k_to_k1
 
 VERSION_RE = re.compile(r'^#\s*version\s*:?\s*(?:(\d+)\.(\d+)(?:\.(\d+))?)\s*$', re.IGNORECASE)
@@ -31,7 +32,6 @@ class VariableSpec(DataClassDictMixin):
     name: str
     initial: Optional[float] = None
     bounds: Optional[List[float]] = None
-    step: Optional[float] = None
     fix: Optional[bool] = None
 
 @dataclass
@@ -75,7 +75,7 @@ def _load_model_spec(path: Path) -> ExafsModelSpecification:
     try:
         model = _load_model_spec_from_yaml(path)
     except ModelFormatError:
-        from ...legacy.model import load_model_from_legacy
+        from .legacy import load_model_from_legacy
         model = load_model_from_legacy(path)
     return model
 
@@ -163,35 +163,6 @@ def rule_to_expression(varrule: VariableRuleSpec, rulename: str) -> tuple[dict[s
 
             return base_vars, expr_vars
         
-        # case 'vectornorm':
-        #     # Adds n parameters (pₙ), defined from m = n-1 internal angles
-        #     # constraints: ∑ₙ pₙ² = 1
-        #     # internal parameters: angles θₘ
-        #     #                      p₀ = cos(θ₀)
-        #     #                      p₁ = sin(θ₀) * cos(θ₁)
-        #     #                      p₂ = sin(θ₀) * sin(θ₁) * cos(θ₂)
-        #     #                      ...
-        #     nparams = len(varrule.names)
-        #     if nparams < 2:
-        #         raise ValueError(f'VariableRule {rulename} vectornorm rule requires at least two parameters.')
-            
-        #     if varrule.initial is not None:
-        #         initialvals = varrule.initial
-        #         if len(initialvals) != nparams:
-        #             raise ValueError(f'VariableRule {rulename} initial values length does not match names length.')
-        #         total_sq = sum(p*p for p in initialvals)
-        #         if total_sq == 0.0:
-        #             raise ValueError(f'VariableRule {rulename} initial values cannot all be zero for vectornorm rule.')
-        #         initialvals = [p / np.sqrt(total_sq) for p in initialvals]
-        #     else:
-        #         initialvals = [1.0 / np.sqrt(nparams) for _ in varrule.names]
-            
-        #     # Add basevars
-        #     for i in range(nparams - 1):
-                
-
-            
-            
         case _:
             raise ValueError(f'Unknown variable rule: {varrule.rule}')
 
@@ -247,14 +218,18 @@ def _sort_expression_dependencies(exps: dict[str, Expression[float]], vars: dict
         missing = expr.required_vars - set(vars) - set(exps)
         if missing:
             raise ValueError(f'Undefined variable(s) in expression for variable \'{name}\': {", ".join(missing)}.')
-        for reqvar in expr.required_vars:
-            if reqvar == name:
-                raise DependencyCycleError(f'Variable \'{name}\' depends on itself.')
-            if reqvar in exps:
-                graph.add(name, reqvar)
-            else:
-                graph.add_empty(name)
-    
+        if expr.required_vars:
+            for reqvar in expr.required_vars:
+                if reqvar == name:
+                    raise DependencyCycleError(f'Variable \'{name}\' depends on itself.')
+                if reqvar in exps:
+                    graph.add(name, reqvar)
+                else:
+                    graph.add_empty(name)
+        else:
+            # The variable has no dependencies and is a fixed value
+            graph.add_empty(name)
+
     # Topologically sort the graph
     sorted_exps: list[str] = []
     ready = sorted([n for n, deps in graph.groups() if not deps])
@@ -278,6 +253,7 @@ def _sort_expression_dependencies(exps: dict[str, Expression[float]], vars: dict
 
 @dataclass
 class Phase:
+    name: str
     feffpath: FeffPath
     N: Expression[float]
     r: Expression[float]
@@ -448,26 +424,206 @@ class Phase:
             raise ValueError(f'Undefined variable(s) in eta expression for phase {spec.name}: {", ".join(missing)}.')
         
         return cls(
+            name = spec.name,
             feffpath=feffpath,
             N=N_expr,
             r=r_expr,
             dE=dE_expr,
             s2=s2_expr,
             s02=s02_expr,
-            eta=eta_expr
+            eta=eta_expr,
         )
         
     
 @dataclass(slots=True)
 class ExafsFitResult:
-    fitted_vars: dict[str, float]
+    # Resulting parameters of the fit
+    fitted_vars: pd.Series
+    kaxis: npt.NDArray[np.floating]
+    fittedknchi: npt.NDArray[np.floating]
+    partialknphases: dict[str, npt.NDArray[np.floating]]
+
+    # Internal storage of fit details
+    _param_order: list[str]
+    _fitted_params: npt.NDArray[np.floating]
+    _expressions: OrderedDict[str, Expression[float]]
+
+    # Covariance and correlation matrices
+    std_errors: pd.Series
+    covariance: pd.DataFrame
+    correlation: pd.DataFrame
+
+    # Fit parameters
+    weights: npt.NDArray[np.floating]
+    krange: tuple[float, float]
+
+    # Fit statistics
+    residuals: npt.NDArray[np.floating]
+    difference: npt.NDArray[np.floating]
     chi_squared: float
     reduced_chi_squared: float
-    fittedchi: npt.NDArray[np.float64]
-    residuals: npt.NDArray[np.float64]
-    partialphases: dict[str, npt.NDArray[np.float64]]
+    R_squared: float
+    reduced_R_squared: float
+    dof: float
+    n_params: int
+    n_points: int
+    residual_variance: float
 
-from matplotlib import pyplot as plt
+    # Optimization details
+    finalresult: OptimizeResult
+    history: list[OptimizeResult]
+
+    # Original data
+    kdata: npt.NDArray[np.floating]
+    knchidata: npt.NDArray[np.floating]
+    kpow: float
+
+
+def jacobian_finite_difference(
+        param_names: list[str],
+        params: npt.NDArray[np.floating],
+        expressions: OrderedDict[str, Expression[float]]
+    ) -> npt.NDArray[np.floating]:
+    """
+    Compute Jacobian of expressions with respect to parameters using finite differences.
+    
+    Parameters
+    ----------
+    params : np.ndarray
+        Independent parameter values (ordered)
+    param_names : list[str]
+        Names of parameters (same order as params)
+    expressions : OrderedDict[str, Expression[float]]
+        Dependent parameter expressions (ordered by dependency)
+    
+    Returns
+    -------
+    J : np.ndarray
+        Jacobian matrix (n_expressions × n_params)
+    """
+    # Create a vectorized function that evaluates all expressions
+    def vector_func(x: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        # Reconstruct params dict from array
+        vars_dict = dict(zip(param_names, x))
+        for n,expr in expressions.items():
+            vars_dict[n] = expr(**vars_dict)
+        return np.array([vars_dict[n] for n in expressions.keys()])
+    
+    xk = np.asarray(params, float)
+    f0 = vector_func(xk)
+
+    # Using approx_derivative from scipy for better accuracy with complex step method
+    return np.array(approx_derivative(vector_func, xk, method='cs', f0=f0))
+    return np.array(approx_fprime(params, vector_func), dtype=np.float64)
+
+def sanitize_covariance_matrix(
+    cov_matrix: npt.NDArray[np.floating],
+) -> npt.NDArray[np.floating]:
+    """
+    Sanitize covariance matrix for numerical stability and symmetry.
+    
+    Parameters
+    ----------
+    cov_matrix : np.ndarray
+        Covariance matrix to sanitize
+    
+    Returns
+    -------
+    cov_sanitized : np.ndarray
+        Sanitized covariance matrix
+    """
+
+    # Bool mask of values that are to be set to zero, for numerical stability and symmetry
+    iszero = np.isclose(cov_matrix, 0.0, atol=1e-15)
+    
+    # Check for negative variances on the diagonal and set them to zero, along with their rows and columns
+    diagzero = np.diag(cov_matrix) < 0
+    iszero[diagzero, :] = True
+    iszero[:, diagzero] = True
+
+    # Ensure symmetry of the iszero mask
+    iszero |= iszero.T
+
+    # Create a copy to avoid modifying the original
+    cov_sanitized = np.array(cov_matrix, copy=True)
+    
+    # Set identified values to zero
+    cov_sanitized[iszero] = 0.0
+
+    # Force symmetry
+    np.add(cov_sanitized, cov_sanitized.T, out=cov_sanitized)
+    cov_sanitized *= 0.5
+
+    return cov_sanitized
+
+def extend_covariance_matrix(
+    cov_matrix: npt.NDArray[np.floating],
+    param_names: list[str],
+    params: npt.NDArray[np.floating],
+    expressions: OrderedDict[str, Expression[float]]
+) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], list[str]]:
+    """
+    Extend covariance and correlation matrices to include dependent parameters.
+    
+    Parameters
+    ----------
+    cov_matrix : np.ndarray
+        Covariance matrix of independent parameters
+    param_names : list[str]
+        Names of independent parameters (ordered)
+    params : np.ndarray
+        Independent parameter values (ordered)
+    expressions : OrderedDict[str, Expression[float]]
+        Dependent parameter expressions (ordered by dependency)
+    
+    Returns
+    -------
+    cov_combined : np.ndarray
+        Combined covariance matrix
+    corr_combined : np.ndarray
+        Combined correlation matrix
+    all_names : list[str]
+        Combined parameter names (independent + dependent)
+    """
+    # Compute Jacobian using scipy
+    J_dep = jacobian_finite_difference(param_names, params, expressions)
+    expr_names = list(expressions.keys())
+    
+    # Propagate covariance to dependent parameters
+    # Cov(y) = J @ Cov(x) @ J^T
+    cov_dep = J_dep @ cov_matrix @ J_dep.T
+    
+    # Create combined covariance matrix
+    all_names = param_names + expr_names
+    n_indep = len(param_names)
+    n_dep = len(expr_names)
+    n_total = n_indep + n_dep
+    
+    cov_combined = np.zeros((n_total, n_total))
+    
+    # Independent-independent block (top-left)
+    cov_combined[:n_indep, :n_indep] = cov_matrix
+    
+    # Dependent-dependent block (bottom-right)
+    cov_combined[n_indep:, n_indep:] = cov_dep
+    
+    # Cross-covariance blocks
+    # Cov(x, y) = Cov(x) @ J^T
+    cov_cross = cov_matrix @ J_dep.T
+    cov_combined[:n_indep, n_indep:] = cov_cross
+    cov_combined[n_indep:, :n_indep] = cov_cross.T
+
+    cov_combined = sanitize_covariance_matrix(cov_combined)
+
+    std_dev_scaling = np.sqrt(np.diag(cov_combined))
+    
+    # Handle zero standard deviations (setting to 1 is ok because their correlation is zero)
+    std_dev_scaling = np.where(std_dev_scaling > 0, std_dev_scaling, 1.0)
+    
+    D_inv_combined = np.diag(1.0 / std_dev_scaling)
+    corr_combined = D_inv_combined @ cov_combined @ D_inv_combined
+    
+    return cov_combined, corr_combined, all_names
 
 @dataclass
 class ExafsModel:
@@ -485,7 +641,11 @@ class ExafsModel:
         for variable in spec.variables:
             match variable:
                 case VariableSpec():
-                    vars[variable.name] = variable
+                    if variable.fix:
+                        fixvar = Expression[float].compile(str(variable.initial if variable.initial is not None else 0.0))
+                        exps[variable.name] = fixvar
+                    else:
+                        vars[variable.name] = variable
                 case VariableRuleSpec():
                     base_vars, expr_vars = rule_to_expression(variable, f'rule_{''.join(variable.names)}')
                     vars.update(base_vars)
@@ -527,9 +687,14 @@ class ExafsModel:
             chi_total += phase.chi(k, kweight, **vars)
         return chi_total
     
-    def _get_initials(self, *, default: float = 0.0) -> dict[str, float]:
+    def _get_initials(self, order: list[str], *, default: float = 0.0) -> npt.NDArray[np.floating]:
         """Get a dictionary of variable initial values."""
-        return {varname:var.initial if var.initial is not None else default for varname,var in self.vars.items()}
+        return np.array([self.vars[var].initial if self.vars[var].initial is not None else default for var in order], dtype=np.float64)
+    
+    def _get_bounds(self, order: list[str]) -> tuple[npt.NDArray[np.float64],npt.NDArray[np.float64]]:
+        """Get lower and upper bounds for variables as two arrays."""
+        bounds = np.array([self.vars[var].bounds if self.vars[var].bounds is not None else [-np.inf, np.inf] for var in order], dtype=np.float64)
+        return bounds[:,0], bounds[:,1]
 
     def _get_exps(self, vars: dict[str, float], *, inplace:bool=False) -> dict[str, float]:
         """Return a new dictionary with expression variables evaluated and added, without modifying vars."""
@@ -539,84 +704,124 @@ class ExafsModel:
         return newvars
     
     def fit_k(self, k: npt.NDArray[np.float64], chi: npt.NDArray[np.float64], krange: tuple[float, float], kweight: float) -> ExafsFitResult:
-        initial = self._get_initials()
-        bounds = (
-            [self.vars[varname].bounds[0] if self.vars[varname].bounds is not None else -np.inf for varname in initial.keys()],
-            [self.vars[varname].bounds[1] if self.vars[varname].bounds is not None else np.inf for varname in initial.keys()],
-        )
-        vars = self._get_exps(initial)
+        param_order = list(self.vars.keys())
+        initial, bounds = self._get_initials(param_order), self._get_bounds(param_order)
 
         kidx = np.where((k >= krange[0]) & (k <= krange[1]))[0]
         kfit = k[kidx]
         chifit = chi[kidx] * (kfit ** kweight)
 
         # weight vector given by the spacing in x
-        weight = np.sqrt(np.gradient(kfit))
-
-        from scipy.optimize import least_squares, OptimizeResult, minimize
+        dk_weight = np.sqrt(np.gradient(kfit))
         
         history: list[OptimizeResult] = []
-        def cb(intermediateresult: OptimizeResult) -> None:
-            history.append(intermediateresult)
+        def cb(intermediate_result: OptimizeResult) -> None:
+            history.append(intermediate_result)
         
         def residuals(varvalues: npt.NDArray[np.float64]):
-            vars = dict(zip(initial.keys(), varvalues))
+            vars = dict(zip(param_order, varvalues))
             self._get_exps(vars, inplace=True)
             chicalc = self.calc(kfit, vars, kweight)
             residual = chicalc - chifit
-            weighted = residual * weight
+            weighted = residual * dk_weight
 
             return weighted
 
-        result: OptimizeResult = least_squares(
+        result: OptimizeResult = least_squares( # pyright: ignore[reportUnknownVariableType]
             fun=residuals,
-            x0=np.array([initial[varname] for varname in self.vars.keys()]),
+            x0=initial,
             bounds=bounds,
             jac='3-point',
             callback=cb,
         )
+        assert isinstance(result, OptimizeResult)
 
-        vars:dict[str, float] = dict(zip(self.vars.keys(), result.x))
-        self._get_exps(vars, inplace=True)
+        # Covariance and correlation matrices --------------------------------------------------------------
+        JTJ:npt.NDArray[np.floating] = np.asarray(result.jac.T @ result.jac) # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+        residual:npt.NDArray[np.floating] = np.asarray(result.fun) # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+        parameters:npt.NDArray[np.floating] = np.asarray(result.x) # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
 
-        _calc = self.calc(kfit, vars, kweight)
-        vshift = np.ptp(_calc)/2
-        plt.scatter(kfit, chifit, color="green", marker="+", linewidth=0.5, s=20)
-        plt.plot(kfit, _calc, color="black")
+        # Estimate the residual variance
+        # degrees of freedom = number of observations - number of parameters
+        n_obs, n_params = len(residual), len(parameters)
+        dof = n_obs - n_params
+        residual_variance = np.sum(residual**2) / dof
 
-        for idx,phas in enumerate(self.phases, start=1):
-            part = phas.chi(kfit, kweight, **vars)
-            plt.plot(kfit, part - idx * vshift, label=f'Phase {idx}', color="orange")
+        # Covariance matrix (inverse of J^T * J, scaled by residual variance)
+        try:
+            cov_matrix = np.linalg.inv(JTJ) * residual_variance
+        except np.linalg.LinAlgError:
+            # If singular, use pseudoinverse
+            cov_matrix = np.linalg.pinv(JTJ) * residual_variance
+
+        cov_matrix, corr_matrix, value_order = extend_covariance_matrix(cov_matrix, param_order, parameters, self.exps)
+        _fitted_param_dict: dict[str, float] = dict(zip(param_order, parameters))
+        self._get_exps(_fitted_param_dict, inplace=True)
+        fitted_params = np.array([_fitted_param_dict[name] for name in value_order], dtype=np.float64)
+        _cov_df = pd.DataFrame(cov_matrix, index=value_order, columns=value_order)
+        _corr_df = pd.DataFrame(corr_matrix, index=value_order, columns=value_order)
         
-        plt.scatter(kfit, chifit - _calc - (idx+2) * vshift, color="black", linewidth=0.5, s=20, marker= "o", facecolors='none')
+        # TODO: come fa la varianza ad essere negativa lo sa solo il diavolo, però succede.
+        # Ma che cazzo, numpy?
+        _std_err = pd.Series(np.sqrt(np.diag(cov_matrix)), index=value_order)
 
-        window = flattop_window(kfit, (kfit[0], kfit[0]+0.5, kfit[-1]-0.5, kfit[-1]), 'hanning')
+        external_pars = [v for v in value_order if not v.startswith("_")]
 
-        r = np.linspace(0, 7, 1000)
-        fdat = fourier(kfit, chifit * window, r)
-        fchi = fourier(kfit, _calc * window, r)
+        # Prepare fit result --------------------------------------------------------------------------------
+        partial_phases: dict[str, npt.NDArray[np.floating]] = {
+            phase.name: phase.chi(kfit, kweight, **_fitted_param_dict) for phase in self.phases
+        }
+        fittedknchi = self.calc(kfit, _fitted_param_dict, kweight)
 
-        vshift = np.ptp(fchi.real)/2
-        plt.figure()
-        plt.scatter(r, np.abs(fdat), color="green", marker="+", linewidth=0.5, s=20, label='Data')
-        plt.scatter(r, np.imag(fdat), color="green", marker="x", linewidth=0.5, s=20)
 
-        plt.plot(r, np.abs(fchi), color="black", label='Fit')
-        plt.plot(r, np.imag(fchi), color="black")
+        params = pd.Series(
+            data=[_fitted_param_dict[name] for name in external_pars],
+            index=external_pars
+        )
 
-        for idx,phas in enumerate(self.phases, start=1):
-            part = fourier(kfit, phas.chi(kfit, kweight, **vars) * window, r)
-            plt.plot(r, np.imag(part) - idx * vshift, label=f'Phase {idx}', color="orange")
-            plt.plot(r, np.abs(part) - idx * vshift, label=f'Phase {idx}', color="orange", linewidth=0.5)
-            plt.plot(r, -np.abs(part) - idx * vshift, label=f'Phase {idx}', color="orange", linewidth=0.5)
-        
-        plt.scatter(r, np.imag(fdat - fchi) - (idx+2) * vshift, color="black", linewidth=0.5, s=20, marker= "o", facecolors='none')
+        cov_df = _cov_df.loc[external_pars, external_pars]
+        corr_df = _corr_df.loc[external_pars, external_pars]
+        std_err = _std_err.loc[external_pars]
+
+        # Regression statistics -----------------------------------------------------------------------
+        chi2 = float(np.sum(residual**2))
+        tss = np.sum((chifit - np.mean(chifit))**2)
+        r2 = float(1.0 - chi2 / tss)
+        red_chi2 = float(chi2 / dof)
+        red_r2 = float(1.0 - (chi2 / dof) / (tss / (n_obs - 1)))
 
         return ExafsFitResult(
-            fitted_vars=vars,
-            chi_squared=float(result.cost * 2),
-            reduced_chi_squared=float(result.cost * 2 / (len(kfit) - len(self.vars))),
-            fittedchi=self.calc(kfit, vars, kweight),
-            residuals=residuals(result.x),
-            partialphases={f'phase_{i}': phase.chi(kfit, kweight, **vars) for i,phase in enumerate(self.phases)},
+            fitted_vars = params,
+            kaxis = kfit,
+            fittedknchi = fittedknchi,
+            partialknphases = partial_phases,
+
+            _param_order = param_order,
+            _fitted_params = fitted_params,
+            _expressions = self.exps,
+
+            std_errors = std_err,
+            covariance = cov_df,
+            correlation = corr_df,
+
+            weights = dk_weight,
+            krange = krange,
+
+            residuals = residual,
+            difference = chifit - fittedknchi,
+            chi_squared = chi2,
+            reduced_chi_squared = red_chi2,
+            R_squared = r2,
+            reduced_R_squared = red_r2,
+            dof = dof,
+            n_params = n_params,
+            n_points = n_obs,
+            residual_variance = float(residual_variance),
+            
+            finalresult = result,
+            history = history,
+            
+            kdata = kfit,
+            knchidata = chifit,
+            kpow = kweight
         )

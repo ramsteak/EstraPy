@@ -1,7 +1,6 @@
 import re
 import numpy as np
 from numpy import typing as npt
-import pandas as pd
 
 from lark import Token, Tree
 from pathlib import Path
@@ -12,9 +11,9 @@ from functools import partial
 from .. import __version__
 from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
-from ..grammar.mathexpressions import Expression
-from ..core.datastore import Domain, DataPage, ColumnDescription, ColumnKind, FileMetadata
+from ..core.commandparser import CommandArgumentParser
+from ..core.grammar.mathexpressions import Expression
+from ..core.datastore import Domain, FileMetadata
 
 
 @dataclass(slots=True)
@@ -50,7 +49,7 @@ def save_to_file(filepath: Path, data: npt.NDArray[Any], columns: list[str], hea
     strdata = np.char.mod('%10.6f', data)
     # The column width is determined by the maximum length of data in each column plus some padding
     colwidth = max(int(np.char.str_len(strdata).max()), max(len(col) for col in columns)) + 1
-    header += "\n# " + "  ".join(c.ljust(colwidth) for c in columns) + "\n"
+    header += "# " + "  ".join(c.ljust(colwidth) for c in columns) + "\n"
 
     # Ensure path exists
     filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -87,7 +86,7 @@ class Command_Save(Command[CommandArguments_Save, CommandResult_Save]):
 
         column_names = [expr.to_string() for expr in args.columns]
         
-        for name, page in context.datastore.pages.items():
+        for _, page in context.datastore.pages.items():
             filename = RE_VARNAME.sub(partial(_replace_name_vars, meta=page.meta), args.path)
             filepath = context.paths.outputdir / filename
             domain = page.domains[Domain.RECIPROCAL] # TODO: make domain selectable            

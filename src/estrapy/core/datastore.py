@@ -22,6 +22,7 @@ class ColumnKind(Enum):
     AXIS = 'axis'  # e.g. energy, k, r, etc.
     DATA = 'data'  # e.g. I0, mu, chi, etc.
     ERROR = 'error'  # e.g. sI0, smu, etc
+    DOFS = 'dofs'  # degrees of freedom for statistical analysis, eg vI0, vmu
     TEMP = 'temp'  # temporary columns, removed after import e.g. magnitude and phase -> complex value
 
 
@@ -33,6 +34,7 @@ class ColumnDescription:
     deps: list[str] = field(default_factory=list[str])
     calc: Callable[[pd.DataFrame], pd.Series] | None = None
     labl: str | None = None
+    refs: list[str] = field(default_factory=list[str])
 
 
 @dataclass(slots=True)

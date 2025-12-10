@@ -13,7 +13,7 @@ from ..core.context import Context, ParseContext
 from ..core.datastore import Domain, DataPage, ColumnDescription, ColumnKind
 from ..core.number import Number, parse_number, parse_range, Unit, parse_edge
 from ..core.threaded import execute_threaded
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..operations.edge_detection import correlation_edge_detection, SlidingL2Result
 
 

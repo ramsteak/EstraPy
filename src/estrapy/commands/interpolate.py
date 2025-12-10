@@ -8,7 +8,7 @@ from typing import Self
 
 from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_number, Unit, parse_range
 from ..core.datastore import Domain, ColumnKind
 from ..core.misc import fuzzy_match

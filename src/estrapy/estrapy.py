@@ -9,11 +9,11 @@ import logging  # noqa: E402
 import re  # noqa: E402
 
 from pathlib import Path  # noqa: E402
-from lark.exceptions import VisitError  # noqa: E402
+from lark.exceptions import VisitError, UnexpectedToken  # noqa: E402
 
-from . import __version__, __version_tuple__  # noqa: E402
+from . import __version__, __version_tuple__, copyright  # noqa: E402
 from .dispatcher import execute_script  # noqa: E402
-from .grammar import file_parser  # noqa: E402
+from .core.grammar.estrapyparser import file_parser  # noqa: E402
 from .transformer import EstraTransformer
 from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
 from .core.errors import ParseError  # noqa: E402
@@ -71,11 +71,11 @@ def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.L
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description='Analyze XAS data files from an instruction file.',
-        epilog='(c) 2024 Marco Stecca',
+        epilog=copyright,
     )
     parser.add_argument(
         'inputfile',
-        type=Path,
+        type=str,
         nargs='?',
         default=None,
         help='Path to the input .estra file. If not provided, reads from stdin.',
@@ -140,6 +140,7 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
             timings=args.timings or args.debug,
         ),
         logger=logging.getLogger('estrapy'),
+        parser=file_parser,
     )
 
     if args.cwd is not None:
@@ -149,30 +150,45 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
             raise FileNotFoundError(f"Current working directory '{args.cwd}' does not exist or is not a directory.")
 
     # Set input file and projectname in context
-    inputfile: Path | None = args.inputfile
-    if inputfile is not None:
-        inputfile = inputfile.resolve()
-        if inputfile.exists() and inputfile.is_file():
+    inputfile_str: str | None = args.inputfile
+
+    match inputfile_str:
+        case None:
+            context.options.interactive = True
+            inputfile = None
+        case "-":
+            import sys
+            inputfile = sys.stdin
+        case "?":
+            # Discover input files in the current working directory and ask the user to select one
+            discovered_files = discover_input_files(context.paths.workingdir)
+            if not discovered_files:
+                raise FileNotFoundError(f'No input files found in directory {context.paths.workingdir} for interactive selection.')
+            selected_file = select_input_file([str(f.relative_to(context.paths.workingdir)) for f in discovered_files])
+            inputfile = context.paths.workingdir / selected_file
+            context.paths.inputfile = inputfile.resolve()
+            context.paths.workingdir = inputfile.parent
+            context.projectname = inputfile.stem
+        case "*":
+            raise NotImplementedError('Batch processing of all input files in a directory is not implemented yet.')
+        case str(inputfile):
+            inputfile = Path(inputfile).resolve()
+            if not inputfile.exists() or not inputfile.is_file():
+                raise FileNotFoundError(f"Input file '{inputfile}' does not exist or is not a file.")
             context.paths.inputfile = inputfile
             context.paths.workingdir = inputfile.parent
             context.projectname = inputfile.stem
-        else:
-            raise FileNotFoundError(f"Input file '{args.inputfile}' does not exist or is not a file.")
-        context.options.interactive = False
-    else:
-        context.projectname = context.paths.workingdir.name
-        context.options.interactive = True
 
     # Set output directory in context and create it if it doesn't exist
     outputdir: Path | None = args.outputdir
     match outputdir, inputfile, context.options.interactive:
         case None, Path(), False:  # input file provided, no output dir provided
             context.paths.outputdir = inputfile.with_suffix('').resolve()
-        case outdir, Path(), False:
+        case outdir, Path(), False if outdir is not None:
             context.paths.outputdir = outdir.resolve()
         case None, None, True:  # interactive mode, no output dir provided
             context.paths.outputdir = context.paths.workingdir
-        case outdir, None, True:  # interactive mode, output dir provided
+        case outdir, None, True if outdir is not None:  # interactive mode, output dir provided
             context.paths.outputdir = outdir.resolve()
         case _:
             raise RuntimeError('Unreachable state when setting output directory.')
@@ -191,6 +207,26 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
 
     return context
 
+def discover_input_files(directory: Path) -> list[Path]:
+    return list(filter(
+        lambda p: p.suffix.lower() in ('.estra', '.inp', '.estrapy'),
+        directory.rglob('*.*')
+    ))
+
+def select_input_file(files: list[str]) -> str:
+    import inquirer # pyright: ignore[reportMissingTypeStubs] # 
+
+    questions = [
+        inquirer.List(
+            'inputfile',
+            message='Multiple input files found. Please select one to process:',
+            choices=files,
+        )
+    ]
+    answers = inquirer.prompt(questions) # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
+    if answers is None or 'inputfile' not in answers:
+        raise RuntimeError('No input file selected.')
+    return str(answers['inputfile']) # pyright: ignore[reportUnknownArgumentType]
 
 def main() -> None:
     timers = TimerCollection()
@@ -211,11 +247,56 @@ def main() -> None:
     log.debug(f"Time to load imports: {(timers["imports"]) / 1e6:.2f} ms")
 
     # Parse the input file
-    assert context.paths.inputfile is not None, 'Interactive mode (no input file) is not implemented yet.'
+    match context.options.interactive, context.paths.inputfile:
+        case True, _:
+            estrapy_interactive_mode(context, timers)
+        case False, Path():
+            estrapy_file_mode(context, timers)
+        case _:
+            raise RuntimeError('Unreachable state when determining execution mode.')
 
+def estrapy_interactive_mode(context: Context, timers: TimerCollection) -> None:
+    parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'), context.parser)
+    transformer = EstraTransformer(parsecontext)
+    
+    previous = ""
+    while True:
+        prompt = '...    ' if previous else ' > '
+        line = input(prompt) + "\n"
+        if previous:
+            line = "    " + line  # Preserve indentation for continued lines
+
+        if line.strip().endswith('\\'):
+            previous += line.strip()[:-1] + '\n'
+            continue
+
+        
+        line = previous + line
+        previous = ""
+
+        try:
+            parsed_tree = file_parser.parse(line) # pyright: ignore[reportUnknownMemberType]
+            script = transformer.transform(parsed_tree)
+            if script.commands[0].name == 'exit':
+                print('Exiting interactive mode.')
+                break
+            execute_script(script, context)
+        except UnexpectedToken as e:
+            print(f'Syntax error: {e}')
+        except ParseError as e:
+            print(f'Parse error: {e}')
+        except VisitError as e:
+            print(f'Error during execution: {e}')
+        
+            
+
+
+def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
+    log = context.logger
     with timers.time('parsing'):
         # Lark command parsing gives an error if all commands do not end in \n,
         # so we append \n to the input file so the last command has at least one.
+        assert context.paths.inputfile is not None, "Input file must be set in file mode."
         input_file_data = context.paths.inputfile.read_text() + '\n'
 
         # Check that the input file version is lower or equal to the program version
@@ -235,13 +316,13 @@ def main() -> None:
             raise ValueError(
                 f"The input file version {'.'.join(map(str, file_version))} is higher than the program version {__version__}. Please update the program."
             )
-        parsed_tree = file_parser.parse(input_file_data)  # type: ignore
+        parsed_tree = file_parser.parse(input_file_data) # pyright: ignore[reportUnknownMemberType]
 
         # Transform the parse tree into a more manageable structure
         try:
-            parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'))
+            parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'), context.parser)
             transformer = EstraTransformer(parsecontext)
-            t_tree = transformer.transform(parsed_tree)
+            script = transformer.transform(parsed_tree)
         except VisitError as ve:
             # On transformation error, check if it's a CommandSyntaxError and re-raise it with input file context
             if isinstance(ve.orig_exc, ParseError):
@@ -273,7 +354,7 @@ def main() -> None:
     with timers.time('execution'):
         # Execute the commands in the transformed tree
 
-        execute_script(t_tree, context)
+        execute_script(script, context)
     log.debug(f"Time to execute the script: {(timers["execution"]) / 1e6:.2f} ms")
 
     # End of the program
@@ -285,6 +366,36 @@ def main() -> None:
         log.info('Timing summary:')
         for line in context.timers.table_format('ms').splitlines():
             log.info(line)
+    
+    # Close all logging handlers
+    handlers = context.logger.handlers[:]
+    for handler in handlers:
+        handler.close()
+        context.logger.removeHandler(handler)
+    
+    # Archive output directory if requested
+    if context.options.archive:
+        import zipfile
+        timestr = "_" + context.starttime.strftime('%Y%m%d_%H%M%S')
+        titlestr = ("_" + context.projecttitle.replace(' ', '_')) if context.projecttitle else ""
+        archive_path = context.paths.outputdir.parent / f'{context.paths.outputdir.stem}{titlestr}{timestr}.zip'
+
+        # In the root of the zip file, we want the output directory itself, the estra input file
+        # and (in a future version) # TODO a copy of the imported data files, as pre-parsed
+        # (possibly as a data.h5 / data.parquet or similar)
+
+        with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for file in context.paths.outputdir.rglob('*'):
+                archive.write(
+                    file,
+                    arcname=file.relative_to(context.paths.outputdir.parent),
+                )
+            archive.write(
+                context.paths.inputfile,
+                arcname=context.paths.inputfile.name,
+            )
+            for path, archivepath in context.paths.additional_paths.items():
+                archive.write(path, arcname=archivepath)
 
 
 def entry_point() -> None:
@@ -299,7 +410,7 @@ def entry_point() -> None:
         else:
             import sys
 
-            print(f'Fatal error: {e}', file=sys.stderr)
+            print(f'Fatal error [{e.__class__.__name__}]: {e}', file=sys.stderr)
             exit(1)
 
 

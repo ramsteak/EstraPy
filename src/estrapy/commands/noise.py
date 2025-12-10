@@ -7,9 +7,9 @@ from numpy import typing as npt
 from functools import partial
 from typing import Self
 
-from ..core.grammarclasses import CommandArguments, Command
+from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 
@@ -19,6 +19,10 @@ class CommandArguments_Noise(CommandArguments):
     x: str
     y: str
 
+@dataclass(slots=True)
+class CommandResult_Noise(CommandResult):
+    ...
+
 
 parse_noise_command = CommandArgumentParser(CommandArguments_Noise)
 parse_noise_command.add_argument('x', '--xaxiscol', type=str, default='E')
@@ -26,7 +30,7 @@ parse_noise_command.add_argument('y', '--yaxiscol', type=str, default='a')
 
 
 @dataclass(slots=True)
-class Command_Noise(Command[CommandArguments_Noise, None]):
+class Command_Noise(Command[CommandArguments_Noise, CommandResult_Noise]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
@@ -38,13 +42,15 @@ class Command_Noise(Command[CommandArguments_Noise, None]):
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
-        expr = partial(estimate_noise, xcol=self.args.x, ycol=self.args.y, name='noise')
+    def execute(self, context: Context) -> CommandResult_Noise:
+        expr = partial(estimate_noise, xcol=self.args.x, ycol=self.args.y, name='sa')
 
         for _, page in context.datastore.pages.items():
             datadomain = page.domains[Domain.RECIPROCAL]
-            col = ColumnDescription('noise', None, ColumnKind.DATA, [self.args.x, self.args.y], expr)
+            col = ColumnDescription('sa', None, ColumnKind.DATA, [self.args.x, self.args.y], expr, 'Standard Deviation of absorbance', ['a'])
             datadomain.add_column(col.name, col)
+        
+        return CommandResult_Noise()
 
 
 def _estimate_noise_np(xy: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:

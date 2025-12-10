@@ -3,6 +3,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Any
 from datetime import datetime
+from lark import Lark
 
 from .timers import TimerCollection
 from .datastore import DataStore
@@ -30,6 +31,9 @@ class Paths:
     # Output file path. Contains the output of the program as a report.
     outfile: Path | None
 
+    # Additional paths that have been needed during execution, as (source, archive path) tuples.
+    additional_paths: dict[Path,Path] = field(default_factory=dict[Path,Path])
+
 
 @dataclass(slots=True)
 class Options:
@@ -39,6 +43,7 @@ class Options:
     verbose: bool = False
     debug: bool = False
     timings: bool = False
+    archive: bool = False
 
     # Whether interactive mode is enabled.
     interactive: bool = False
@@ -60,6 +65,12 @@ class Context:
 
     # Logger object for logging.
     logger: Logger
+
+    # Parser object for parsing commands
+    parser: Lark
+
+    # Project title, set from a directive. Used to comment the zip output.
+    projecttitle: str = ''
 
     # Variables defined in the script.
     vars: dict[str, Any] = field(default_factory=dict[str, Any])
@@ -86,3 +97,6 @@ class ParseContext:
 
     # Logger object for logging.
     logger: Logger
+
+    # Grammar parser
+    parser: Lark

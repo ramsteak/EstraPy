@@ -7,7 +7,7 @@ from typing import Self
 
 from ..core.grammarclasses import CommandArguments, Command
 from ..core.context import Context, ParseContext
-from ..grammar.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, Unit
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 from ..core.misc import fmt

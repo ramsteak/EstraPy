@@ -14,10 +14,10 @@ from os import cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.errors import CommandSyntaxError, ExecutionError
-from ..core.grammarclasses import CommandArguments, Command
+from ..core.grammarclasses import CommandArguments, Command, CommandResult
 from ..core.number import Number, parse_number, Unit
 from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
-from ..core.misc import peek, Bag, fmt
+from ..core.misc import peek, Bag, fmt, guess_type
 from ..core.context import Context, ParseContext
 
 import pandas as pd
@@ -900,19 +900,6 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
     )
 
 
-def guess_type(s: str) -> str | Number | int:
-    # Try to guess if the string is an integer, a number with unit, or just a string
-    try:
-        return int(s)
-    except ValueError:
-        pass
-    try:
-        return parse_number(s)
-    except ValueError:
-        pass
-    return s
-
-
 def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
     # Parse header lines for variable definitions. Each header position is defined
     # as a variable, in the format .h<line>.<position>, starting from 1.
@@ -1057,9 +1044,11 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
         newdata,
     )
 
+class CommandResults_filein(CommandResult):
+    pass
 
 @dataclass(slots=True)
-class Command_Filein(Command[CommandArguments_filein, None]):
+class Command_Filein(Command[CommandArguments_filein, CommandResults_filein]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
