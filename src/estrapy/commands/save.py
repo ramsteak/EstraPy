@@ -112,6 +112,7 @@ class Command_Save(Command[CommandArguments_Save, CommandResult_Save]):
             headerlines.extend([f"#V {k} {v}" for k,v in page.meta._dict.items() if not k.startswith('.')])  # pyright: ignore[reportPrivateUsage]
             header = "\n".join(headerlines)
             header += f"\n{page.meta.header}"
+            header += '\n' if not header.endswith('\n') else ''
 
             save_to_file(filepath, columns[select_idx,:], column_names, header)
             log.debug(f"Saved file '{filepath}' with {np.sum(select_idx)} rows.")
