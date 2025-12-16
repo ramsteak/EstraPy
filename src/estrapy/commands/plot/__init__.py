@@ -66,6 +66,9 @@ class CommandArguments_Plot(CommandArguments):
     ygrid: bool | None
     grid: bool | None
 
+    # Figure customization
+    figsize: tuple[float, float] | None
+
 
 @dataclass(slots=True)
 class CommandResult_Plot(CommandResult):
@@ -111,6 +114,10 @@ parse_plot_command.add_argument('grid', '--grid', action='set_true', default=Non
 parse_plot_command.add_argument('xgrid', '--xgrid', action='set_true', default=None, nargs=0)
 parse_plot_command.add_argument('ygrid', '--ygrid', action='set_true', default=None, nargs=0)
 
+def parse_x_tuple_floats(value: str) -> tuple[float, float]:
+    a,b = value.split('x')
+    return (float(a), float(b))
+parse_plot_command.add_argument('figsize', '--figsize', type=parse_x_tuple_floats, default=None)
 
 @dataclass(slots=True)
 class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
