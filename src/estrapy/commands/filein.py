@@ -930,7 +930,13 @@ def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
     stat = file.stat()
     vars['.fs'] = stat.st_size                  # File size in bytes
     vars['.fa'] = int(stat.st_atime)            # Last access time
-    vars['.fc'] = int(stat.st_birthtime)        # Creation time
+    # Check if creation time is available (only on some OS)
+    if hasattr(stat, 'st_birthtime'):
+        vars['.fc'] = int(stat.st_birthtime)
+    elif hasattr(stat, 'st_ctime'):
+        vars['.fc'] = int(stat.st_ctime) # pyright: ignore[reportDeprecated]
+    else:
+        vars['.fc'] = -1 # Creation time not available
     vars['.fm'] = int(stat.st_mtime)            # Last modification time
     return vars
 
