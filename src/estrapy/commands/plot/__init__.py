@@ -75,7 +75,7 @@ parse_plot_command.add_argument('color', '--color', type=str, default=None)
 parse_plot_command.add_argument('alpha', '--alpha', type=float, default=None)
 
 parse_plot_command.add_argument('linestyle', '--linestyle', type=str, default=None)
-for style in ['solid', 'dashed', 'dotted', 'dashdot']:
+for style in ['solid', 'dashed', 'dotted', 'dashdot', 'noline']:
     parse_plot_command.add_argument(None, f'--{style}', type=str, action='store_const', dest='linestyle', const=style, nargs=0)
 
 parse_plot_command.add_argument('linewidth', '--linewidth', type=float, default=None)
