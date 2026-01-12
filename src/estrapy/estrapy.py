@@ -357,6 +357,20 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
         execute_script(script, context)
     log.debug(f"Time to execute the script: {(timers["execution"]) / 1e6:.2f} ms")
 
+    # Show the plots if any were created
+    if context.plotcontext.nonnumberedfigures or context.plotcontext.numberedfigures:
+        for fign, figspec in context.plotcontext.numberedfigures.items():
+            from .commands.plot.show import realize_figure
+            fig = realize_figure(figspec)
+            fig.savefig(context.paths.outputdir / f'figure_{fign}.png', dpi=300) # pyright: ignore[reportUnknownMemberType]
+            fig.show()
+        for ufign, figspec in enumerate(context.plotcontext.nonnumberedfigures):
+            from .commands.plot.show import realize_figure
+            fig = realize_figure(figspec)
+            fig.savefig(context.paths.outputdir / f'figure_u{ufign}.png', dpi=300) # pyright: ignore[reportUnknownMemberType]
+            fig.show()
+        from matplotlib import pyplot as plt
+        plt.show()
     # End of the program
 
     timers.stop()

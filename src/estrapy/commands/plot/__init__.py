@@ -1,31 +1,19 @@
+import numpy as np
 from numpy import typing as npt
 from lark import Token, Tree
 
 from dataclasses import dataclass
-from typing import Self, Any, Literal
+from typing import Self, Any
 
-from ...core.grammarclasses import CommandArguments, Command, CommandResult
-from ...core.context import Context, ParseContext
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+
+from ...core.context import CommandArguments, Command, CommandResult
+from ...core.context import Context, ParseContext, PlotContext, FigureSpecification, AxisSpecification
+from ...core.datastore import DataPage
 from ...core.commandparser import CommandArgumentParser
 from ...core.grammar.mathexpressions import Expression
 from ...core.grammar.axisindexpos import AxisIndexPosition
-
-class PlotKind:
-    ...
-
-class VariablePlotKind(PlotKind):
-    x: Expression[Any]
-    y: Expression[Any]
-    x_variable_kind: Literal["value", "index"]
-
-class ExpressionPlotKind(PlotKind):
-    x_expression: Expression[npt.NDArray[Any]]
-    y_expression: Expression[npt.NDArray[Any]]
-
-class ResultPlotKind(PlotKind):
-    result_name: str
-    result_kind: str
-
 
 @dataclass(slots=True)
 class CommandArguments_Plot(CommandArguments):
@@ -119,6 +107,15 @@ def parse_x_tuple_floats(value: str) -> tuple[float, float]:
     return (float(a), float(b))
 parse_plot_command.add_argument('figsize', '--figsize', type=parse_x_tuple_floats, default=None)
 
+def freeze_to_vars(page: DataPage) -> dict[str, Any]:
+    vars: dict[str, Any] = {}
+    for domain in page.domains.values():
+        # Freeze raw names of the data columns
+        vars |= {str(n):s.values for n,s in domain.data.items()} # pyright: ignore[reportArgumentType]
+        # Freeze current names for the columns
+        vars.update({vname: vars.get(collist[-1].meta.physicalname) for vname, collist in domain.columns.items()})
+    return page.meta._dict | vars # pyright: ignore[reportPrivateUsage]
+
 @dataclass(slots=True)
 class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
     @classmethod
@@ -153,5 +150,83 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
         )
 
     def execute(self, context: Context) -> CommandResult_Plot:
-        ...
+        # Shorthand
+        plotcontext: PlotContext = context.plotcontext
 
+        # First, we determine the figure and axis to plot on
+        if self.args.figure is not None:
+            fignum = self.args.figure.figurenumber
+            # Use the given fignum. Create it if it does not exist.
+            ifigure = plotcontext.numberedfigures.setdefault(fignum, FigureSpecification())
+            # Check if the axis exists in the figure
+            iaxis = ifigure.axes.setdefault(self.args.figure.axisindex, AxisSpecification(pos=self.args.figure))
+        else:
+            # Since a figure number was not specified, create a new figure as a non-numbered figure
+            ifigure = FigureSpecification()
+            plotcontext.nonnumberedfigures.append(ifigure)
+
+            iaxis = AxisSpecification(pos=AxisIndexPosition(-1, (1,1), (None, None)))
+            ifigure.axes[(1,1)] = iaxis
+
+        
+        # Apply figure size if specified
+        if self.args.figsize is not None:
+            ifigure.figsize = self.args.figsize
+        
+        # Apply axis settings if specified
+        if self.args.xlabel is not None:
+            iaxis.callbacks.append(lambda ax, fig: ax.set_xlabel(self.args.xlabel)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.ylabel is not None:
+            iaxis.callbacks.append(lambda ax, fig: ax.set_ylabel(self.args.ylabel)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.title is not None:
+            iaxis.callbacks.append(lambda ax, fig: ax.set_title(self.args.title)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.suptitle is not None:
+            iaxis.callbacks.append(lambda ax, fig: fig.suptitle(self.args.suptitle)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        
+        # Grid specifications
+        if self.args.xgrid is True:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='x', which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.ygrid is True:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='y', which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.grid is True:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        
+        # Limits specifications
+        if self.args.xlim is not None:
+            iaxis.callbacks.append(lambda ax, fig: ax.set_xlim(self.args.xlim)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        if self.args.ylim is not None:
+            iaxis.callbacks.append(lambda ax, fig: ax.set_ylim(self.args.ylim)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        
+        # Plotting logic
+        # We need to determine wether the plot kind is a series of spectra, a series of variables
+        # or the result of a previous command.
+        if self.args.kind is not None:
+            # Freeze the pages into variable dictionaries for expression evaluation (both kind and color)
+            frozenpages = {name: freeze_to_vars(page) for name, page in context.datastore.pages.items()}
+            # An expression requires xaxis:yaxis, separated by a colon, so we can assume that if there
+            # is a colon and both parts parse as expressions, it is an expression plot (either variable or spectra).
+            try:
+                if ':' in self.args.kind:
+                    xpart, ypart = self.args.kind.split(':', 1)
+                    # Try to parse both parts as expressions
+                    xexpr = Expression.compile(xpart)
+                    yexpr = Expression.compile(ypart)
+
+                    xaxis: list[npt.NDArray[np.floating] | float] = []
+                    yaxis: list[npt.NDArray[np.floating] | float] = []
+
+                    for name, fpage in frozenpages.items():
+                        xval, yval = xexpr(**fpage), yexpr(**fpage)
+                        xaxis.append(xval)
+                        yaxis.append(yval)
+
+                    def cb(ax: Axes, fig: Figure) -> Any:
+                        rs: list[Any] = []
+                        for xval, yval in zip(xaxis, yaxis):
+                            rs.append(ax.plot(xval, yval))
+                        return rs
+                
+                    iaxis.callbacks.append(cb)
+            
+            except Exception:
+                print("AAAAAAAAA Debug error")

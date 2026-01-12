@@ -13,7 +13,7 @@ plotspec_parser = Lark(
     propagate_positions=True,
 )
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AxisIndexPosition:
     figurenumber: int
     axisindex: tuple[int, int]
