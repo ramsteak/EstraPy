@@ -2,7 +2,7 @@ from lark import Token, Tree
 
 from .directives import Directive_define, Directive_clear, execute_directive, Directive_archive, sorted_directives, Directive_title
 
-from ..core.grammarclasses import Directive, CommandArguments, Command, CommandResult
+from ..core.context import Directive, CommandArguments, Command, CommandResult
 from ..core.errors import CommandSyntaxError
 from ..core.number import parse_number
 from ..core.context import ParseContext

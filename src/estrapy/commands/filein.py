@@ -14,7 +14,7 @@ from os import cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..core.errors import CommandSyntaxError, ExecutionError
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult, Context, ParseContext
 from ..core.number import Number, parse_number, Unit
 from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
 from ..core.misc import peek, Bag, fmt, guess_type

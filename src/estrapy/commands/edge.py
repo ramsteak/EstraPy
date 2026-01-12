@@ -9,7 +9,7 @@ from typing import Self
 from functools import partial
 
 from ..core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.number import Number, parse_number, Unit, parse_range, parse_edge
 from ..core.threaded import execute_threaded

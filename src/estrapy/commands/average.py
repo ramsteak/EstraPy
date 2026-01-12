@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Self, Any
 from itertools import batched
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.misc import Bag

@@ -4,7 +4,7 @@ from dataclasses import dataclass, fields, MISSING
 from types import EllipsisType
 from enum import Enum
 
-from .grammarclasses import CommandArguments
+from .context import CommandArguments
 from .errors import ParseError
 from .errors import ArgumentError, DuplicateArgumentError
 from .context import ParseContext

@@ -1,12 +1,27 @@
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from datetime import datetime
 from lark import Lark
 
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+
 from .timers import TimerCollection
 from .datastore import DataStore
+
+from .grammar.axisindexpos import AxisIndexPosition
+
+
+@dataclass(slots=True)
+class Directive: ...
+
+@dataclass(slots=True)
+class CommandArguments: ...
+
+@dataclass(slots=True)
+class CommandResult: ...
 
 
 @dataclass(slots=True)
@@ -50,6 +65,40 @@ class Options:
 
 
 @dataclass(slots=True)
+class ParseContext:
+    # Paths object containing all relevant paths.
+    paths: Paths
+
+    # Timers object containing all relevant timers.
+    timers: TimerCollection
+
+    # Logger object for logging.
+    logger: Logger
+
+    # Grammar parser
+    parser: Lark
+
+
+# Plotting context
+@dataclass(slots=True)
+class AxisSpecification:
+    pos:  AxisIndexPosition
+    callbacks: list[Callable[[Axes, Figure], Any]] = field(default_factory=list[Any])
+
+@dataclass(slots=True)
+class FigureSpecification:
+    figsize: tuple[float, float] | None = None
+    # Index the axes with (row, column) tuples, without the size specified
+    axes: dict[tuple[int, int], AxisSpecification] = field(default_factory=dict[tuple[int, int], AxisSpecification])
+
+@dataclass(slots=True)
+class PlotContext:
+    # Hold all figure settings
+    numberedfigures: dict[int, FigureSpecification] = field(default_factory=dict[int, FigureSpecification])
+    nonnumberedfigures: list[FigureSpecification] = field(default_factory=list[FigureSpecification])
+    
+
+@dataclass(slots=True)
 class Context:
     # Paths object containing all relevant paths.
     paths: Paths
@@ -82,21 +131,40 @@ class Context:
     # DataStore object containing all loaded data files.
     datastore: DataStore = field(default_factory=DataStore)
 
+    # Results of the executed commands
+    results: dict[str, CommandResult] = field(default_factory=dict[str, CommandResult])
+
     # overwrite __repr__ to avoid printing the entire context in debug logs
     def __repr__(self) -> str:
         return f'Context(projectname={self.projectname}, paths={self.paths}, options={self.options}, ...)'
 
+    # Plotting context
+    plotcontext: PlotContext = field(default_factory=PlotContext)
+
+
+from typing import NamedTuple
+from lark import Token, Tree
+from dataclasses import dataclass
+from typing import Self, Generic, TypeVar
+
+from .context import ParseContext, Context
+
+_A = TypeVar('_A', bound=CommandArguments, covariant=True)
+_R = TypeVar('_R', bound=CommandResult, covariant=True)
 
 @dataclass(slots=True)
-class ParseContext:
-    # Paths object containing all relevant paths.
-    paths: Paths
+class Command(Generic[_A, _R]):
+    line: int
+    name: str
+    args: _A
+    outname : str | None = None
 
-    # Timers object containing all relevant timers.
-    timers: TimerCollection
+    @classmethod
+    def parse(cls, commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext) -> Self: ...
 
-    # Logger object for logging.
-    logger: Logger
+    def execute(self, context: Context) -> _R: ...
 
-    # Grammar parser
-    parser: Lark
+
+class Script(NamedTuple):
+    directives: list[Directive]
+    commands: list[Command[CommandArguments, CommandResult]]

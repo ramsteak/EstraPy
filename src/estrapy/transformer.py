@@ -2,7 +2,7 @@ from lark import Transformer, Token
 from typing import Any
 
 
-from .core.grammarclasses import Command, Script, Directive, CommandArguments, CommandResult
+from .core.context import Command, Script, Directive, CommandArguments, CommandResult
 from .core.context import ParseContext
 from .commands import parse_command, parse_directive
 

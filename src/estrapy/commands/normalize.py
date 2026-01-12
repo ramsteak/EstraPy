@@ -3,7 +3,7 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from ..core.grammarclasses import CommandArguments, Command
+from ..core.context import CommandArguments, Command
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, try_parse_number

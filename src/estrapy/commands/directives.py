@@ -4,8 +4,7 @@ from logging import getLogger
 from typing import Any
 
 from ..core.number import Number
-from ..core.grammarclasses import Directive
-from ..core.context import Context
+from ..core.context import Directive, Context
 
 
 @dataclass(slots=True)

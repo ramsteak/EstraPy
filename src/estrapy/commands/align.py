@@ -8,7 +8,7 @@ from lark import Token, Tree
 from typing import Self
 from functools import partial
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.datastore import Domain, DataPage, ColumnDescription, ColumnKind
 from ..core.number import Number, parse_number, parse_range, Unit, parse_edge

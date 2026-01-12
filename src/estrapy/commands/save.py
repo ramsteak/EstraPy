@@ -9,7 +9,7 @@ from typing import Self, Any
 from functools import partial
 
 from .. import __version__
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.grammar.mathexpressions import Expression

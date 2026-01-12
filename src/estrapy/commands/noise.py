@@ -7,7 +7,7 @@ from numpy import typing as npt
 from functools import partial
 from typing import Self
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 

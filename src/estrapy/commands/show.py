@@ -3,7 +3,7 @@ from lark import Token, Tree
 from dataclasses import dataclass, field
 from typing import Self
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.misc import fuzzy_match, Bag

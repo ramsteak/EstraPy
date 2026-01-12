@@ -10,7 +10,7 @@ from typing import Self
 from matplotlib import pyplot as plt
 from matplotlib.colors import SymLogNorm
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.number import Number, parse_range, Unit

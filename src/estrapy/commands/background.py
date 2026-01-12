@@ -8,7 +8,7 @@ from typing import Self
 from functools import partial
 from logging import Logger
 
-from ..core.grammarclasses import CommandArguments, Command, CommandResult
+from ..core.context import CommandArguments, Command, CommandResult
 from ..core.threaded import execute_threaded
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
