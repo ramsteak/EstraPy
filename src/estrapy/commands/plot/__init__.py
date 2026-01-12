@@ -108,7 +108,7 @@ def parse_x_tuple_floats(value: str) -> tuple[float, float]:
 parse_plot_command.add_argument('figsize', '--figsize', type=parse_x_tuple_floats, default=None)
 
 def freeze_to_vars(page: DataPage) -> dict[str, Any]:
-    vars: dict[str, Any] = {}
+    vars: dict[str, Any] = {k.replace(".","_"):v for k,v in page.meta._dict.items()}
     for domain in page.domains.values():
         # Freeze raw names of the data columns
         vars |= {str(n):s.values for n,s in domain.data.items()} # pyright: ignore[reportArgumentType]
@@ -220,13 +220,23 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
                         xaxis.append(xval)
                         yaxis.append(yval)
 
-                    def cb(ax: Axes, fig: Figure) -> Any:
-                        rs: list[Any] = []
-                        for xval, yval in zip(xaxis, yaxis):
-                            rs.append(ax.plot(xval, yval))
-                        return rs
-                
+                    # Determine if the plot is a collection of line plots or one plot
+                    if all(isinstance(x, np.ndarray) and isinstance(y, np.ndarray) for x,y in zip(xaxis, yaxis)):
+                        # Multiple line plots
+                        def cb(ax: Axes, fig: Figure) -> Any:
+                            rs: list[Any] = []
+                            for xval, yval in zip(xaxis, yaxis):
+                                rs.append(ax.plot(xval, yval))
+                            return rs
+                    else:
+                        # Single plot. First, we put everything into flat arrays
+                        xflat = np.array(xaxis, dtype=float)
+                        yflat = np.array(yaxis, dtype=float)
+
+                        def cb(ax: Axes, fig: Figure) -> Any:
+                            return ax.plot(xflat, yflat)
+                    
                     iaxis.callbacks.append(cb)
             
-            except Exception:
+            except Exception as e:
                 print("AAAAAAAAA Debug error")
