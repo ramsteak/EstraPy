@@ -114,7 +114,7 @@ def freeze_to_vars(page: DataPage) -> dict[str, Any]:
         vars |= {str(n):s.values for n,s in domain.data.items()} # pyright: ignore[reportArgumentType]
         # Freeze current names for the columns
         vars.update({vname: vars.get(collist[-1].meta.physicalname) for vname, collist in domain.columns.items()})
-    return page.meta._dict | vars # pyright: ignore[reportPrivateUsage]
+    return vars # pyright: ignore[reportPrivateUsage]
 
 @dataclass(slots=True)
 class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
