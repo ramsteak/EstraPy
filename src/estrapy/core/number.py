@@ -44,6 +44,9 @@ class Number:
         # Add '+' sign for positive numbers. Negative numbers already have '-' sign in str(self.value)
         return f"{self.sign if self.sign == '+' else ''}{self.value}{self.unit.value if self.unit else ''}"
 
+    def __float__(self) -> float:
+        return self.value
+
 SI_MULTIPLIERS: dict[str, float] = {
     # 'Q': 1e30,  # Useless
     # 'R': 1e27,  # Useless
