@@ -1,6 +1,5 @@
 from .commands import execute_directive, sorted_directives
-from .core.grammarclasses import Script
-from .core.context import Context
+from .core.context import Script, Context
 
 def execute_script(script: Script, context: Context) -> None:
     with context.timers.time('execution/directives'):
@@ -9,4 +8,7 @@ def execute_script(script: Script, context: Context) -> None:
  
     for command in script.commands:
         with context.timers.time(f'execution/{command.name} (line {command.line})'):
-            command.execute(context)
+            res = command.execute(context)
+            
+            if res is not None: # pyright: ignore[reportUnnecessaryComparison]
+                context.results[command.outname or command.name] = res
