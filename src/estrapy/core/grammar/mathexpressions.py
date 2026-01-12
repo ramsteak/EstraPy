@@ -32,6 +32,7 @@ class MathExpressionCompiler(Transformer[Token, str]):
     def var(self, n: list[Token]) -> str:
         return f"{n[0].value}"
     def evar(self, n: list[Token]) -> str:
+        # Replace dots with underscores for escaped vars
         return f"{n[0].value.replace('.', '_')}"
     
     def add(self, args: list[Token | str]):
@@ -203,6 +204,9 @@ def get_required_vars(expression: str | Tree[Token]) -> set[str]:
             self.vars: set[str] = set()
         def var(self, n: list[Token]) -> None:
             self.vars.add(n[0].value)
+        def evar(self, n: list[Token]) -> None:
+            self.vars.add(n[0].value.replace('.', '_'))
+    
     vf = VarFinder()
     vf.transform(expression)
     return vf.vars
