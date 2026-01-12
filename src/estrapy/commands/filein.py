@@ -18,6 +18,7 @@ from ..core.context import CommandArguments, Command, CommandResult, Context, Pa
 from ..core.number import Number, parse_number, Unit
 from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
 from ..core.misc import peek, Bag, fmt, guess_type
+from ..core.extracttimestamp import extract_datetime_from_file
 
 import pandas as pd
 import numpy as np
@@ -995,6 +996,16 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     # Parse file header and name variables
     file_variables = parse_header_vars(fileheader)
     file_variables |= parse_filename_vars(file)
+
+    # Parse datetime from header
+    time, duration = extract_datetime_from_file("\n".join(fileheader))
+    if time is not None:
+        file_variables['.time'] = time
+        file_variables['.t'] = time.timestamp()
+    if duration is not None:
+        file_variables['.dur'] = duration
+        file_variables['.d'] = duration.total_seconds()
+
 
     # Read command variables. If some values are equal to other variable names,
     # set them to the same value.
