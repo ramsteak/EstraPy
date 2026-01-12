@@ -18,7 +18,6 @@ from ..core.context import CommandArguments, Command, CommandResult, Context, Pa
 from ..core.number import Number, parse_number, Unit
 from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
 from ..core.misc import peek, Bag, fmt, guess_type
-from ..core.context import Context, ParseContext
 
 import pandas as pd
 import numpy as np
@@ -260,7 +259,7 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
 
     if options.rspace is not ...:
         columnselector = parse_column_descriptor(options.rspace)
-        column = ColumnDescription(name='R', unit=Unit.A, type=ColumnKind.AXIS, labl='R-space [Å]')
+        column = ColumnDescription(name='r', unit=Unit.A, type=ColumnKind.AXIS, labl='R-space [Å]')
         cmd.columns.append((column, Domain.FOURIER, columnselector))
 
     # Check reciprocal domain columns
