@@ -346,34 +346,46 @@ class CommandArgumentParser(Generic[_T]):
             while isinstance(__t, Tree):
                 __t = __t.children[0]
 
+            # Attempt to parse first token as a subparser, then option, then positional argument.
+            #  - If the token matches, a tuple (ArgumentSpecification, value) is returned.
+            #  - If the token does not match, None is returned.
+            #  - If the token is consumed and the token stream is modified, True is returned,
+            #     so that the modified token stream is re-evaluated.
+
             # Attempt to parse first token as subparser
             result = self._parse_subparser(tokens)
-            if result is not None:
+            if isinstance(result, tuple):
                 arg, val = result
                 if arg.action.destination in _definedfields:
                     raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
                 self._perform_action(kwargs, arg.action, val)
                 _definedfields.add(arg.action.destination)
+                continue
+            elif result is True:
                 continue
 
             # Attempt to parse first token as option
             result = self._parse_option(tokens)
-            if result is not None:
+            if isinstance(result, tuple):
                 arg, val = result
                 if arg.action.destination in _definedfields:
                     raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
                 self._perform_action(kwargs, arg.action, val)
                 _definedfields.add(arg.action.destination)
                 continue
+            elif result is True:
+                continue
 
             # Attempt to parse first token as a positional argument
             result = self._parse_positional(tokens, _positional_arguments_iter)
-            if result is not None:
+            if isinstance(result, tuple):
                 arg, val = result
                 if arg.action.destination in _definedfields:
                     raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
                 self._perform_action(kwargs, arg.action, val)
                 _definedfields.add(arg.action.destination)
+                continue
+            elif result is True:
                 continue
 
             # None matched, so this argument parser is finished and we exit
@@ -386,7 +398,7 @@ class CommandArgumentParser(Generic[_T]):
         output = self.dataclass_type(**kwargs)
         return output
 
-    def _parse_subparser(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | None:
+    def _parse_subparser(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | bool | None:
         if not self.subparsers:
             return None
 
@@ -412,7 +424,7 @@ class CommandArgumentParser(Generic[_T]):
 
         return self.arguments[dest], parsed
 
-    def _parse_option(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | None:
+    def _parse_option(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | bool | None:
         __t = tokens.peek()
         while isinstance(__t, Tree):
             __t = __t.children[0]
@@ -426,7 +438,15 @@ class CommandArgumentParser(Generic[_T]):
             case Tree(Token('RULE', 'option'), [Token('OPTION', str(option)) as _opt, *subtokens]):
                 arg_name = self.command_optflags.get(option)
                 if arg_name is None:
-                    tokens.pushback(token)
+                    # Check if the option is a multi-option (e.g. -dqe -> -d -q -e)
+                    if len(option) > 2 and option.startswith('-') and not option.startswith('--'):
+                        # Multioption, push back individual options
+                        for ch in reversed(option[1:]):
+                            tokens.pushback(Tree(Token('RULE', 'option'), [Token('OPTION', f'-{ch}')]))
+                        # Indicate that tokens were modified, exit the parsing attempt and retry.
+                        return True
+                    else:
+                        tokens.pushback(token)
                     return None
                 arg_spec = self.arguments[arg_name]
 
@@ -456,7 +476,7 @@ class CommandArgumentParser(Generic[_T]):
 
     def _parse_positional(
         self, tokens: peekable[Token | Tree[Token]], posargs: Iterator[ArgumentSpecification]
-    ) -> tuple[ArgumentSpecification, Any] | None:
+    ) -> tuple[ArgumentSpecification, Any] | bool | None:
         arg_spec = next(posargs, None)
         if arg_spec is None:
             return None
