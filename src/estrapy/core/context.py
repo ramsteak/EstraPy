@@ -1,16 +1,20 @@
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Self, Generic, TypeVar
 from datetime import datetime
 from lark import Lark
 
+# TODO: avoid importing matplotlib in core if possible
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
+from lark import Token, Tree
+
+from .context import ParseContext, Context
+
 from .timers import TimerCollection
 from .datastore import DataStore
-
 from .grammar.axisindexpos import AxisIndexPosition
 
 
@@ -18,7 +22,13 @@ from .grammar.axisindexpos import AxisIndexPosition
 class Directive: ...
 
 @dataclass(slots=True)
-class CommandArguments: ...
+class CommandArguments:
+    _token_map: dict[str, Token] = field(default_factory=dict[str, Token], init=False)
+
+    def set_token(self, argname: str, token: Token) -> None:
+        self._token_map[argname] = token
+    def get_token(self, argname: str) -> Token | None:
+        return self._token_map.get(argname, None)
 
 @dataclass(slots=True)
 class CommandResult: ...
@@ -145,14 +155,6 @@ class Context:
     # Plotting context
     plotcontext: PlotContext = field(default_factory=PlotContext)
 
-
-from typing import NamedTuple
-from lark import Token, Tree
-from dataclasses import dataclass
-from typing import Self, Generic, TypeVar
-
-from .context import ParseContext, Context
-
 _A = TypeVar('_A', bound=CommandArguments, covariant=True)
 _R = TypeVar('_R', bound=CommandResult, covariant=True)
 
@@ -168,7 +170,7 @@ class Command(Generic[_A, _R]):
 
     def execute(self, context: Context) -> _R: ...
 
-
-class Script(NamedTuple):
+@dataclass(slots=True)
+class Script:
     directives: list[Directive]
     commands: list[Command[CommandArguments, CommandResult]]
