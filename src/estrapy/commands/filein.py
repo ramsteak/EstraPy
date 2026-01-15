@@ -5,7 +5,7 @@ from io import StringIO
 from itertools import zip_longest
 from pathlib import Path
 from lark import Tree, Token
-from typing import TypeAlias, Sequence, Callable, Self
+from typing import TypeAlias, Sequence, Callable, Self, Any
 from types import EllipsisType
 from tqdm.std import tqdm
 from tqdm.contrib.logging import logging_redirect_tqdm
@@ -903,7 +903,7 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
     )
 
 
-def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
+def parse_header_vars(header: list[str]) -> dict[str, Any]:
     # Parse header lines for variable definitions. Each header position is defined
     # as a variable, in the format .h<line>.<position>, starting from 1.
     return {
@@ -913,9 +913,9 @@ def parse_header_vars(header: list[str]) -> dict[str, str | Number | int]:
     }
 
 
-def parse_filename_vars(file: Path) -> dict[str, str | int | Number]:
+def parse_filename_vars(file: Path) -> dict[str, Any]:
     # Define vars dict to store all variables
-    vars: dict[str, str | int | Number] = {}
+    vars: dict[str, Any] = {}
 
     # Add parts of the filename separated by underscores as .f1, .f2, ...
     vars.update({f'.f{i}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)})
@@ -1003,11 +1003,11 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     # Parse datetime from header
     time, duration = extract_datetime_from_file("\n".join(fileheader))
     if time is not None:
-        file_variables['.time'] = time
-        file_variables['.t'] = time.timestamp()
+        file_variables['.t'] = time
+        file_variables['.ts'] = time.timestamp()
     if duration is not None:
-        file_variables['.dur'] = duration
-        file_variables['.d'] = duration.total_seconds()
+        file_variables['.d'] = duration
+        file_variables['.ds'] = duration.total_seconds()
 
 
     # Read command variables. If some values are equal to other variable names,
