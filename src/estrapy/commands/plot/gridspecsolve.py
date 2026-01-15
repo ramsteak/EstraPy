@@ -140,7 +140,16 @@ def make_figure_gridspec(figspec: list[AxisIndexPosition]) -> tuple[Figure, Grid
     # Build gridspec + mapping
     gs, axis_map = define_gridspec(figspec)
 
-    fig = plt.figure(constrained_layout=False) # pyright: ignore[reportUnknownMemberType]
+    # Check that all AxisIndexPosition entries have the same figure index, and get it
+    match [*{ax.figurenumber for ax in figspec}]:
+        case [] | [-1]:
+            figurenumber = None
+        case [int(fignum)]:
+            figurenumber = fignum
+        case _:
+            raise ValueError("figspec contains multiple figure numbers")
+    
+    fig = plt.figure(figurenumber, constrained_layout=False) # pyright: ignore[reportUnknownMemberType]
 
     axes: dict[tuple[int, int], Axes] = {}
     for axspec, ((r0, r1), (c0, c1)) in axis_map.items():
