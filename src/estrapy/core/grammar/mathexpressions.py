@@ -11,7 +11,7 @@ ALLOWED_FUNCTIONS = {
     'arcsin', 'arccos', 'arctan',
     'sinh', 'cosh', 'tanh',
     'exp', 'log', 'log10', 'log2',
-    'sqrt', 'abs',
+    'sqrt', 'abs', 'real', 'imag',
 }
 
 grammar_data = load_grammar("mathexpression.lark")
