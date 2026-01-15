@@ -40,15 +40,15 @@ class CommandArguments_Background(CommandArguments):
 
 sub_fourier = CommandArgumentParser(SubCommandArguments_Background_Fourier, name='fourier')
 sub_fourier.add_argument('rmax', '--rmax', type=parse_number, required=False, default=Number(None, 1.0, Unit.A))
-sub_fourier.add_argument('kweight', '--kweight', type=float, required=False, default=2)
+sub_fourier.add_argument('kweight', '--kweight', '-k', type=float, required=False, default=2)
 
 sub_polynomial = CommandArgumentParser(SubCommandArguments_Background_Polynomial, name='polynomial')
 sub_polynomial.add_argument('degree', '--degree', '-d', type=int, required=False, default=3)
-sub_polynomial.add_argument('kweight', '--kweight', type=float, required=False, default=2)
+sub_polynomial.add_argument('kweight', '--kweight', '-k', type=float, required=False, default=2)
 
 sub_spline_nodes = CommandArgumentParser(SubCommandArguments_Background_SplineNodes, name='splinenodes')
 sub_spline_nodes.add_argument('nodes', '--nodes', '-n', type=parse_number, nargs='+', required=True)
-sub_spline_nodes.add_argument('kweight', '--kweight', type=float, required=False, default=2)
+sub_spline_nodes.add_argument('kweight', '--kweight', '-k', type=float, required=False, default=2)
 
 _default_range = (Number(None, 0.0, Unit.K), Number(None, np.inf, Unit.K))
 parse_background_command = CommandArgumentParser(CommandArguments_Background)
