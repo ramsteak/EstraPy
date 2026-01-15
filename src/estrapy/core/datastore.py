@@ -8,6 +8,8 @@ from typing import Any, Callable
 
 from .number import Unit
 
+COLUMNSEPARATOR = "_"
+
 # Structure that hold the file data during the execution of the program, stored in the context variable.
 
 
@@ -89,7 +91,7 @@ class DataDomain:
         column_version = (
             self.columns[name][-1].meta.versionnumber + 1 if name in self.columns and self.columns[name] else 0
         )
-        physicalname = f'{name}.{column_version}'
+        physicalname = f'{name}{COLUMNSEPARATOR}{column_version}'
         colmeta = ColumnMetadata(column_version, physicalname, resolved_deps)
 
         self.columns[name].append(Column(column, colmeta))
