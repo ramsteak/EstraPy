@@ -340,6 +340,10 @@ class CommandArgumentParser(Generic[_T]):
         _definedfields: set[str] = set()
         _positional_arguments_iter = (self.arguments[name] for name in self.command_posargs)
 
+        # Positional arguments can only be defined before options. Once an option is encountered,
+        # positional arguments are no longer accepted.
+        _could_be_positional = True
+
         while tokens and (_allfields - _definedfields):
             # Get first token for error reporting
             __t = tokens.peek()
@@ -367,6 +371,8 @@ class CommandArgumentParser(Generic[_T]):
             # Attempt to parse first token as option
             result = self._parse_option(tokens)
             if isinstance(result, tuple):
+                # Once an option is matched, positional arguments are no longer accepted
+                _could_be_positional = False
                 arg, val = result
                 if arg.action.destination in _definedfields:
                     raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
@@ -375,6 +381,10 @@ class CommandArgumentParser(Generic[_T]):
                 continue
             elif result is True:
                 continue
+
+            # No option matched, and positional arguments are no longer accepted
+            if not _could_be_positional:
+                break
 
             # Attempt to parse first token as a positional argument
             result = self._parse_positional(tokens, _positional_arguments_iter)
