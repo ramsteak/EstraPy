@@ -207,9 +207,12 @@ def parse_column_descriptor(t: Token) -> ColumnSelector:
     for part in s.split(','):
         match part.split('..'):
             case [str(one)]:
-                desc.append(int(one) if one.isdigit() else one)
+                # Single column. If it is a digit, convert from 1-based to 0-based index.
+                desc.append(int(one)-1 if one.isdigit() else one)
             case [str(start), str(end)]:
-                desc.append((int(start) if start.isdigit() else start, int(end) if end.isdigit() else end))
+                # Range of columns. Convert from 1-based to 0-based index
+                # (only the start, pandas uses exclusive ending and we use inclusive).
+                desc.append((int(start)-1 if start.isdigit() else start, int(end) if end.isdigit() else end))
             case _:
                 raise CommandSyntaxError('Invalid column descriptor.', t)
     return desc
