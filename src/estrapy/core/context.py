@@ -82,17 +82,21 @@ class ParseContext:
 # Plotting context
 @dataclass(slots=True)
 class AxisSpecification:
+    """An intermediate structure to hold axis specifications before plotting.
+    It holds both the position and all callbacks that generate the plot."""
     pos:  AxisIndexPosition
     callbacks: list[Callable[[Axes, Figure], Any]] = field(default_factory=list[Any])
 
 @dataclass(slots=True)
 class FigureSpecification:
+    """An intermediate structure to hold figure specifications before plotting."""
     figsize: tuple[float, float] | None = None
     # Index the axes with (row, column) tuples, without the size specified
     axes: dict[tuple[int, int], AxisSpecification] = field(default_factory=dict[tuple[int, int], AxisSpecification])
 
 @dataclass(slots=True)
 class PlotContext:
+    """Holds all plotting-related context during execution."""
     # Hold all figure settings
     numberedfigures: dict[int, FigureSpecification] = field(default_factory=dict[int, FigureSpecification])
     nonnumberedfigures: list[FigureSpecification] = field(default_factory=list[FigureSpecification])
