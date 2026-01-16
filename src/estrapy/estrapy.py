@@ -40,7 +40,7 @@ def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.L
         global global_LOGGING_LEVEL
         global_LOGGING_LEVEL = logging.DEBUG
     else:
-        logging.INFO
+        log_level = logging.INFO
 
     handlers: list[logging.Handler] = []
 
