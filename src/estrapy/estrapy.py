@@ -74,6 +74,17 @@ def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.L
 
     return logger
 
+VERSION_RE = re.compile(r'^#\s*version\s*:?\s*(?:(\d+)\.(\d+)(?:\.(\d+))?)\s*$', re.IGNORECASE)
+def parse_version_line(line: str) -> tuple[int, ...]:
+    """Parse a version line of the form '# version X.Y[.Z]' and return a tuple of integers.
+    Raises ValueError if the line is not in the correct format."""
+    match = VERSION_RE.match(line)
+    if not match:
+        raise ValueError(
+            "The version line must be in the form '# version X.Y[.Z]'."
+        )
+    return tuple(int(x) if x is not None else 0 for x in match.groups())
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -215,10 +226,27 @@ def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Con
     return context
 
 def discover_input_files(directory: Path) -> list[Path]:
-    return list(filter(
-        lambda p: p.suffix.lower() in ('.estra', '.inp', '.estrapy'),
-        directory.rglob('*.*')
-    ))
+    """Discover valid input files in the given directory and its subdirectories."""
+    # A valid input file is a non-empty file with extension .estra, .inp, .estrapy
+    # that starts with a version comment.
+    def is_valid_file(path: Path) -> bool:
+        if not path.is_file():
+            return False
+        if path.stat().st_size == 0:
+            return False
+        if path.suffix.lower() not in ('.estra', '.inp', '.estrapy'):
+            return False
+        
+        # Filter by files that start with a version comment
+        try:
+            with path.open('r', encoding='utf-8') as f:
+                first_line = f.readline()
+                return VERSION_RE.match(first_line) is not None
+        except Exception:
+            return False
+    
+    return [p for p in directory.rglob('*.*') if is_valid_file(p)]
+
 
 def select_input_file(files: list[str]) -> str:
     import inquirer # pyright: ignore[reportMissingTypeStubs] # 
@@ -226,7 +254,7 @@ def select_input_file(files: list[str]) -> str:
     questions = [
         inquirer.List(
             'inputfile',
-            message='Multiple input files found. Please select one to process:',
+            message='Multiple input files found. Please select one to process',
             choices=files,
         )
     ]
@@ -267,34 +295,37 @@ def estrapy_interactive_mode(context: Context, timers: TimerCollection) -> None:
     transformer = EstraTransformer(parsecontext)
     
     previous = ""
-    while True:
-        prompt = '...    ' if previous else ' > '
-        line = input(prompt) + "\n"
-        if previous:
-            line = "    " + line  # Preserve indentation for continued lines
-
-        if line.strip().endswith('\\'):
-            previous += line.strip()[:-1] + '\n'
-            continue
-
-        
-        line = previous + line
-        previous = ""
-
-        try:
-            parsed_tree = file_parser.parse(line) # pyright: ignore[reportUnknownMemberType]
-            script = transformer.transform(parsed_tree)
-            if script.commands[0].name == 'exit':
+    try:    
+        while True:
+            prompt = '...    ' if previous else ' > '
+            line = input(prompt) + "\n"
+            if previous:
+                line = "    " + line  # Preserve indentation for continued lines
+            
+            if line.strip() in ("exit", "quit", "q"):
                 print('Exiting interactive mode.')
                 break
-            execute_script(script, context)
-        except UnexpectedToken as e:
-            print(f'Syntax error: {e}')
-        except ParseError as e:
-            print(f'Parse error: {e}')
-        except VisitError as e:
-            print(f'Error during execution: {e}')
-        
+
+            if line.strip().endswith('\\'):
+                previous += line.strip()[:-1] + '\n'
+                continue
+
+            
+            line = previous + line
+            previous = ""
+
+            try:
+                parsed_tree = file_parser.parse(line) # pyright: ignore[reportUnknownMemberType]
+                script = transformer.transform(parsed_tree)
+                execute_script(script, context)
+            except UnexpectedToken as e:
+                print(f'Syntax error: {e}')
+            except ParseError as e:
+                print(f'Parse error: {e}')
+            except VisitError as e:
+                print(f'Error during execution: {e}')
+    except (KeyboardInterrupt, EOFError):
+        print('\nExiting interactive mode.')
             
 
 
@@ -308,17 +339,7 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
 
         # Check that the input file version is lower or equal to the program version
         first_line = input_file_data.partition('\n')[0]
-        version_match = re.match(
-            r'^#\s*version\s*:?\s*(?:(\d+)\.(\d+)(?:\.(\d+))?)\s*$',
-            first_line,
-            re.IGNORECASE,
-        )
-        if not version_match:
-            raise ValueError(
-                "The first line of the input file must specify the version in the form '# version X.Y[.Z]'."
-            )
-
-        file_version = tuple(int(x) if x is not None else 0 for x in version_match.groups())
+        file_version = parse_version_line(first_line)
         if file_version > __version_tuple__[: len(file_version)]:
             raise ValueError(
                 f"The input file version {'.'.join(map(str, file_version))} is higher than the program version {__version__}. Please update the program."
@@ -425,7 +446,6 @@ def entry_point() -> None:
     except Exception as e:
         if global_LOGGING_LEVEL == logging.DEBUG:
             import traceback
-
             traceback.print_exc()
         else:
             import sys
