@@ -19,6 +19,8 @@ from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
 from .core.errors import ParseError  # noqa: E402
 from .core.timers import TimerCollection  # noqa: E402
 
+global_LOGGING_LEVEL = logging.INFO
+
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 
