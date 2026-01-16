@@ -477,15 +477,17 @@ def eq(items: Iterable[SupportsEq]) -> bool:
         return True
     return all(first == other for other in iterator)
 
-
-def guess_type(s: str) -> str | Number | int:
+def guess_type(s: str) -> str | Number | float | int:
     # Try to guess if the string is an integer, a number with unit, or just a string
     try:
         return int(s)
     except ValueError:
         pass
     try:
-        return parse_number(s)
+        n = parse_number(s)
+        if n.unit is None:
+            return n.value
+        return n
     except ValueError:
         pass
     return s
