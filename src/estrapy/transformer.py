@@ -24,9 +24,6 @@ class EstraTransformer(Transformer[Any, Script]):
             commands=[item for item in items if isinstance(item, Command)],
         )
     
-    def exit_stmt(self, items: list[Any]) -> Token: # TODO: restore exit
-        raise StopIteration("Exit statement encountered.")
-
     def ESCAPED_STRING(self, item: Token) -> Token:
         # Convert escaped string to normal string by removing quotes and unescaping
         # Escaped strings are always quoted with either " or '
