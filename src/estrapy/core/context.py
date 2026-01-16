@@ -11,8 +11,6 @@ from matplotlib.figure import Figure
 
 from lark import Token, Tree
 
-from .context import ParseContext, Context
-
 from .timers import TimerCollection
 from .datastore import DataStore
 from .grammar.axisindexpos import AxisIndexPosition
