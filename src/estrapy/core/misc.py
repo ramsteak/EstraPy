@@ -1,3 +1,5 @@
+import re
+
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
@@ -487,3 +489,30 @@ def guess_type(s: str) -> str | Number | int:
     except ValueError:
         pass
     return s
+
+_K_con = TypeVar('_K_con', contravariant=True)
+_V_cov = TypeVar('_V_cov', covariant=True)
+class SupportsGetItem(Protocol[_K_con, _V_cov]):
+    def __getitem__(self, key: _K_con) -> _V_cov: ...
+
+RE_VARNAME = re.compile(r"\{([^{:}]*)(?::([^{:}]*))?\}")
+def template_replace(template: str, vars: SupportsGetItem[str, str]) -> str:
+    """Replace variables in a template string with values from a mapping.
+
+    Variables are enclosed in curly braces {}. Optionally, a format specifier can be provided after a colon :.
+
+    Example:
+        template = "Hello, {name}! You have {count:d} new messages."
+        vars = {'name': 'Alice', 'count': '5'}
+        result = template_replace(template, vars)
+        # result == "Hello, Alice! You have 5 new messages."
+    """
+    def replacer(match: re.Match[str]) -> str:
+        var_name = match.group(1)
+        format_spec = match.group(2) or ''
+        value = vars[var_name]
+        if format_spec:
+            return format(value, format_spec)
+        return str(value)
+
+    return RE_VARNAME.sub(replacer, template)

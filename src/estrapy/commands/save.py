@@ -1,4 +1,3 @@
-import re
 import numpy as np
 from numpy import typing as npt
 
@@ -6,14 +5,14 @@ from lark import Token, Tree
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Self, Any
-from functools import partial
 
 from .. import __version__
 from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.grammar.mathexpressions import Expression
-from ..core.datastore import Domain, FileMetadata
+from ..core.datastore import Domain
+from ..core.misc import template_replace
 
 
 @dataclass(slots=True)
@@ -37,12 +36,6 @@ sub_columns.add_argument('select', '--select', type=Expression.compile, required
 
 parse_save_command = CommandArgumentParser(CommandArguments_Save)
 parse_save_command.add_subparser('columns', sub_columns, 'mode')
-
-RE_VARNAME = re.compile(r"\{([^{:}]*)(?::([^{:}]*))?\}")
-def _replace_name_vars(match: re.Match[str], meta: FileMetadata) -> str:
-    varname, formatspec = match.groups()
-    value = meta[varname]
-    return format(value, formatspec) if formatspec is not None else str(value)
 
 def save_to_file(filepath: Path, data: npt.NDArray[Any], columns: list[str], header: str) -> None:
 
@@ -87,8 +80,9 @@ class Command_Save(Command[CommandArguments_Save, CommandResult_Save]):
         column_names = [expr.to_string() for expr in args.columns]
         
         for _, page in context.datastore.pages.items():
-            filename = RE_VARNAME.sub(partial(_replace_name_vars, meta=page.meta), args.path)
+            filename = template_replace(args.path, page.meta)
             filepath = context.paths.outputdir / filename
+
             domain = page.domains[Domain.RECIPROCAL] # TODO: make domain selectable            
 
             data_cols = {str(n):s.to_numpy() for n,s in domain.get_columns_data(list(selected_columns)).items()}
