@@ -48,7 +48,8 @@ _STRING_INNER: /.*?/
 _STRING_ESC_INNER: _STRING_INNER /(?<!\\)(\\\\)*?/
 ESCAPED_STRING : ("\"" _STRING_ESC_INNER "\"") | ("'" _STRING_ESC_INNER "'") 
 
-_NL: (/\r?\n[\t ]*/ | SH_COMMENT)+
+_WHITESPACE: /[ \t]+/
+_NL: _WHITESPACE? (/\r?\n[\t ]*/ | SH_COMMENT)+
 
 
 // -------- RULES --------
