@@ -183,7 +183,7 @@ class CommandArgumentParser(Generic[_T]):
 
         self.name = name
         self.dataclass_type = returnstruct
-        self._fields = {f.name: f for f in fields(returnstruct)}
+        self._fields = {f.name: f for f in fields(returnstruct) if f.init}
 
         # Return type argument name -> ArgumentSpecification
         # Unnamed arguments are stored with a progressive index as key
