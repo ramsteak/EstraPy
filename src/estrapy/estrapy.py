@@ -33,7 +33,12 @@ LEVELS: list[tuple[str, int, str]] = [
 
 def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.Logger:
     # Check the logfile folder exists
-    log_level = logging.DEBUG if debug else logging.INFO
+    if debug:
+        log_level = logging.DEBUG
+        global global_LOGGING_LEVEL
+        global_LOGGING_LEVEL = logging.DEBUG
+    else:
+        logging.INFO
 
     handlers: list[logging.Handler] = []
 
@@ -416,8 +421,7 @@ def entry_point() -> None:
     try:
         main()
     except Exception as e:
-        hw = logging.getLogger('estrapy').handlers
-        if all(h.level == logging.DEBUG for h in hw):
+        if global_LOGGING_LEVEL == logging.DEBUG:
             import traceback
 
             traceback.print_exc()
