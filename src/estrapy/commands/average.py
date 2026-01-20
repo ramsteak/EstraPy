@@ -141,7 +141,11 @@ class Command_Average(Command[CommandArguments_Average, CommandResult_Average]):
 
         new_pages: dict[str, DataPage] = {}
         for groupid, (group, page_names) in enumerate(groups.groups(), start=1):
+            # Name unnamed pages with their group id
             groupname = "_".join(map(str, group))
+            if not groupname:
+                groupname = f'spectrum_{groupid}'
+            
             pages = [context.datastore.pages[page_name] for page_name in page_names]
 
             meta = _merge_metadata(
