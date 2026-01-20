@@ -136,7 +136,8 @@ class Command_Average(Command[CommandArguments_Average, CommandResult_Average]):
                             )
                     for i,sg in enumerate(split_groups, start=1):
                         groups.adds((*group, i), sg)
-
+        else:
+            groups = macro_groups
 
         new_pages: dict[str, DataPage] = {}
         for groupid, (group, page_names) in enumerate(groups.groups(), start=1):
