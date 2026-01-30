@@ -8,13 +8,13 @@ from typing import Self
 from functools import partial
 from logging import Logger
 
-from ..core.context import CommandArguments, Command, CommandResult
-from ..core.threaded import execute_threaded
-from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
-from ..core.number import Number, parse_range, Unit, parse_number
-from ..core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
-from ..operations.fourier import flattop_window, fourier
+from ...core.context import CommandArguments, Command, CommandResult
+from ...core.threaded import execute_threaded
+from ...core.context import Context, ParseContext
+from ...core.commandparser import CommandArgumentParser
+from ...core.number import Number, parse_range, Unit, parse_number
+from ...core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
+from ...operations.fourier import flattop_window, fourier
 
 
 @dataclass(slots=True)
@@ -75,7 +75,7 @@ def _compute_background_fourier(xy: npt.NDArray[np.floating], name: str, range: 
     range = (range[0] if range[0] != -np.inf else xy[0,0], range[1] if range[1] != np.inf else xy[-1,0])
     idx = (xy[:,0] >= range[0]) & (xy[:,0] <= range[1])
     x, y = xy[idx,0], xy[idx,1]
-    w = flattop_window(x, (range[0]-0.1, range[0]+1, range[1]-0.1, range[1]+1), 'hanning')
+    w = flattop_window(x, (range[0]-0.1, range[0]+1, range[1]-1.0, range[1]+0.1), 'hanning')
 
     r = np.linspace(-5*cutoff,5*cutoff,2**10)
     W = flattop_window(r, (-cutoff-0.1,-cutoff+0.1,cutoff-0.1,cutoff+0.1), 'hanning')
@@ -245,8 +245,8 @@ class Command_Background(Command[CommandArguments_Background, CommandResult_Back
             _remove_background(page, page_background[name])
         log.info(f'Calculated background for {len(context.datastore.pages)} spectra using polynomial method.')
     
-    def _execute_bspline(self, args: SubCommandArguments_Background_Spline, range: tuple[Number,Number], context: Context) -> None:
-        log = context.logger.getChild('command.background.bspline')
+    def _execute_spline(self, args: SubCommandArguments_Background_Spline, range: tuple[Number,Number], context: Context) -> None:
+        log = context.logger.getChild('command.background.spline')
         log.debug(f'Calculating background with B-spline method in range [{range[0]!s}, {range[1]!s}], knots {args.nknots}, kweight {args.kweight}')
 
         k_range = (range[0].value, range[1].value)
@@ -275,7 +275,7 @@ class Command_Background(Command[CommandArguments_Background, CommandResult_Back
             case SubCommandArguments_Background_Polynomial():
                 self._execute_polynomial(self.args.mode, self.args.range, context)
             case SubCommandArguments_Background_Spline():
-                self._execute_bspline(self.args.mode, self.args.range, context)
+                self._execute_spline(self.args.mode, self.args.range, context)
             case _:
                 raise ValueError('Invalid background mode')
         return CommandResult_Background()
