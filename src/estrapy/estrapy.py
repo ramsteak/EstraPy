@@ -12,7 +12,7 @@ from pathlib import Path  # noqa: E402
 from lark.exceptions import VisitError, UnexpectedToken  # noqa: E402
 from dataclasses import dataclass  # noqa: E402
 
-from . import __version__, __version_tuple__, copyright  # noqa: E402
+from . import __version__, __version_tuple__, copyright, banner  # noqa: E402
 from .dispatcher import execute_script  # noqa: E402
 from .core.grammar.estrapyparser import file_parser  # noqa: E402
 from .transformer import EstraTransformer
@@ -142,6 +142,13 @@ def parse_args() -> ArgumentConfig:
         nargs='*',
         default=[],
         help='Variables to define in the script, in the form NAME=VALUE. Multiple variables can be defined by repeating this argument.',
+    )
+    parser.add_argument(
+        '--version',
+        '-V',
+        action='version',
+        version=f'EstraPy version {__version__}',
+        help='Show the program version and exit.',
     )
 
     args = parser.parse_args()
