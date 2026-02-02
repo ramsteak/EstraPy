@@ -126,6 +126,9 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         case [Token('COMMANDNAME', 'plot') as t, *args]:
             from .plot import Command_Plot
             return Command_Plot.parse(t, args, parsecontext)
+        case [Token('COMMANDNAME', 'deglitch') as t, *args]:
+            from .deglitch import Command_Deglitch
+            return Command_Deglitch.parse(t, args, parsecontext)
         # Command exit -----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'exit' | 'quit') as t, *args]:
             pass # Exit is a statement that has no arguments. Everything after exit is ignored.
