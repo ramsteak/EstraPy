@@ -21,12 +21,7 @@ class Directive: ...
 
 @dataclass(slots=True)
 class CommandArguments:
-    _token_map: dict[str, Token] = field(default_factory=dict[str, Token], init=False)
-
-    def set_token(self, argname: str, token: Token) -> None:
-        self._token_map[argname] = token
-    def get_token(self, argname: str) -> Token | None:
-        return self._token_map.get(argname, None)
+    _token_map: dict[str, Token | Tree[Token]] = field(default_factory=dict[str, Token | Tree[Token]], init=False)
 
 @dataclass(slots=True)
 class CommandResult: ...
