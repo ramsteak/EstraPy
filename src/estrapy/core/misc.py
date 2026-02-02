@@ -3,8 +3,9 @@ import re
 from abc import ABC, abstractmethod
 from io import TextIOWrapper
 from types import EllipsisType
-from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence, Protocol
+from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Literal, Self, NoReturn, Sequence, Protocol, overload
 from collections import deque
+from enum import Enum
 
 from .number import Number, parse_number
 
@@ -198,7 +199,7 @@ class Sack(CollectionDict[_K, _V, set[_V]]):
         return new_sack
 
 
-def peek(f: TextIOWrapper, n: int | Literal['line'] | None = 1) -> str:
+def peek_text(f: TextIOWrapper, n: int | Literal['line'] | None = 1) -> str:
     pos = f.tell()
     r = f.readline() if n == 'line' else f.read(n)
     f.seek(pos)
@@ -363,9 +364,11 @@ class peekable(Iterator[_T], Generic[_T]):
         return item
 
     def peek_n(self, n: int) -> list[_T]:
-        """Peek at the next n items without consuming them. Returns a list of the next n items. If there are not enough items, returns the available ones."""
+        """Peek at the next n items without consuming them. Returns a list of the next n items.
+        If there are not enough items, returns the available ones.
+        If n is negative, consume the entire iterator and return all remaining items."""
         try:
-            while len(self._buffer) < n or n < 1:
+            while len(self._buffer) < n or n < 1: # If n < 1, consume the entire iterator
                 item = next(self._iterator)
                 self._buffer.append(item)
         except StopIteration:
@@ -423,7 +426,12 @@ class peekable(Iterator[_T], Generic[_T]):
             self._iterator.close()  # type: ignore
 
 
-def fuzzy_match(string: str, options: Iterable[str], /) -> str | None:
+@overload
+def fuzzy_match(string: str, options: Iterable[str], *, strict: Literal[True]) -> str: ...
+@overload
+def fuzzy_match(string: str, options: Iterable[str], *, strict: Literal[False] = False) -> str | None: ...
+
+def fuzzy_match(string: str, options: Iterable[str], *, strict: bool = False) -> str | None:
     """Perform a fuzzy match of a string against a list of options. Returns the best matching option.
     The matching is case-insensitive, ignores underscores, hyphens and spaces.
     
@@ -461,21 +469,25 @@ def fuzzy_match(string: str, options: Iterable[str], /) -> str | None:
             1-1/(len(option))
         ])
     
+    if not scores and strict:
+        raise ValueError(f'No match found for "{string}" in options: {list(options)}')
     if not scores:
         return None
     return _options[min(scores, key=scores.get)] # type: ignore
 
-class SupportsEq(Protocol):
-    def __eq__(self, other: Any) -> bool: ...
+_E = TypeVar('_E', bound=Enum)
 
-def eq(items: Iterable[SupportsEq]) -> bool:
-    """Check if all items in an iterable are equal."""
-    iterator = iter(items)
-    try:
-        first = next(iterator)
-    except StopIteration:
-        return True
-    return all(first == other for other in iterator)
+@overload
+def fuzzy_match_enum(string: str, enum: type[_E], *, strict: Literal[True]) -> _E: ...
+@overload
+def fuzzy_match_enum(string: str, enum: type[_E], *, strict: Literal[False] = False) -> _E | None: ...
+
+def fuzzy_match_enum(string: str, enum: type[_E], *, strict: bool = False) -> _E | None:
+    match = fuzzy_match(string, [e.name for e in enum])
+    if match is None:
+        return None
+    return enum[match]
+
 
 def guess_type(s: str) -> str | Number | float | int:
     # Try to guess if the string is an integer, a number with unit, or just a string

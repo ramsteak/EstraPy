@@ -17,7 +17,7 @@ from ..core.errors import CommandSyntaxError, ExecutionError
 from ..core.context import CommandArguments, Command, CommandResult, Context, ParseContext
 from ..core.number import Number, parse_number, Unit
 from ..core.datastore import FileMetadata, DataDomain, Domain, ColumnDescription, ColumnKind, DataPage
-from ..core.misc import peek, Bag, fmt, guess_type
+from ..core.misc import peek_text, Bag, fmt, guess_type
 from ..core.extracttimestamp import extract_datetime_from_file
 
 import pandas as pd
@@ -45,7 +45,6 @@ class ImporterOptions:
     skip_rows: int = 0
     decimal: str | None = None
     leadingheader: int | None = None
-
     re_sep: re.Pattern[str] | None = None
 
 
@@ -961,9 +960,9 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             for _ in range(command.importeroptions.skip_rows):
                 f.readline()
 
-        if peek(f) == command.importeroptions.comment_prefix:
+        if peek_text(f) == command.importeroptions.comment_prefix:
             line = '#'  # Initialize line to enter the loop. Useless assignment, warning suppression.
-            while peek(f) == command.importeroptions.comment_prefix:
+            while peek_text(f) == command.importeroptions.comment_prefix:
                 line = f.readline()
                 fileheader.append(line.strip())
             # Moved header detection to after reading the data, to support leadingheader option
