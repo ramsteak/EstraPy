@@ -37,6 +37,7 @@ class ColumnDescription:
     calc: Callable[[pd.DataFrame], pd.Series] | None = None
     labl: str | None = None
     refs: list[str] = field(default_factory=list[str])
+    relative: bool = False
 
 
 @dataclass(slots=True)
