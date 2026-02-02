@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+
 from numpy import typing as npt
 from lark import Token, Tree
 
@@ -9,6 +11,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.cm import get_cmap
+
+import seaborn as sns
 
 from ...core.context import CommandArguments, Command, CommandResult
 from ...core.context import Context, ParseContext, PlotContext, FigureSpecification, AxisSpecification
@@ -36,6 +40,7 @@ class CommandArguments_Plot(CommandArguments):
 
     # Plotting color and style (requires something to plot)
     colorby: str | None
+    legendname: str | None
     color: str | None
     alpha: float | None
     linestyle: str | None
@@ -77,6 +82,7 @@ parse_plot_command.add_argument('hshift', '--hshift', type=float, default=None)
 parse_plot_command.add_argument('voffset', '--voffset', type=float, default=None)
 parse_plot_command.add_argument('hoffset', '--hoffset', type=float, default=None)
 parse_plot_command.add_argument('colorby', '--colorby', type=str, default=None)
+parse_plot_command.add_argument('legendname', '--legendname', type=str, default=None)
 parse_plot_command.add_argument('color', '--color', type=str, default=None)
 parse_plot_command.add_argument('alpha', '--alpha', type=float, default=None)
 
@@ -335,29 +341,60 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
             xexpr = Expression.compile(xpart)
             yexpr = Expression.compile(ypart)
 
-            xaxis: list[npt.NDArray[np.floating] | float] = []
-            yaxis: list[npt.NDArray[np.floating] | float] = []
+            # xaxis: list[npt.NDArray[np.floating] | float] = []
+            # yaxis: list[npt.NDArray[np.floating] | float] = []
 
-            for name, fpage in frozenpages.items():
-                xval, yval = xexpr(**fpage), yexpr(**fpage)
-                xaxis.append(xval)
-                yaxis.append(yval)
+            # Collect dataframes for each page, with columns:
+            #  - 'unit' -> the name of the page, to be used with sns.unit
+            #  - 'x', 'y' -> the x and y values
+            #  - 'color' -> the colorby variable value
+            # The dataframe is then concatenated and plotted with seaborn
 
-            # Determine if the plot is a collection of line plots or one plot
-            if all(isinstance(x, np.ndarray) and isinstance(y, np.ndarray) for x,y in zip(xaxis, yaxis)):
-                # Multiple line plots
-                def cb(ax: Axes, fig: Figure) -> Any:
-                    rs: list[Any] = []
-                    for xval, yval in zip(xaxis, yaxis):
-                        rs.append(ax.plot(xval, yval))
-                    return rs
-            else:
-                # Single plot. First, we put everything into flat arrays
-                xflat = np.array(xaxis, dtype=float)
-                yflat = np.array(yaxis, dtype=float)
+            pass
 
-                def cb(ax: Axes, fig: Figure) -> Any:
-                    return ax.plot(xflat, yflat)
+            datas: list[pd.DataFrame] = [
+                pd.DataFrame(
+                        {
+                            'unit': name,
+                            'x': np.atleast_1d(xexpr(**fpage)),
+                            'y': np.atleast_1d(yexpr(**fpage)),
+                            'color': color
+                        }
+                    )
+                for (name, fpage), color in zip(frozenpages.items(), colorby_var)
+            ]
+
+            style: dict[str, Any] = {}
+            if self.args.linestyle is not None:
+                if self.args.linestyle == 'noline':
+                    style['linestyle'] = 'none'
+                else:
+                    style['linestyle'] = self.args.linestyle
+            
+            if self.args.linewidth is not None:
+                style['linewidth'] = self.args.linewidth
+            
+            if self.args.marker is not None:
+                style['marker'] = self.args.marker
+
+            # Determine if the plot is
+            #  - a collection of line plots -> each dataframe is more than one point
+            #  - one plot -> each dataframe is a single point
+            multiple_lines = any(len(df) > 1 for df in datas)
+
+            data_flat = pd.concat(datas, ignore_index=True)
+
+            def cb(ax: Axes, fig: Figure) -> Any:
+                if is_categorical:
+                    palette = colormap.colors if isinstance(colormap, ListedColormap) else None
+                else:
+                    palette = colormap
+                sns.lineplot(data_flat,
+                             x='x', y='y',
+                             hue='color',
+                             units='unit' if multiple_lines else None,
+                             palette=palette,
+                             ax=ax)
             
             iaxis.callbacks.append(cb)
         
