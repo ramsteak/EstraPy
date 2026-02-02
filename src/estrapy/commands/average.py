@@ -2,8 +2,9 @@ import pandas as pd
 
 from lark import Token, Tree
 from pathlib import Path
+from functools import partial
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Self, Any
 from itertools import batched
 
@@ -12,16 +13,58 @@ from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser
 from ..core.misc import Bag
 from ..core.datastore import DataPage, FileMetadata, Domain, DataDomain
-from ..core.misc import fuzzy_match, guess_type
+from ..core.misc import guess_type, fuzzy_match_enum
 
 @dataclass(slots=True)
 class CommandArguments_Average(CommandArguments):
-    groupby: list[str]
-    maxsize: int | None
-    minsize: int
-    exclude: list[str]
-    domain: Domain
-    axis: str | None
+    maxsize: int | None = field(
+        metadata={
+            'options': ['--maxsize'],
+            'type': int,
+            'required': False,
+            'help': 'Maximum size of each group. If a group exceeds this size, it will be split into smaller groups.'
+            },
+    )
+
+    minsize: int = field(
+        metadata={
+            'options': ['--minsize'],
+            'type': int,
+            'required': False,
+            'help': 'Minimum size of each group. If the last split group is smaller than this size, it will be merged with the previous group.'
+            },
+        default=1
+    )
+
+    groupby: list[str] = field(
+        metadata={
+            'options': ['--groupby'],
+            'type': list[str],
+            'nargs': '+',
+            'required': False,
+            'help': 'New name of the page, used for grouping current pages before averaging.'
+            },
+        default_factory=list[str])
+    
+    domain: Domain = field(
+        metadata={
+            'options': ['--domain'],
+            'type': partial(fuzzy_match_enum, enum=Domain, strict=True),
+            'required': False,
+            'help': 'Domain to average over.'
+            },
+        default=Domain.RECIPROCAL
+    )
+
+    axis: str | None = field(
+        metadata={
+            'options': ['--axis'],
+            'type': str,
+            'required': False,
+            'help': 'Axis to average over. If not specified, all axes are averaged together.'
+            },
+        default=None
+    )
 
 @dataclass(slots=True)
 class CommandResult_Average(CommandResult):
@@ -32,8 +75,7 @@ parse_average_command = CommandArgumentParser(CommandArguments_Average)
 parse_average_command.add_argument('groupby', '--groupby', type=str, nargs='+', required=False, default_factory=list)
 parse_average_command.add_argument('maxsize', '--maxsize', type=int, required=False, default=None)
 parse_average_command.add_argument('minsize', '--minsize', type=int, required=False, default=1)
-parse_average_command.add_argument('exclude', '--exclude', type=str, nargs='+', required=False, default_factory=list)
-parse_average_command.add_argument('domain', '--domain', type=str, required=False, default='reciprocal')
+parse_average_command.add_argument('domain', '--domain', type=partial(fuzzy_match_enum, enum=Domain, strict=True), required=False, default='reciprocal')
 parse_average_command.add_argument('axis', '--axis', type=str, required=False, default=None)
 
 def _try_relative_path(path: Path, base: Path | None) -> Path:
@@ -99,8 +141,6 @@ class Command_Average(Command[CommandArguments_Average, CommandResult_Average]):
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
         arguments = parse_average_command(commandtoken, tokens, parsecontext)
-
-        arguments.domain = Domain(fuzzy_match(arguments.domain, ['reciprocal', 'fourier'])) # pyright: ignore[reportArgumentType]
 
         return cls(
             line=commandtoken.line or -1,
@@ -174,3 +214,4 @@ class Command_Average(Command[CommandArguments_Average, CommandResult_Average]):
         context.datastore.pages.update(new_pages)
 
         return CommandResult_Average()
+    
