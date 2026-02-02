@@ -1,6 +1,6 @@
 [project]
 name = "estrapy2"
-version = "0.1.0"
+version = "2.0.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
@@ -37,3 +37,6 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+
+[project.scripts]
+estrapy2 = "estrapy:estrapy.main"
