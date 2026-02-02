@@ -3,9 +3,9 @@ import numpy as np
 from numpy import typing as npt
 from logging import Logger
 from scipy.interpolate import make_interp_spline, BSpline # type: ignore missing stub
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from lark import Token, Tree
-from typing import Self
+from typing import Self, Callable
 from functools import partial
 
 from ..core.context import CommandArguments, Command, CommandResult
@@ -19,24 +19,108 @@ from ..operations.edge_detection import correlation_edge_detection, SlidingL2Res
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Shift(CommandArguments):
-    range: tuple[Number, Number]
-    resolution: Number
-    shift: Number
-    derivative: int
-    energy: Number | None
+    resolution: Number = field(
+        metadata={
+            'options': ['--resolution', '--res'],
+            'type': parse_number,
+            'required': True,
+            'help': 'Energy resolution for the alignment calculation.',
+        },
+    )
+
+    shift: Number = field(
+        metadata={
+            'options': ['--shift', '-s'],
+            'type': parse_number,
+            'required': True,
+            'help': 'Maximum shift to consider for the alignment calculation.',
+        },
+    )
+
+    derivative: int = field(
+        metadata={
+            'options': ['--derivative', '--deriv'],
+            'type': int,
+            'required': False,
+            'help': 'Derivative order to use for the correlation calculation.',
+        },
+        default=0
+    )
+
+    range: tuple[Number, Number] = field(
+        metadata={
+            'types': parse_range,
+            'nargs': 2,
+            'required': False,
+            'help': 'Energy range to consider for alignment.',
+            },
+        default=(Number(None, -np.inf, None), Number(None, np.inf, None))
+    )
+
+    energy: Number | None = field(
+        metadata={
+            'options': ['--energy', '--E0', '-E'],
+            'type': parse_edge,
+            'required': False,
+            'help': 'Edge energy to set in the metadata after alignment.',
+        },
+        default=None
+    )
+
 
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Calc(CommandArguments):
-    method: str
-    energy: Number
-    delta: Number
-    search: Number | None
+    method: str = field(
+        metadata={
+            'options': ['--method', '-m'],
+            'type': str,
+            'required': True,
+            'help': 'Method to use for alignment calculation.',
+        },
+    )
+
+    energy: Number = field(
+        metadata={
+            'options': ['--energy', '--E0', '-E'],
+            'type': parse_edge,
+            'required': True,
+            'help': 'Edge energy to align to.',
+        },
+    )
+    
+    delta: Number = field(
+        metadata={
+            'options': ['--delta', '-d'],
+            'type': parse_number,
+            'required': True,
+            'help': 'Energy delta around the edge to consider for the calculation.',
+        },
+    )
+
+    search: Number | None = field(
+        metadata={
+            'options': ['--search', '--sE0'],
+            'type': parse_edge,
+            'required': False,
+            'help': 'Energy to search for the edge within. If not provided, default to the value of --energy.',
+            },
+        default=None
+    )
 
 
 @dataclass(slots=True)
 class CommandArguments_Align(CommandArguments):
-    mode: SubCommandArguments_Align_Calc | SubCommandArguments_Align_Shift
+    mode: SubCommandArguments_Align_Calc | SubCommandArguments_Align_Shift = field(
+        metadata={
+            'subparsers': {
+                'calc': SubCommandArguments_Align_Calc,
+                'shift': SubCommandArguments_Align_Shift,
+            },
+            'required': True,
+            'help': 'Alignment mode to use.',
+        }
+    )
 
 
 sub_calc = CommandArgumentParser(SubCommandArguments_Align_Calc, name='calc')
@@ -60,8 +144,92 @@ parse_align_command.add_subparser('shift', sub_shift, 'mode')
 
 @dataclass(slots=True)
 class SubCommandResult_Align_Shift(CommandResult):
-    e_range: tuple[float, float]
+    e_axis: npt.NDArray[np.floating]
+    average: npt.NDArray[np.floating]
+    data: dict[str, npt.NDArray[np.floating]]
     results: dict[str, SlidingL2Result]
+
+    def plot_histogram(self) -> Callable[..., None]:
+        """Factory for a callback that plots a histogram of the calculated shifts."""
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+        
+        def plot_histogram_callback(ax: Axes, fig: Figure) -> None:
+            shifts = [result.x for result in self.results.values()]
+            ax.hist(shifts, bins='sqrt')
+            ax.set_title('Histogram of Calculated Shifts')
+            ax.set_xlabel('Shift (eV)')
+            ax.set_ylabel('Frequency')
+        return plot_histogram_callback
+    
+    def plot_shifts(self) -> Callable[..., None]:
+        """Factory for a callback that plots the calculated shifts."""
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+
+        def plot_shifts_callback(ax: Axes, fig: Figure) -> None:
+            shifts = [result.x for result in self.results.values()]
+            ax.plot(range(len(shifts)), shifts, 'o', alpha=0.7)
+            ax.set_title('Calculated Shifts per Spectrum')
+            ax.set_xlabel('Spectrum Index')
+            ax.set_ylabel('Shift (eV)')
+        return plot_shifts_callback
+    
+    def plot_l2norms(self) -> Callable[..., None]:
+        """Factory for a callback that plots the L2 norms for each spectrum."""
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+
+        def plot_l2norms_callback(ax: Axes, fig: Figure) -> None:
+            for name, result in self.results.items():
+                ax.plot(result.shifts, result.l2_values, label=name)
+            ax.set_title('L2 Norms for Each Spectrum')
+            ax.set_xlabel('Shift (eV)')
+            ax.set_ylabel('L2 Norm')
+        return plot_l2norms_callback
+
+    def plot_spectra(self) -> Callable[..., None]:
+        """Factory for a callback that plots the interpolated spectra before and after alignment."""
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+
+        def plot_spectra_callback(ax: Axes, fig: Figure) -> None:
+            for name, data in self.data.items():
+                x = self.results[name].x
+                ax.plot(self.e_axis, data, color = 'tab:blue')
+                ax.plot(self.e_axis - x, data, color = 'tab:orange')
+            
+            ax.plot(self.e_axis, self.average, color='black', linewidth=2, linestyle="dotted")
+            ax.set_title('Interpolated Spectra')
+            ax.set_xlabel('Energy Index')
+            ax.set_ylabel('Intensity')
+        return plot_spectra_callback
+
+    def plot(self) -> Callable[..., None]:
+        """Factory for a callback that plots all the relevant plots in a 2x2 grid."""
+        from matplotlib.figure import Figure
+        from matplotlib.axes import Axes
+        from matplotlib.gridspec import GridSpecFromSubplotSpec
+
+        def plot_callback(ax: Axes, fig: Figure) -> None:
+            # Subplot ax with gridspec, and add all the other 4 plots in the quadrants.
+            spec = ax.get_subplotspec()
+            grid = GridSpecFromSubplotSpec(2, 2, subplot_spec=spec, wspace=0.3, hspace=0.3)
+            axes = [
+                fig.add_subplot(grid[0,0]),
+                fig.add_subplot(grid[0,1]),
+                fig.add_subplot(grid[1,0]),
+                fig.add_subplot(grid[1,1]),
+            ]
+
+            self.plot_histogram()(axes[0], fig)
+            self.plot_shifts()(axes[1], fig)
+            self.plot_l2norms()(axes[2], fig)
+            self.plot_spectra()(axes[3], fig)
+
+            ax.axis('off')
+        
+        return plot_callback
 
 CommandResult_Align = SubCommandResult_Align_Shift
 
@@ -160,6 +328,8 @@ class Command_Align(Command[CommandArguments_Align, CommandResult_Align]):
         log.info('Aligned all spectra using correlation method.')
 
         return SubCommandResult_Align_Shift(
-            e_range = (args.range[0].value, args.range[1].value),
+            e_axis = new_e,
+            average = average_reference,
+            data = page_interpolated,
             results = slidenorm
         )
