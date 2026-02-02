@@ -11,11 +11,30 @@
 
 ## Miglioramenti generali
 
-- parse di numeri come 88.eV -> 88.0eV
 - ri aggiungere plot intermedi per ciascun comando, se richiesti
 
-## Nuove feature
+## Cose da controllare
 
-- Modalità autodiscovery: scansione automatica di una directory per trovare file di input
-- Modalità batch: scansione di una directory per processare tutti i file di input trovati
-- Modalità interattiva
+- I limiti di range non accettano unità di misura
+- Se background o altri comandi vanno oltre le fourier sono malmenate dallo step
+- Provare minuit
+- Aggiungere deglitch
+- Le colonne vanno pulite dei punti per le espressioni
+- Finire stili nei plot
+- Controllare background che prima di bkg deve essere 0
+- Deglitch aggiungere single point removal
+
+## Migliorie
+
+- Gestione degli errori più elegante:
+  - In CommandArguments, usare un dizionario per mappare i token agli argomenti del comando.
+  - Quando viene generato un errore, di cui costruire una classe specifica, includere Token o Tree[Token] corretta in modo da poter fornire messaggi di errore più dettagliati, con informazioni sulla posizione nel file.
+
+- Irrigidimento di CommandArguments:
+  - Implementare la costruzione e validazione di argomenti attraverso dataclasses fields, in modo da ridurre la quantità di codice boilerplate e migliorare la leggibilità.
+
+- Implementare una sezione di help, accessibile anche dall'esterno (`estrapy help <comando>`)
+
+## Background
+
+- Aggiungere opzione per fare background in E oltre che in k
