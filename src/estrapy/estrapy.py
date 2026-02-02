@@ -10,13 +10,14 @@ import re  # noqa: E402
 
 from pathlib import Path  # noqa: E402
 from lark.exceptions import VisitError, UnexpectedToken  # noqa: E402
+from dataclasses import dataclass  # noqa: E402
 
 from . import __version__, __version_tuple__, copyright  # noqa: E402
 from .dispatcher import execute_script  # noqa: E402
 from .core.grammar.estrapyparser import file_parser  # noqa: E402
 from .transformer import EstraTransformer
 from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
-from .core.errors import ParseError  # noqa: E402
+from .core.errors import CommandParseError  # noqa: E402
 from .core.timers import TimerCollection  # noqa: E402
 
 global_LOGGING_LEVEL = logging.INFO
@@ -31,7 +32,6 @@ LEVELS: list[tuple[str, int, str]] = [
     ('ERR', logging.ERROR, 'red'),
     ('FTL', logging.CRITICAL, 'bold_red'),
 ]
-
 
 def init_logging(log_file: Path | None = None, debug: bool = False) -> logging.Logger:
     # Check the logfile folder exists
@@ -85,8 +85,17 @@ def parse_version_line(line: str) -> tuple[int, ...]:
         )
     return tuple(int(x) if x is not None else 0 for x in match.groups())
 
+@dataclass(slots=True)
+class ArgumentConfig:
+    inputfile: str | None
+    outputdir: Path | None
+    cwd: Path | None
+    verbose: bool
+    debug: bool
+    timings: bool
+    vars: dict[str, str]
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> ArgumentConfig:
     parser = argparse.ArgumentParser(
         description='Analyze XAS data files from an instruction file.',
         epilog=copyright,
@@ -135,10 +144,19 @@ def parse_args() -> argparse.Namespace:
         help='Variables to define in the script, in the form NAME=VALUE. Multiple variables can be defined by repeating this argument.',
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    return ArgumentConfig(
+        inputfile=args.inputfile,
+        outputdir=args.outputdir,
+        cwd=args.cwd,
+        verbose=args.verbose,
+        debug=args.debug,
+        timings=args.timings,
+        vars=args.vars,
+    )
 
 
-def initialize_context(args: argparse.Namespace, timers: TimerCollection) -> Context:
+def initialize_context(args: ArgumentConfig, timers: TimerCollection) -> Context:
     # Initialize context with default values
     context = Context(
         paths=Paths(
@@ -320,7 +338,7 @@ def estrapy_interactive_mode(context: Context, timers: TimerCollection) -> None:
                 execute_script(script, context)
             except UnexpectedToken as e:
                 print(f'Syntax error: {e}')
-            except ParseError as e:
+            except CommandParseError as e:
                 print(f'Parse error: {e}')
             except VisitError as e:
                 print(f'Error during execution: {e}')
@@ -353,7 +371,7 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
             script = transformer.transform(parsed_tree)
         except VisitError as ve:
             # On transformation error, check if it's a CommandSyntaxError and re-raise it with input file context
-            if isinstance(ve.orig_exc, ParseError):
+            if isinstance(ve.orig_exc, CommandParseError):
                 token = ve.orig_exc.token
                 # If the token is None, raise the original exception
                 if token is None:
@@ -375,7 +393,7 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
                 message_lines.extend(all_lines[max(0, line - 5) : line])
                 message_lines.append(' ' * (col - 1) + '^' * (endcol - col) + f'\n\n{ve.orig_exc}')
 
-                raise ParseError('\n'.join(message_lines), token) from ve
+                raise CommandParseError('\n'.join(message_lines), token) from ve
             raise ve from ve
     log.debug(f"Time to parse the input file: {(timers["parsing"]) / 1e6:.2f} ms")
 
@@ -452,7 +470,11 @@ def entry_point() -> None:
 
             print(f'Fatal error [{e.__class__.__name__}]: {e}', file=sys.stderr)
             exit(1)
-
+    except KeyboardInterrupt:
+        import sys
+        
+        print('\nExecution interrupted by user.', file=sys.stderr)
+        exit(1)
 
 if __name__ == '__main__':
     entry_point()
