@@ -1,21 +1,6 @@
 import numpy as np
 from numpy import typing as npt
-from typing import TypeVar
 from dataclasses import dataclass
-
-_N = TypeVar('_N', bound=npt.ArrayLike)
-
-# Uses N*M memory, inefficient and can be slow and crash
-# def sliding_l2(f: npt.NDArray[np.floating], g: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]: 
-#     f = np.asarray(f)
-#     g = np.asarray(g)
-
-#     M = len(f)
-#     # All M-length windows of g
-#     windows = np.lib.stride_tricks.sliding_window_view(g, M)
-
-#     # Compute L2 for each shift
-#     return np.sum((windows - f)**2, axis=1)
 
 def sliding_l2(f: npt.NDArray[np.floating], g: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
     f = np.asarray(f, float)
