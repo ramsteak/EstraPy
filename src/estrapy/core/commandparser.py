@@ -3,15 +3,24 @@ from lark import Token, Tree
 from dataclasses import dataclass, fields, MISSING
 from types import EllipsisType
 from enum import Enum
+from typing import Mapping, Any
 
 from .context import CommandArguments
-from .errors import ParseError
+from .errors import CommandParseError
 from .errors import ArgumentError, DuplicateArgumentError
 from .context import ParseContext
 from .misc import peekable
 
 # Define a command parser that can parse commands and their arguments, akin to an argparser.
 _T = TypeVar('_T', bound=CommandArguments)
+
+# @dataclass(slots=True)
+# class CommandArgumentMetadata(Mapping[str, Any]):
+#     """This class is a structure that holds the metadata for argument creation.
+#     It is a mapping to be used in the `field` attribute of dataclasses."""
+#     options: tuple[str, ...] = ()
+#     type: Callable[[str], Any] = str
+#     types: Callable[..., Any] | None = None
 
 
 class ActionType(Enum):
@@ -339,6 +348,7 @@ class CommandArgumentParser(Generic[_T]):
         _allfields = set(self._fields.keys())
         _definedfields: set[str] = set()
         _positional_arguments_iter = (self.arguments[name] for name in self.command_posargs)
+        _token_map: dict[str, Token | Tree[Token]] = {}
 
         # Positional arguments can only be defined before options. Once an option is encountered,
         # positional arguments are no longer accepted.
@@ -346,9 +356,11 @@ class CommandArgumentParser(Generic[_T]):
 
         while tokens and (_allfields - _definedfields):
             # Get first token for error reporting
-            __t = tokens.peek()
-            while isinstance(__t, Tree):
-                __t = __t.children[0]
+            # _t is the raw token, __t is the first unwrapped token.
+            _t = tokens.peek()
+            _ut = _t
+            while isinstance(_ut, Tree):
+                _ut = _ut.children[0]
 
             # Attempt to parse first token as a subparser, then option, then positional argument.
             #  - If the token matches, a tuple (ArgumentSpecification, value) is returned.
@@ -359,11 +371,17 @@ class CommandArgumentParser(Generic[_T]):
             # Attempt to parse first token as subparser
             result = self._parse_subparser(tokens)
             if isinstance(result, tuple):
+                # Once a subparser is matched, positional arguments are no longer accepted
+                _could_be_positional = False
                 arg, val = result
+                # If the subparser argument is already defined, raise an error
                 if arg.action.destination in _definedfields:
-                    raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
+                    raise CommandParseError(f"Argument '{arg.action.destination}' is already defined.", _ut)
                 self._perform_action(kwargs, arg.action, val)
+                # Add the value to defined fields
                 _definedfields.add(arg.action.destination)
+                # Add the token/tree to the token map for error reporting
+                _token_map[arg.action.destination] = _t
                 continue
             elif result is True:
                 continue
@@ -374,10 +392,14 @@ class CommandArgumentParser(Generic[_T]):
                 # Once an option is matched, positional arguments are no longer accepted
                 _could_be_positional = False
                 arg, val = result
+                # If the option argument is already defined, raise an error
                 if arg.action.destination in _definedfields:
-                    raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
+                    raise CommandParseError(f"Argument '{arg.action.destination}' is already defined.", _ut)
                 self._perform_action(kwargs, arg.action, val)
+                # Add the value to defined fields
                 _definedfields.add(arg.action.destination)
+                # Add the token/tree to the token map for error reporting
+                _token_map[arg.action.destination] = _t
                 continue
             elif result is True:
                 continue
@@ -390,10 +412,14 @@ class CommandArgumentParser(Generic[_T]):
             result = self._parse_positional(tokens, _positional_arguments_iter)
             if isinstance(result, tuple):
                 arg, val = result
+                # If the positional argument is already defined, raise an error
                 if arg.action.destination in _definedfields:
-                    raise ParseError(f"Argument '{arg.action.destination}' is already defined.", __t)
+                    raise CommandParseError(f"Argument '{arg.action.destination}' is already defined.", _ut)
                 self._perform_action(kwargs, arg.action, val)
+                # Add the value to defined fields
                 _definedfields.add(arg.action.destination)
+                # Add the token/tree to the token map for error reporting
+                _token_map[arg.action.destination] = _t
                 continue
             elif result is True:
                 continue
@@ -406,6 +432,7 @@ class CommandArgumentParser(Generic[_T]):
                 raise ArgumentError(f"Argument '{argname}' is required but not provided.")
 
         output = self.dataclass_type(**kwargs)
+        output._token_map.update(_token_map) # pyright: ignore[reportPrivateUsage]
         return output
 
     def _parse_subparser(self, tokens: peekable[Token | Tree[Token]]) -> tuple[ArgumentSpecification, Any] | bool | None:
@@ -473,7 +500,7 @@ class CommandArgumentParser(Generic[_T]):
                         value = arg_spec.types(*value)
                     except Exception as e:
                         tokens.pushback(token)
-                        raise ParseError(f"Error parsing argument '{arg_spec.name}': {e}", _opt) from e
+                        raise CommandParseError(f"Error parsing argument '{arg_spec.name}': {e}", _opt) from e
                 # Push back all unconsumed tokens
                 tokens.pushback_n(sub_tokens)
                 return arg_spec, value
@@ -496,7 +523,7 @@ class CommandArgumentParser(Generic[_T]):
 
         try:
             value = self._consume_tokens_for_nargs(tokens, arg_spec.nargs, arg_spec.type, arg_spec.accept)
-        except ParseError as pe:
+        except CommandParseError as pe:
             if not arg_spec.required:
                 return None
             raise pe from None
@@ -505,7 +532,7 @@ class CommandArgumentParser(Generic[_T]):
             try:
                 value = arg_spec.types(*value)
             except Exception as e:
-                raise ParseError(f"Error parsing argument '{arg_spec.name}': {e}", __t) from e
+                raise CommandParseError(f"Error parsing argument '{arg_spec.name}': {e}", __t) from e
 
         return arg_spec, value
 
@@ -539,7 +566,7 @@ class CommandArgumentParser(Generic[_T]):
                     break
                 else:
                     tokens.pushback_n(__tokens)
-                    raise ParseError(f"Failed to parse token '{token.value}' as {_type}", token) from None
+                    raise CommandParseError(f"Failed to parse token '{token.value}' as {_type}", token) from None
 
             values.append(val)
             __tokens.append(tokens.next())  # type: ignore
@@ -550,7 +577,7 @@ class CommandArgumentParser(Generic[_T]):
         # Validate number of consumed tokens
         if not nargs_spec.inrange(len(values)):
             tokens.pushback_n(__tokens)
-            raise ParseError(
+            raise CommandParseError(
                 f'Expected between {nargs_spec.min} and {nargs_spec.max} values, but got {len(values)}', __t
             )
 
@@ -565,9 +592,13 @@ class CommandArgumentParser(Generic[_T]):
             case ActionType.STORE_CONST:
                 kwargs[action.destination] = action.constant
             case ActionType.APPEND:
-                kwargs.setdefault(action.destination, []).append(value)
+                if kwargs.get(action.destination) is None:
+                    kwargs[action.destination] = []
+                kwargs[action.destination].append(value)
             case ActionType.APPEND_CONST:
-                kwargs.setdefault(action.destination, []).append(action.constant)
+                if kwargs.get(action.destination) is None:
+                    kwargs[action.destination] = []
+                kwargs[action.destination].append(action.constant)
             case _:
                 raise ArgumentError(f"Unknown action '{action.action}' for argument '{action.destination}'")
 
@@ -585,13 +616,13 @@ class CommandArgumentParser(Generic[_T]):
         if _tokens:
             match _tokens.next():
                 case Token() as t:
-                    raise ParseError('Unexpected extra tokens after parsing command.', t)
+                    raise CommandParseError('Unexpected extra tokens after parsing command.', t)
                 case Tree(Token(), [Token() as t, *_]):
-                    raise ParseError('Unexpected extra tokens after parsing command.', t)
+                    raise CommandParseError('Unexpected extra tokens after parsing command.', t)
                 case Tree(Token() as t, _):
-                    raise ParseError('Unexpected extra tokens after parsing command.', t)
+                    raise CommandParseError('Unexpected extra tokens after parsing command.', t)
                 case _:
-                    raise ParseError('Unexpected extra tokens after parsing command.')
+                    raise CommandParseError('Unexpected extra tokens after parsing command.')
 
         _tokens.close()
         return struct
