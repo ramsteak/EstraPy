@@ -82,7 +82,7 @@ def _get_shift_axis(range: tuple[float, float], resolution: float) -> npt.NDArra
 def _set_edge_energy_value(page: DataPage, edge_energy: float) -> None:
     page.meta['E0'] = edge_energy
     domain = page.domains[Domain.RECIPROCAL]
-    e_column = ColumnDescription('e', Unit.EV, ColumnKind.AXIS, deps=['E'], calc=lambda df, E0=edge_energy: df['E'] - E0, labl='Relative energy [eV]')
+    e_column = ColumnDescription('e', Unit.EV, ColumnKind.AXIS, deps=['E'], calc=lambda df, E0=edge_energy: df['E'] - E0, labl='Relative energy [eV]', relative=True)
     k_column = ColumnDescription('k', Unit.A, ColumnKind.AXIS, deps=['E'], calc=lambda df, E0=edge_energy: E_to_k(df['E'], E0), labl='Wave vector k [1/Å]')
     domain.add_column('e', e_column)
     domain.add_column('k', k_column)
