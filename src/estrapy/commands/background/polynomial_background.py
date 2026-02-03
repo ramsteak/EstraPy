@@ -100,4 +100,6 @@ def execute_background_polynomial(
     threaded = len(context.datastore.pages) >= 12 and context.options.debug is False
     page_background = execute_threaded(compute, page_fulldata, argkind='s', threaded=threaded, pass_key_as='name')
 
+    log.info('Completed polynomial background calculation for all pages.')
+
     return page_background
