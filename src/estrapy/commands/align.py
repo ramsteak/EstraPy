@@ -3,144 +3,117 @@ import numpy as np
 from numpy import typing as npt
 from logging import Logger
 from scipy.interpolate import make_interp_spline, BSpline # type: ignore missing stub
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from lark import Token, Tree
 from typing import Self, Callable
 from functools import partial
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core._validators import validate_number_unit, validate_number_positive, validate_int_non_negative, validate_range_unit
+
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.datastore import Domain, DataPage, ColumnDescription, ColumnKind
 from ..core.number import Number, parse_number, parse_range, Unit, parse_edge
 from ..core.threaded import execute_threaded
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
 from ..operations.edge_detection import correlation_edge_detection, SlidingL2Result
 
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Shift(CommandArguments):
-    resolution: Number = field(
-        metadata={
-            'options': ['--resolution', '--res'],
-            'type': parse_number,
-            'required': True,
-            'help': 'Energy resolution for the alignment calculation.',
-        },
+    range: tuple[Number, Number] = field_arg(
+        position = 0,
+        types = parse_range,
+        nargs = 2,
+        required = False,
+        help = 'Energy range to consider for alignment.',
+        default = (Number(None, -np.inf, None), Number(None, np.inf, None)),
+        validate = validate_range_unit(Unit.EV)
     )
 
-    shift: Number = field(
-        metadata={
-            'options': ['--shift', '-s'],
-            'type': parse_number,
-            'required': True,
-            'help': 'Maximum shift to consider for the alignment calculation.',
-        },
+    resolution: Number = field_arg(
+        flags = ['--resolution', '--res'],
+        type = parse_number,
+        required = True,
+        help = 'Energy resolution for the alignment calculation.',
+        validate = [validate_number_unit(Unit.EV), validate_number_positive],
+        default = Number(None, 0.1, Unit.EV)
     )
 
-    derivative: int = field(
-        metadata={
-            'options': ['--derivative', '--deriv'],
-            'type': int,
-            'required': False,
-            'help': 'Derivative order to use for the correlation calculation.',
-        },
-        default=0
+    shift: Number = field_arg(
+        flags = ['--shift', '-s'],
+        type = parse_number,
+        required = True,
+        help = 'Maximum shift to consider for the alignment calculation.',
+        default = Number(None, 5.0, Unit.EV),
+        validate = [validate_number_unit(Unit.EV), validate_number_positive],
     )
 
-    range: tuple[Number, Number] = field(
-        metadata={
-            'types': parse_range,
-            'nargs': 2,
-            'required': False,
-            'help': 'Energy range to consider for alignment.',
-            },
-        default=(Number(None, -np.inf, None), Number(None, np.inf, None))
+    derivative: int = field_arg(
+        flags = ['--derivative', '--deriv'],
+        type = int,
+        required = False,
+        help = 'Derivative order to use for the correlation calculation.',
+        default = 0,
+        validate = validate_int_non_negative,
     )
 
-    energy: Number | None = field(
-        metadata={
-            'options': ['--energy', '--E0', '-E'],
-            'type': parse_edge,
-            'required': False,
-            'help': 'Edge energy to set in the metadata after alignment.',
-        },
-        default=None
+    energy: Number | None = field_arg(
+        flags = ['--energy', '--E0', '-E'],
+        type = parse_edge,
+        required = False,
+        help = 'Edge energy to set in the metadata after alignment.',
+        default = None,
+        validate = validate_number_unit(Unit.EV),
     )
-
 
 
 @dataclass(slots=True)
 class SubCommandArguments_Align_Calc(CommandArguments):
-    method: str = field(
-        metadata={
-            'options': ['--method', '-m'],
-            'type': str,
-            'required': True,
-            'help': 'Method to use for alignment calculation.',
-        },
-    )
-
-    energy: Number = field(
-        metadata={
-            'options': ['--energy', '--E0', '-E'],
-            'type': parse_edge,
-            'required': True,
-            'help': 'Edge energy to align to.',
-        },
+    energy: Number = field_arg(
+        flags = ['--energy', '--E0', '-E'],
+        type = parse_edge,
+        required = True,
+        help = 'Edge energy to align to.',
+        validate = validate_number_unit(Unit.EV),
     )
     
-    delta: Number = field(
-        metadata={
-            'options': ['--delta', '-d'],
-            'type': parse_number,
-            'required': True,
-            'help': 'Energy delta around the edge to consider for the calculation.',
-        },
+    delta: Number = field_arg(
+        flags = ['--delta', '-d'],
+        type = parse_number,
+        required = True,
+        help = 'Allowed deviation from the edge energy.',
+        validate = [validate_number_unit(Unit.EV), validate_number_positive],
     )
 
-    search: Number | None = field(
-        metadata={
-            'options': ['--search', '--sE0'],
-            'type': parse_edge,
-            'required': False,
-            'help': 'Energy to search for the edge within. If not provided, default to the value of --energy.',
-            },
-        default=None
+    method: str = field_arg(
+        flags = ['--method', '-m'],
+        type = str,
+        required = False,
+        help = 'Method to use for alignment calculation.',
+        default = 'set',
+    )
+
+    search: Number | None = field_arg(
+        flags = ['--search', '--sE0'],
+        type = parse_edge,
+        required = False,
+        help = 'Search energy for the edge if different from the edge energy.',
+        default = None,
+        validate = validate_number_unit(Unit.EV),
     )
 
 
 @dataclass(slots=True)
 class CommandArguments_Align(CommandArguments):
-    mode: SubCommandArguments_Align_Calc | SubCommandArguments_Align_Shift = field(
-        metadata={
-            'subparsers': {
-                'calc': SubCommandArguments_Align_Calc,
-                'shift': SubCommandArguments_Align_Shift,
-            },
-            'required': True,
-            'help': 'Alignment mode to use.',
+    mode: SubCommandArguments_Align_Calc | SubCommandArguments_Align_Shift = field_arg(
+        subparsers = {
+            'calc': SubCommandArguments_Align_Calc,
+            'shift': SubCommandArguments_Align_Shift,
         }
     )
 
-
-sub_calc = CommandArgumentParser(SubCommandArguments_Align_Calc, name='calc')
-sub_calc.add_argument('method', '--method', '-m', type=str, required=False, default='set')
-sub_calc.add_argument('energy', '--energy', '--E0', '-E', type=parse_edge, required=False)
-sub_calc.add_argument('search', '--search', '--sE0', type=parse_edge, required=False, default=None)
-sub_calc.add_argument('delta', '--delta', '-d', type=parse_number, required=False)
-
-_default_range = (Number(None, -np.inf, None), Number(None, np.inf, None))
-sub_shift = CommandArgumentParser(SubCommandArguments_Align_Shift, name='shift')
-sub_shift.add_argument('range', types=parse_range, nargs=2, required=False, default=_default_range)
-sub_shift.add_argument('resolution', '--resolution', '--res', type=parse_number, required=False, default=Number(None, 0.1, Unit.EV))
-sub_shift.add_argument('shift', '--shift', '-s', type=parse_number, required=False, default=Number(None, 5.0, Unit.EV))
-sub_shift.add_argument('derivative', '--derivative', '--deriv', type=int, required=False, default=0)
-sub_shift.add_argument('energy', '--energy', '--E0', '-E', type=parse_edge, required=False, default=None)
-
 parse_align_command = CommandArgumentParser(CommandArguments_Align, name='align')
-parse_align_command.add_subparser('calc', sub_calc, 'mode')
-parse_align_command.add_subparser('shift', sub_shift, 'mode')
-
 
 @dataclass(slots=True)
 class SubCommandResult_Align_Shift(CommandResult):
@@ -274,7 +247,7 @@ class Command_Align(Command[CommandArguments_Align, CommandResult_Align]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_align_command(commandtoken, tokens, parsecontext)
+        arguments = parse_align_command.parse(commandtoken, tokens)
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,

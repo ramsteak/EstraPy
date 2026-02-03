@@ -8,62 +8,110 @@ from lark import Token, Tree
 from typing import Self
 from functools import partial
 
+from ..core._validators import validate_number_unit, validate_number_positive, validate_int_non_negative
+
 from ..core.datastore import Domain, ColumnDescription, ColumnKind, DataPage
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.number import Number, parse_number, Unit, parse_range, parse_edge
 from ..core.threaded import execute_threaded
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, field_arg, CommandArguments
 from ..operations.edge_detection import correlation_edge_detection, SlidingL2Result
 from ..operations.axis_conversions import E_to_k
 
 
 @dataclass(slots=True)
+class SubCommandArguments_Edge_Set(CommandArguments):
+    energy: Number = field_arg(
+        position=0,
+        type=parse_edge,
+        required=True,
+        validate = [validate_number_unit(Unit.EV), validate_number_positive]
+    )
+
+
+@dataclass(slots=True)
 class SubCommandArguments_Edge_Calc(CommandArguments):
-    mode: str
-    energy: Number | str
-    search: Number
-    delta: Number
+    mode: str = field_arg(
+        flags=['--mode', '-m'],
+        type=str,
+        required=False,
+        default='set'
+    )
+
+    energy: Number | str | None = field_arg(
+        flags=['--energy', '--E0', '-E'],
+        type=parse_edge,
+        required=False,
+        default=None,
+        validate= [validate_number_unit(Unit.EV), validate_number_positive]
+    )
+
+    search: Number = field_arg(
+        flags=['--search', '--sE0'],
+        type=parse_edge,
+        required=False,
+        default=Number(None, 0.0, Unit.EV),
+        validate=validate_number_unit(Unit.EV)
+    )
+
+    delta: Number | None = field_arg(
+        flags=['--delta', '-d'],
+        type=parse_number,
+        required=False,
+        default=None,
+        validate=[validate_number_unit(Unit.EV), validate_number_positive]
+    )
 
 
 @dataclass(slots=True)
 class SubCommandArguments_Edge_Shift(CommandArguments):
-    range: tuple[Number, Number]
-    resolution: Number
-    shift: Number
-    derivative: int
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=False,
+        default=(Number(None, -np.inf, None), Number(None, np.inf, None))
+    )
 
+    resolution: Number = field_arg(
+        flags=['--resolution', '--res'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 0.1, Unit.EV),
+        validate=validate_number_positive
+    )
 
-@dataclass(slots=True)
-class SubCommandArguments_Edge_Set(CommandArguments):
-    energy: Number
+    shift: Number = field_arg(
+        flags=['--shift', '-s'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 5.0, None),
+        validate=validate_number_positive
+    )
+
+    derivative: int = field_arg(
+        flags=['--derivative', '--deriv'],
+        type=int,
+        required=False,
+        default=1,
+        validate=validate_int_non_negative
+    )
 
 
 @dataclass(slots=True)
 class CommandArguments_Edge(CommandArguments):
-    mode: SubCommandArguments_Edge_Calc | SubCommandArguments_Edge_Shift | SubCommandArguments_Edge_Set
-
-
-sub_set = CommandArgumentParser(SubCommandArguments_Edge_Set, name='set')
-sub_set.add_argument('energy', type=parse_edge, required=True)
-
-sub_calc = CommandArgumentParser(SubCommandArguments_Edge_Calc, name='calc')
-sub_calc.add_argument('mode', '--mode', '-m', type=str, required=False, default='set')
-sub_calc.add_argument('energy', '--energy', '--E0', '-E', type=parse_edge, required=False)
-sub_calc.add_argument('search', '--search', '--sE0', type=parse_edge, required=False, default=Number(None, 0.0, None))
-sub_calc.add_argument('delta', '--delta', '-d', type=parse_number, required=False)
-
-_default_range = (Number(None, -np.inf, None), Number(None, np.inf, None))
-sub_shift = CommandArgumentParser(SubCommandArguments_Edge_Shift, name='shift')
-sub_shift.add_argument('range', types=parse_range, nargs=2, required=False, default=_default_range)
-sub_shift.add_argument('resolution', '--resolution', '--res', type=parse_number, required=False, default=Number(None, 0.1, None))
-sub_shift.add_argument('shift', '--shift', '-s', type=parse_number, required=False, default=Number(None, 5.0, None))
-sub_shift.add_argument('derivative', '--derivative', '--deriv', type=int, required=False, default=1)
-
+    mode: SubCommandArguments_Edge_Calc | SubCommandArguments_Edge_Shift | SubCommandArguments_Edge_Set = field_arg(
+        subparsers={
+            'set': SubCommandArguments_Edge_Set,
+            'calc': SubCommandArguments_Edge_Calc,
+            'shift': SubCommandArguments_Edge_Shift,
+        }
+    )
 parse_edge_command = CommandArgumentParser(CommandArguments_Edge, name='edge')
-parse_edge_command.add_subparser('set', sub_set, 'mode')
-parse_edge_command.add_subparser('calc', sub_calc, 'mode')
-parse_edge_command.add_subparser('shift', sub_shift, 'mode')
+
+
+
 
 @dataclass(slots=True)
 class SubCommandResult_Edge_Shift(CommandResult):
@@ -120,7 +168,7 @@ class Command_Edge(Command[CommandArguments_Edge, CommandResult_Edge]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_edge_command(commandtoken, tokens, parsecontext)
+        arguments = parse_edge_command.parse(commandtoken, tokens)
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,

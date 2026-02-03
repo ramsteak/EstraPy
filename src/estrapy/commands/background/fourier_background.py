@@ -8,9 +8,9 @@ from functools import partial
 from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
-from ...core.commandparser import CommandArgumentParser
-from ...core.context import CommandArguments
-from ...core.number import Number, parse_number
+from ...core.commandparser2 import CommandArguments, field_arg
+from ...core._validators import validate_float_non_negative, validate_number_unit, validate_number_positive, validate_non_negative
+from ...core.number import Number, parse_number, Unit
 from ...operations.fourier import flattop_window, fourier
 from ...core.context import Context
 from ...core.datastore import Domain
@@ -18,36 +18,67 @@ from ...core.datastore import Domain
 
 @dataclass(slots=True)
 class SubCommand_FourierBackgroundArguments(CommandArguments):
-    rmax: Number
-    kweight: float
-    forwardpad: Number = parse_number('0.1k')
-    forwardwidth: Number = parse_number('1.0k')
-    backwardpad: Number = parse_number('0.1A')
-    backwardwidth: Number = parse_number('0.2A')
+    rmax: Number = field_arg(
+        flags=['--rmax'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 1.0, Unit.A),
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
 
-subcommand_fourier = CommandArgumentParser(
-    SubCommand_FourierBackgroundArguments,
-    name = 'fourier'
-)
+    kweight: float = field_arg(
+        flags=['--kweight'],
+        type=float,
+        required=False,
+        default=2.0,
+        validate=validate_float_non_negative
+    )
 
-subcommand_fourier.add_argument('rmax', '--rmax', type = parse_number, required=False, default=parse_number('1A'))
-subcommand_fourier.add_argument('kweight', '--kweight', type = float, required=False, default=2.0)
-subcommand_fourier.add_argument('forwardpad', '--forward-pad', type = parse_number, required=False, default=parse_number('0.1k'))
-subcommand_fourier.add_argument('forwardwidth', '--forward-width', type = parse_number, required=False, default=parse_number('1.0k'))
-subcommand_fourier.add_argument('backwardpad', '--backward-pad', type = parse_number, required=False, default=parse_number('0.1A'))
-subcommand_fourier.add_argument('backwardwidth', '--backward-width', type = parse_number, required=False, default=parse_number('0.2A'))
+    forwardpad: Number = field_arg(
+        flags=['--forward-pad'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 0.1, Unit.K),
+        validate=[validate_number_unit(Unit.K), validate_number_positive]
+    )
+
+    forwardwidth: Number = field_arg(
+        flags=['--forward-width'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 1.0, Unit.K),
+        validate=[validate_number_unit(Unit.K), validate_number_positive]
+    )
+
+    backwardpad: Number = field_arg(
+        flags=['--backward-pad'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 0.1, Unit.A),
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
+
+    backwardwidth: Number = field_arg(
+        flags=['--backward-width'],
+        type=parse_number,
+        required=False,
+        default=Number(None, 0.2, Unit.A),
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
+
+    epsilon: float = field_arg(
+        flags=['--epsilon'],
+        type=float,
+        required=False,
+        default=1e-30,
+        validate=validate_float_non_negative
+    )
+
 
 @dataclass(slots=True)
 class FourierBackgroundResult(BackgroundResult):
     ...
 
-FORWARD_WINDOW_PADDING = 0.1
-FORWARD_WINDOW_WIDTH = 1.0
-
-BACKWARD_WINDOW_PADDING = 0.1
-BACKWARD_WINDOW_WIDTH = 0.2
-
-EPSILON = 1e-30
 def _compute_background_fourier(xy: npt.NDArray[np.floating],
                                range: tuple[float, float],
                                sargs: SubCommand_FourierBackgroundArguments,
@@ -78,16 +109,16 @@ def _compute_background_fourier(xy: npt.NDArray[np.floating],
     r = np.linspace(-5*cutoff, 5*cutoff, 2**10)
 
     forward_window_shape = (
-        range_lower - FORWARD_WINDOW_PADDING,
-        range_lower + FORWARD_WINDOW_WIDTH,
-        range_upper - FORWARD_WINDOW_WIDTH,
-        range_upper + FORWARD_WINDOW_PADDING
+        range_lower - sargs.forwardpad.value,
+        range_lower + sargs.forwardwidth.value,
+        range_upper - sargs.forwardwidth.value,
+        range_upper + sargs.forwardpad.value
     )
     backward_window_shape = (
-        -cutoff - BACKWARD_WINDOW_PADDING,  
-        -cutoff + BACKWARD_WINDOW_WIDTH,
-        cutoff - BACKWARD_WINDOW_WIDTH,
-        cutoff + BACKWARD_WINDOW_PADDING
+        -cutoff - sargs.backwardpad.value,  
+        -cutoff + sargs.backwardwidth.value,
+        cutoff - sargs.backwardwidth.value,
+        cutoff + sargs.backwardpad.value,
     )
 
     w = flattop_window(x, forward_window_shape, 'hanning')
@@ -96,7 +127,7 @@ def _compute_background_fourier(xy: npt.NDArray[np.floating],
     f = fourier(x, y * x**kweight * w, r)
     b = fourier(r, f.conj() * W, x)
 
-    bkg = b.real / (x**kweight + EPSILON) / w
+    bkg = b.real / (x**kweight + sargs.epsilon) / w
 
     Bkg = np.zeros_like(xy[:,1])
     Bkg[idx] = bkg

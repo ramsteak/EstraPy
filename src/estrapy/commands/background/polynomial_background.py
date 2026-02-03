@@ -8,27 +8,35 @@ from functools import partial
 from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
-from ...core.commandparser import CommandArgumentParser
-from ...core.context import CommandArguments
+from ...core.commandparser2 import CommandArguments, field_arg
+from ...core._validators import validate_int_non_negative, validate_float_non_negative
 from ...core.number import Number
 from ...core.context import Context
 from ...core.datastore import Domain
 
 @dataclass(slots=True)
 class SubCommand_PolynomialBackgroundArguments(CommandArguments):
-    degree: int
-    kweight: float
+    degree: int = field_arg(
+        flags=['--degree', '-d'],
+        type=int,
+        required=False,
+        default=3,
+        const_flags={
+            '--linear': 1, '-l': 1,
+            '--quadratic': 2, '-q': 2,
+            '--cubic': 3, '-c': 3
+        },
+        validate=validate_int_non_negative
+    )
 
-subcommand_polynomial = CommandArgumentParser(
-    SubCommand_PolynomialBackgroundArguments,
-    name = 'polynomial'
-)
+    kweight: float = field_arg(
+        flags=['--kweight'],
+        type=float,
+        required=False,
+        default=2.0,
+        validate=validate_float_non_negative
+    )
 
-subcommand_polynomial.add_argument('degree', '--degree', '-d', type = int, required=False, default=3)
-subcommand_polynomial.add_argument(None, '--linear', '-l', action='store_const', const=1, dest='degree', nargs=0)
-subcommand_polynomial.add_argument(None, '--quadratic', '-q', action='store_const', const=2, dest='degree', nargs=0)
-subcommand_polynomial.add_argument(None, '--cubic', '-c', action='store_const', const=3, dest='degree', nargs=0)
-subcommand_polynomial.add_argument('kweight', '--kweight', type = float, required=False, default=2.0)
 
 @dataclass(slots=True)
 class PolynomialBackgroundResult(BackgroundResult):

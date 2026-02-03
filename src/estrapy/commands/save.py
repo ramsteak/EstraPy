@@ -7,35 +7,48 @@ from dataclasses import dataclass
 from typing import Self, Any
 
 from .. import __version__
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
 from ..core.grammar.mathexpressions import Expression
 from ..core.datastore import Domain
 from ..core.misc import template_replace
 
-
 @dataclass(slots=True)
 class SubCommandArguments_Save_Columns(CommandArguments):
-    path: str
-    columns: list[Expression[npt.NDArray[np.floating]]]
-    select: Expression[npt.NDArray[np.bool]] | None
+    path: str = field_arg(
+        flags=['--path', '-p'],
+        type=str,
+        required=True
+    )
 
-@dataclass(slots=True)
-class CommandArguments_Save(CommandArguments):
-    mode: SubCommandArguments_Save_Columns
+    columns: list[Expression[npt.NDArray[np.floating]]] = field_arg(
+        flags=['--columns', '-c'],
+        type=Expression.compile,
+        nargs='+',
+        required=True
+    )
+
+    select: Expression[npt.NDArray[np.bool_]] | None = field_arg(
+        flags=['--select'],
+        type=Expression.compile,
+        required=False,
+        default=None
+    )
 
 @dataclass(slots=True)
 class CommandResult_Save(CommandResult):
     ...
 
-sub_columns = CommandArgumentParser(SubCommandArguments_Save_Columns, name='columns')
-sub_columns.add_argument('path', '--path', '-p', type=str, required=True)
-sub_columns.add_argument('columns', '--columns', '-c', type=Expression.compile, nargs='+', required=True)
-sub_columns.add_argument('select', '--select', type=Expression.compile, required=False, default=None)
+@dataclass(slots=True)
+class CommandArguments_Save(CommandArguments):
+    mode: SubCommandArguments_Save_Columns = field_arg(
+        subparsers={
+            'columns': SubCommandArguments_Save_Columns,
+        }
+    )
 
-parse_save_command = CommandArgumentParser(CommandArguments_Save)
-parse_save_command.add_subparser('columns', sub_columns, 'mode')
+parse_save_command = CommandArgumentParser(CommandArguments_Save, 'save')
 
 def save_to_file(filepath: Path, data: npt.NDArray[Any], columns: list[str], header: str) -> None:
 
@@ -62,7 +75,8 @@ class Command_Save(Command[CommandArguments_Save, CommandResult_Save]):
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
         # TODO: add a way to know at parse time which variables will exist
-        arguments = parse_save_command(commandtoken, tokens, parsecontext)
+        arguments = parse_save_command.parse(commandtoken, tokens)
+        
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,

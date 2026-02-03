@@ -2,67 +2,62 @@ import pandas as pd
 
 from lark import Token, Tree
 from pathlib import Path
-from functools import partial
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Self, Any
 from itertools import batched
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core._validators import validate_int_positive, type_enum
+
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
 from ..core.misc import Bag
 from ..core.datastore import DataPage, FileMetadata, Domain, DataDomain
-from ..core.misc import guess_type, fuzzy_match_enum
+from ..core.misc import guess_type
 
 @dataclass(slots=True)
 class CommandArguments_Average(CommandArguments):
-    maxsize: int | None = field(
-        metadata={
-            'options': ['--maxsize'],
-            'type': int,
-            'required': False,
-            'help': 'Maximum size of each group. If a group exceeds this size, it will be split into smaller groups.'
-            },
+    groupby: list[str] = field_arg(
+        flags=['--groupby'],
+        type=str,
+        nargs='+',
+        required=False,
+        help='Metadata keys to group by for the averaging process.',
+        default_factory=list[str]
     )
 
-    minsize: int = field(
-        metadata={
-            'options': ['--minsize'],
-            'type': int,
-            'required': False,
-            'help': 'Minimum size of each group. If the last split group is smaller than this size, it will be merged with the previous group.'
-            },
+    maxsize: int | None = field_arg(
+        flags=['--maxsize'],
+        type=int,
+        required=False,
+        help='Maximum number of items in a group.',
+        default=None,
+        validate=validate_int_positive
+    )
+
+    minsize: int = field_arg(
+        flags=['--minsize'],
+        type=int,
+        required=False,
+        help='Minimum number of items required to form a group.',
+        validate=validate_int_positive,
         default=1
     )
 
-    groupby: list[str] = field(
-        metadata={
-            'options': ['--groupby'],
-            'type': list[str],
-            'nargs': '+',
-            'required': False,
-            'help': 'New name of the page, used for grouping current pages before averaging.'
-            },
-        default_factory=list[str])
-    
-    domain: Domain = field(
-        metadata={
-            'options': ['--domain'],
-            'type': partial(fuzzy_match_enum, enum=Domain, strict=True),
-            'required': False,
-            'help': 'Domain to average over.'
-            },
+    domain: Domain = field_arg(
+        flags=['--domain'],
+        type=type_enum(Domain),
+        required=False,
+        help='The data domain (e.g., real or reciprocal) in which to perform averaging.',
         default=Domain.RECIPROCAL
     )
 
-    axis: str | None = field(
-        metadata={
-            'options': ['--axis'],
-            'type': str,
-            'required': False,
-            'help': 'Axis to average over. If not specified, all axes are averaged together.'
-            },
+    axis: str | None = field_arg(
+        flags=['--axis'],
+        type=str,
+        required=False,
+        help='The specific axis along which to perform the average.',
         default=None
     )
 
@@ -71,12 +66,7 @@ class CommandResult_Average(CommandResult):
     ...
 
 
-parse_average_command = CommandArgumentParser(CommandArguments_Average)
-parse_average_command.add_argument('groupby', '--groupby', type=str, nargs='+', required=False, default_factory=list)
-parse_average_command.add_argument('maxsize', '--maxsize', type=int, required=False, default=None)
-parse_average_command.add_argument('minsize', '--minsize', type=int, required=False, default=1)
-parse_average_command.add_argument('domain', '--domain', type=partial(fuzzy_match_enum, enum=Domain, strict=True), required=False, default='reciprocal')
-parse_average_command.add_argument('axis', '--axis', type=str, required=False, default=None)
+parse_average_command = CommandArgumentParser(CommandArguments_Average, 'average')
 
 def _try_relative_path(path: Path, base: Path | None) -> Path:
     """Try to make path relative to base, if possible."""
@@ -140,7 +130,7 @@ class Command_Average(Command[CommandArguments_Average, CommandResult_Average]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_average_command(commandtoken, tokens, parsecontext)
+        arguments = parse_average_command.parse(commandtoken, tokens)
 
         return cls(
             line=commandtoken.line or -1,

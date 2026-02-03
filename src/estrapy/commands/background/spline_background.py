@@ -8,34 +8,61 @@ from functools import partial
 from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
-from ...core.commandparser import CommandArgumentParser
-from ...core.context import CommandArguments
+from ...core.commandparser2 import CommandArguments, field_arg
+from ...core._validators import validate_float_non_negative, validate_int_non_negative
 from ...core.number import Number, parse_number
 from ...core.context import Context
 from ...core.datastore import Domain
 
 from ...operations.spline import PiecewiseSplineFitter
 
-@dataclass(slots=True)
-class SubCommand_SplineBackgroundArguments(CommandArguments):
-    kweight: float
-    nodes: list[Number]
-    degrees: list[int]
-    fixedpoints: list[tuple[Number, float]] | None
-
-subcommand_spline = CommandArgumentParser(
-    SubCommand_SplineBackgroundArguments,
-    name = 'spline'
-)
-
 def parse_fixed_point(s: str) -> tuple[Number, float]:
     xstr, ystr = s.split(",", maxsplit=1)
     return (parse_number(xstr), float(ystr))
 
-subcommand_spline.add_argument('kweight', '--kweight', type = float, required=False, default=2.0)
-subcommand_spline.add_argument('nodes', '--nodes', type = parse_number, nargs='+', required=True)
-subcommand_spline.add_argument('degrees', '--degrees', type = int, nargs='+', required=True)
-subcommand_spline.add_argument('fixedpoints', '--fixed-points', type=parse_fixed_point, nargs=1, action='append', required=False, default=None)
+@dataclass(slots=True)
+class SubCommand_SplineBackgroundArguments(CommandArguments):
+    nodes: list[Number] = field_arg(
+        flags=['--nodes'],
+        type=parse_number,
+        nargs='+',
+        required=True
+    )
+
+    degrees: list[int] = field_arg(
+        flags=['--degrees'],
+        type=int,
+        nargs='+',
+        required=True,
+    )
+
+    kweight: float = field_arg(
+        flags=['--kweight'],
+        type=float,
+        required=False,
+        default=2.0,
+        validate=validate_float_non_negative
+    )
+
+    fixedpoints: list[tuple[Number, float]] | None = field_arg(
+        flags=['--fixed-points'],
+        type=parse_fixed_point,
+        nargs=1,
+        action='append',
+        required=False,
+        default=None
+    )
+
+    def validate(self) -> bool:
+        """
+        Validates the consistency between nodes and degrees.
+        """
+        if len(self.nodes) != len(self.degrees)-1:
+            raise ValueError(
+                f"Number of nodes ({len(self.nodes)}) must match number of degrees ({len(self.degrees)})."
+            )
+        return True
+
 
 @dataclass(slots=True)
 class SplineBackgroundResult(BackgroundResult):
@@ -91,6 +118,8 @@ def execute_background_spline(
     k_range = range[0].value, range[1].value
 
     log.debug('Preparing spline fitter')
+
+    # TODO: if nodes is one element without unit, interpret as nknots and generate equidistant knots within range
 
     spline_fitter = PiecewiseSplineFitter(
         knots = np.array([n.value for n in sargs.nodes]),

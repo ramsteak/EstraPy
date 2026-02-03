@@ -3,22 +3,26 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
-from ..core.number import Number, parse_edge
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.number import Number, parse_range
 from ..core.datastore import Domain
 
 @dataclass(slots=True)
 class CommandArguments_Cut(CommandArguments):
-    range: tuple[Number, Number]
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=True,
+    )
 
 @dataclass(slots=True)
 class CommandResult_Cut(CommandResult):
     ...
 
-parse_cut_command = CommandArgumentParser(CommandArguments_Cut)
-parse_cut_command.add_argument('range', type=parse_edge, nargs=2, required=True)
+parse_cut_command = CommandArgumentParser(CommandArguments_Cut, 'cut')
 
 
 @dataclass(slots=True)
@@ -27,7 +31,7 @@ class Command_Cut(Command[CommandArguments_Cut, CommandResult_Cut]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_cut_command(commandtoken, tokens, parsecontext)
+        arguments = parse_cut_command.parse(commandtoken, tokens)
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,

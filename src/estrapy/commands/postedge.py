@@ -3,11 +3,11 @@ import numpy as np
 from lark import Token, Tree
 
 from dataclasses import dataclass
-from typing import Self
+from typing import Self, Literal
 
-from ..core.context import CommandArguments, Command
-from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.context import Context, ParseContext, Command, CommandResult
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core._validators import validate_int_non_negative, validate_float_non_negative, validate_range_unit, validate_option_in
 from ..core.number import Number, parse_range, Unit
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 from ..core.misc import fmt
@@ -15,42 +15,86 @@ from ..core.misc import fmt
 
 @dataclass(slots=True)
 class CommandArguments_Postedge(CommandArguments):
-    range: tuple[Number, Number]
-    degree: int
-    mode: str = 'division'
-    xaxis: str = 'E'
-    kweight: float = 0
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=True,
+        validate=validate_range_unit(Unit.EV)
+    )
 
-parse_postedge_command = CommandArgumentParser(CommandArguments_Postedge)
-parse_postedge_command.add_argument('range', types=parse_range, nargs=2, required=True)
-parse_postedge_command.add_argument('degree', '--degree', '--deg', type=int, default=2)
-parse_postedge_command.add_argument(None, '--constant', '-C', action='store_const', dest='degree', const=0, nargs=0)
-parse_postedge_command.add_argument(None, '--linear', '-l', action='store_const', dest='degree', const=1, nargs=0)
-parse_postedge_command.add_argument(None, '--quadratic', '-q', action='store_const', dest='degree', const=2, nargs=0)
-parse_postedge_command.add_argument(None, '--cubic', '-c', action='store_const', dest='degree', const=3, nargs=0)
-parse_postedge_command.add_argument('mode', '--mode', '-m', type=str, required=False, default='subtraction')
-parse_postedge_command.add_argument(None, '--subtraction', '--subtract', '--sub', '-s', action='store_const', dest='mode', const='subtraction', nargs=0)
-parse_postedge_command.add_argument(None, '--division', '--divide', '--div', '-d', action='store_const', dest='mode', const='division', nargs=0)
-parse_postedge_command.add_argument('xaxis', '--xaxis', type=str, required=False, default='E')
-parse_postedge_command.add_argument(None, '--E-axis', '-E', action='store_const', dest='xaxis', const='E', nargs=0)
-parse_postedge_command.add_argument(None, '--e-axis', '-e', action='store_const', dest='xaxis', const='e', nargs=0)
-parse_postedge_command.add_argument(None, '--k-axis', '-k', action='store_const', dest='xaxis', const='k', nargs=0)
-parse_postedge_command.add_argument('kweight', '--kweight', type=float, default=0)
+    degree: int = field_arg(
+        flags=['--degree', '--deg'],
+        type=int,
+        default=2,
+        const_flags={
+            '--constant': 0, '-C': 0,
+            '--linear': 1, '-l': 1,
+            '--quadratic': 2, '-q': 2,
+            '--cubic': 3, '-c': 3
+        },
+        validate=validate_int_non_negative
+    )
+
+    mode: Literal['subtraction', 'division'] = field_arg(
+        flags=['--mode', '-m'],
+        type=str,
+        required=False,
+        default='division',
+        const_flags={
+            '--subtraction': 'subtraction',
+            '--subtract': 'subtraction',
+            '--sub': 'subtraction',
+            '-s': 'subtraction',
+            '--division': 'division',
+            '--divide': 'division',
+            '--div': 'division',
+            '-d': 'division'
+        },
+        validate=validate_option_in(['subtraction', 'division'])
+    )
+
+    xaxis: Literal['E', 'e', 'k'] = field_arg(
+        flags=['--xaxis'],
+        type=str,
+        required=False,
+        default='E',
+        const_flags={
+            '--E-axis': 'E', '-E': 'E',
+            '--e-axis': 'e', '-e': 'e',
+            '--k-axis': 'k', '-k': 'k'
+        },
+        validate=validate_option_in(['E', 'e', 'k'])
+    )
+
+    kweight: float = field_arg(
+        flags=['--kweight'],
+        type=float,
+        required=False,
+        default=0.0,
+        validate=validate_float_non_negative
+    )
+
+parse_postedge_command = CommandArgumentParser(CommandArguments_Postedge, 'postedge')
+
+class CommandResult_Postedge(CommandResult):
+    ...
 
 @dataclass(slots=True)
-class Command_Postedge(Command[CommandArguments_Postedge, None]):
+class Command_Postedge(Command[CommandArguments_Postedge, CommandResult_Postedge]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_postedge_command(commandtoken, tokens, parsecontext)
+        arguments = parse_postedge_command.parse(commandtoken, tokens)
+
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> CommandResult_Postedge:
         log = context.logger.getChild('command.postedge')
 
         for name, page in context.datastore.pages.items():
@@ -125,3 +169,5 @@ class Command_Postedge(Command[CommandArguments_Postedge, None]):
 
             log.debug(f'Applied post-edge polynomial correction with polynomial {fmt.sup.poly([*poly], floatfmt='0.2g')} to page {name}.')
 
+        return CommandResult_Postedge()
+    

@@ -6,27 +6,43 @@ from dataclasses import dataclass
 from typing import Self
 
 from .result import CommandResult_Background
-from .fourier_background import execute_background_fourier, SubCommand_FourierBackgroundArguments, subcommand_fourier
-from .spline_background import execute_background_spline, SubCommand_SplineBackgroundArguments, subcommand_spline
-from .polynomial_background import execute_background_polynomial, SubCommand_PolynomialBackgroundArguments, subcommand_polynomial
+from .fourier_background import execute_background_fourier, SubCommand_FourierBackgroundArguments
+from .spline_background import execute_background_spline, SubCommand_SplineBackgroundArguments
+from .polynomial_background import execute_background_polynomial, SubCommand_PolynomialBackgroundArguments
 
-from ...core.context import CommandArguments, Command, Context, ParseContext
-from ...core.commandparser import CommandArgumentParser
+from ...core.context import Command, Context, ParseContext
+from ...core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ...core._validators import validate_range_unit
 from ...core.number import Number, parse_range, Unit
 from ...core.datastore import Domain, ColumnDescription, ColumnKind
 
 
 @dataclass(slots=True)
 class CommandArguments_Background(CommandArguments):
-    range: tuple[Number, Number]
-    mode: SubCommand_FourierBackgroundArguments | SubCommand_SplineBackgroundArguments | SubCommand_PolynomialBackgroundArguments
+    mode: (
+        SubCommand_FourierBackgroundArguments | 
+        SubCommand_SplineBackgroundArguments | 
+        SubCommand_PolynomialBackgroundArguments
+    ) = field_arg(
+        subparsers={
+            'fourier': SubCommand_FourierBackgroundArguments,
+            'spline': SubCommand_SplineBackgroundArguments,
+            'polynomial': SubCommand_PolynomialBackgroundArguments,
+        }
+    )
 
-_default_range = (Number(None, 0.0, Unit.K), Number(None, np.inf, Unit.K))
-parse_background_command = CommandArgumentParser(CommandArguments_Background)
-parse_background_command.add_argument('range', types=parse_range, nargs=2, required=False, default=_default_range)
-parse_background_command.add_subparser('fourier', subcommand_fourier, 'mode')
-parse_background_command.add_subparser('spline', subcommand_spline, 'mode')
-parse_background_command.add_subparser('polynomial', subcommand_polynomial, 'mode')
+    
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=False,
+        default=(Number(None, 0.0, Unit.K), Number(None, np.inf, Unit.K)),
+        validate=validate_range_unit(Unit.K, Unit.EV)
+    )
+
+
+parse_background_command = CommandArgumentParser(CommandArguments_Background, 'background')
 
 
 @dataclass(slots=True)
@@ -35,7 +51,7 @@ class Command_Background(Command[CommandArguments_Background, CommandResult_Back
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_background_command(commandtoken, tokens, parsecontext)
+        arguments = parse_background_command.parse(commandtoken, tokens)
 
         # Allow infinite bounds without an explicit unit (e.g. "0k ..") — treat bounds with unit None as valid only if they are infinite
         def _is_k_or_infinite(num: Number) -> bool:

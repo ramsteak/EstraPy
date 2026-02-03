@@ -1,23 +1,14 @@
+from typing import TypeAlias, Union, Sequence
 from lark import Token, Tree
+
+TokenLike: TypeAlias = Union[Token, Tree[Token], Sequence[Union[Token, Tree[Token]]]]
 
 class CommandError(Exception):
     """Base exception for command-related errors."""
 
-    def __init__(self, message: str, token: Token | Tree[Token] | list[Token | Tree[Token]] | None = None):
+    def __init__(self, message: str, token: TokenLike | None = None):
         super().__init__(message)
         self.token = token
-    
-    def __str__(self) -> str:
-        match self.token:
-            case None:
-                # No token information available
-                return self.args[0]
-            case Token():
-                # Single token information available
-                return f'{self.args[0]} (at line {self.token.line}, column {self.token.column})'
-            case Tree() | list():
-                # Tree node information available. Gather all tokens and find the maximum span.
-                return f'{self.args[0]}'
 
 
 class CommandParseError(CommandError):

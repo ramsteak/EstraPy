@@ -6,31 +6,90 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core._validators import validate_number_positive, validate_int_positive, type_enum, validate_non_null
 from ..core.number import Number, parse_number, Unit, parse_range
 from ..core.datastore import Domain, ColumnKind
-from ..core.misc import fuzzy_match
 
 @dataclass(slots=True)
 class CommandArguments_Interpolate(CommandArguments):
-    range: tuple[Number, Number]
-    interval: Number | None
-    number: int | None
-    axis: str
-    domain: Domain
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=True,
+        default=None,
+    )
+
+    interval: Number | None = field_arg(
+        flags=['--interval'],
+        type=parse_number,
+        required=False,
+        default=None,
+        validate=validate_number_positive
+    )
+
+    number: int | None = field_arg(
+        flags=['--number'],
+        type=int,
+        required=False,
+        default=None,
+        validate=validate_int_positive
+    )
+
+    axis: str | None = field_arg(
+        flags=['--axis'],
+        type=str,
+        required=False,
+        default=None
+    )
+
+    domain: Domain = field_arg(
+        flags=['--domain'],
+        type=type_enum(Domain),
+        required=False,
+        default=None,
+        validate=validate_non_null
+    )
+
+    def validate(self) -> None:
+        if self.interval is None and self.number is None:
+            raise ValueError("Interpolate command requires either --interval or --number to be specified.")
+        if self.interval is not None and self.number is not None:
+            raise ValueError("Interpolate command requires only one of --interval or --number to be specified.")
+    
+    def __post_init__(self) -> None:
+        # Try to infer axis from range unit and sign
+        if self.axis is None: # pyright: ignore[reportUnnecessaryComparison]
+            # Try to infer axis from range unit and sign
+
+            match self.range, self.interval, self.domain:
+                case (Number(unit=None), Number(unit=None)), Number(unit=None), None | Domain.RECIPROCAL:
+                    self.axis = 'E'
+                    self.domain = Domain.RECIPROCAL
+                case (Number(unit=Unit.EV | None, sign=None), Number(unit=Unit.EV | None, sign=None)), Number(unit=Unit.EV | None), None | Domain.RECIPROCAL:
+                    self.axis = 'E'
+                    self.domain = Domain.RECIPROCAL
+                case (Number(unit=Unit.EV | None, sign='+'|'-'), Number(unit=Unit.EV | None, sign='+'|'-')), Number(unit=Unit.EV | None), None | Domain.RECIPROCAL:
+                    self.axis = 'e'
+                    self.domain = Domain.RECIPROCAL
+                case (Number(unit=Unit.K | None), Number(unit=Unit.K | None)), Number(unit=Unit.K | None), None | Domain.RECIPROCAL:
+                    self.axis = 'k'
+                    self.domain = Domain.RECIPROCAL
+                case (Number(unit=Unit.A | None), Number(unit=Unit.A | None)), Number(unit=Unit.A | None), None | Domain.FOURIER:
+                    self.axis = 'R'
+                    self.domain = Domain.FOURIER
+                case _:
+                    raise ValueError("Cannot infer axis from range units. Specify the --axis argument.")
+        
 
 @dataclass(slots=True)
 class CommandResult_Interpolate(CommandResult):
     ...
 
-parse_interpolate_command = CommandArgumentParser(CommandArguments_Interpolate)
-parse_interpolate_command.add_argument('range', types=parse_range, nargs=2, required=True, default=None)
-parse_interpolate_command.add_argument('interval', '--interval', type=parse_number, required=False, default=None)
-parse_interpolate_command.add_argument('number', '--number', type=int, required=False, default=None)
-parse_interpolate_command.add_argument('axis', '--axis', type=str, required=False, default=None)
-parse_interpolate_command.add_argument('domain', '--domain', type=str, required=False, default=None)
+parse_interpolate_command = CommandArgumentParser(CommandArguments_Interpolate, 'interpolate')
 
 @dataclass(slots=True)
 class Command_Interpolate(Command[CommandArguments_Interpolate, CommandResult_Interpolate]):
@@ -38,41 +97,7 @@ class Command_Interpolate(Command[CommandArguments_Interpolate, CommandResult_In
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_interpolate_command(commandtoken, tokens, parsecontext)
-        log = parsecontext.logger.getChild(f'parse.interpolate')
-
-        # Require one of interval or number to be set
-        if arguments.interval is None and arguments.number is None: # pyright: ignore[reportUnnecessaryComparison]
-            raise ValueError("Interpolate command requires either --interval or --number to be specified.")
-        if arguments.interval is not None and arguments.number is not None: # pyright: ignore[reportUnnecessaryComparison]
-            raise ValueError("Interpolate command requires only one of --interval or --number to be specified.")
-        
-        # TODO: whenever, add other domain support
-        if arguments.domain is not None: # pyright: ignore[reportUnnecessaryComparison]
-            domain = fuzzy_match(arguments.domain, ['reciprocal', 'fourier'])  # pyright: ignore[reportArgumentType]
-        else:
-            domain = None
-
-        if arguments.axis is None: # pyright: ignore[reportUnnecessaryComparison]
-            # Try to infer axis from range unit and sign
-            arguments.axis = 'E'  # Default axis if not specified
-
-            match arguments.range, arguments.interval, domain:
-                case (Number(unit=None), Number(unit=None)), Number(unit=None), None | 'reciprocal': # pyright: ignore[reportUnnecessaryComparison]
-                    log.warning("Cannot infer axis from range with no units. Defaulting to 'E'.")
-                    arguments.axis = 'E'
-                case (Number(unit=Unit.EV | None, sign=None), Number(unit=Unit.EV | None, sign=None)), Number(unit=Unit.EV | None), None | 'reciprocal': # pyright: ignore[reportUnnecessaryComparison]
-                    arguments.axis = 'E'
-                case (Number(unit=Unit.EV | None, sign='+'|'-'), Number(unit=Unit.EV | None, sign='+'|'-')), Number(unit=Unit.EV | None), None | 'reciprocal': # pyright: ignore[reportUnnecessaryComparison]
-                    arguments.axis = 'e'
-                case (Number(unit=Unit.K | None), Number(unit=Unit.K | None)), Number(unit=Unit.K | None), None | 'reciprocal': # pyright: ignore[reportUnnecessaryComparison]
-                    arguments.axis = 'k'
-                case (Number(unit=Unit.A | None), Number(unit=Unit.A | None)), Number(unit=Unit.A | None), None | 'fourier': # pyright: ignore[reportUnnecessaryComparison]
-                    arguments.axis = 'R'
-                case _:
-                    raise ValueError("Cannot infer axis from range units. Specify the --axis argument.")
-        
-        arguments.domain = Domain(domain)
+        arguments = parse_interpolate_command.parse(commandtoken, tokens)
 
         return cls(
             line=commandtoken.line or -1,

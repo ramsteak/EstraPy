@@ -5,65 +5,85 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from ..core.context import CommandArguments, Command
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core._validators import validate_number_positive, validate_number_unit, validate_range_unit, validate_float_non_negative, type_fuzzy, validate_option_in
 from ..core.number import Number, parse_range, parse_number, Unit
 from ..operations.fourier import fourier, apodizer_functions, flattop_window
 from ..operations.axis_conversions import Nyquist
 from ..core.datastore import Domain, ColumnKind, ColumnDescription, DataDomain
-from ..core.misc import fmt, fuzzy_match
+from ..core.misc import fmt
 
 @dataclass(slots=True)
 class CommandArguments_Fourier(CommandArguments):
-    range: tuple[Number, Number]
-    maxR: Number | None
-    spacing: Number | None
-    kweight: float
-    width: float | None
-    apodizer: str
-    apodizerp: float
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=True,
+        validate=validate_range_unit(Unit.K)
+    )
 
-parse_fourier_command = CommandArgumentParser(CommandArguments_Fourier)
-parse_fourier_command.add_argument('range', nargs=2, types=parse_range, required=True)
-parse_fourier_command.add_argument('maxR', type=parse_number, default=None, required=False)
-parse_fourier_command.add_argument('spacing', '--dr', '--spacing', type=parse_number, required=False, default=None)
-parse_fourier_command.add_argument('kweight', '--kweight', '-k', type=float, required=False, default=0.0)
-parse_fourier_command.add_argument('width', '--width', '-w', type=float, required=False, default=None)
-parse_fourier_command.add_argument('apodizer', '--apodizer', '-a', type=str, required=False, default='hanning')
-parse_fourier_command.add_argument('apodizerp', '--parameter', '-p', type=float, required=False, default=3)
+    maxR: Number | None = field_arg(
+        position=1,
+        type=parse_number,
+        required=False,
+        default=None,
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
 
+    spacing: Number | None = field_arg(
+        flags=['--dr', '--spacing'],
+        type=parse_number,
+        required=False,
+        default=None,
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
+
+    kweight: float = field_arg(
+        flags=['--kweight', '-k'],
+        type=float,
+        required=False,
+        default=0.0,
+        validate=validate_float_non_negative
+    )
+
+    width: Number | None = field_arg(
+        flags=['--width', '-w'],
+        type=parse_number,
+        required=False,
+        default=None,
+        validate=[validate_number_unit(Unit.A), validate_number_positive]
+    )
+
+    apodizer: str = field_arg(
+        flags=['--apodizer', '-a'],
+        type=type_fuzzy(list(apodizer_functions)),
+        required=False,
+        default='hanning',
+        validate=validate_option_in(apodizer_functions)
+    )
+
+    apodizerp: float = field_arg(
+        flags=['--parameter', '-p'],
+        type=float,
+        required=False,
+        default=3.0
+    )
+
+parse_fourier_command = CommandArgumentParser(CommandArguments_Fourier, 'fourier')
+
+class CommandResult_Fourier(CommandResult):
+    ...
 
 @dataclass(slots=True)
-class Command_Fourier(Command[CommandArguments_Fourier, None]):
+class Command_Fourier(Command[CommandArguments_Fourier, CommandResult_Fourier]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_fourier_command(commandtoken, tokens, parsecontext)
-
-        # Validate parameters
-        if arguments.range[0].unit != Unit.K or arguments.range[1].unit != Unit.K:
-            raise ValueError('Fourier range must be specified in k units.')
-        if arguments.range[0].value < 0.0:
-            raise ValueError('Fourier range start must be non-negative.')
-        if arguments.range[1].value <= arguments.range[0].value:
-            raise ValueError('Fourier range end must be greater than start.')
-        if arguments.maxR is not None and arguments.maxR.unit != Unit.A:
-            raise ValueError('Fourier maxR must be specified in Angstroms.')
-        if arguments.spacing is not None and arguments.spacing.unit != Unit.A:
-            raise ValueError('Fourier spacing must be specified in Angstroms.')
-        if arguments.kweight < 0.0:
-            raise ValueError('Fourier kweight must be non-negative.')
-        if arguments.width is not None and arguments.width <= 0.0:
-            raise ValueError('Window taper width must be positive.')
-        if arguments.apodizer not in apodizer_functions:
-            apodizer = fuzzy_match(arguments.apodizer, apodizer_functions)
-            if apodizer is not None:
-                arguments.apodizer = apodizer
-            else:
-                raise ValueError(f"Unknown apodizer function '{arguments.apodizer}'. Available options are: {', '.join(apodizer_functions)}.")
-
+        arguments = parse_fourier_command.parse(commandtoken, tokens)
 
         return cls(
             line=commandtoken.line or -1,
@@ -71,7 +91,7 @@ class Command_Fourier(Command[CommandArguments_Fourier, None]):
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> CommandResult_Fourier:
         log = context.logger.getChild('command.fourier')
 
         for name, page in context.datastore.pages.items():
@@ -102,7 +122,7 @@ class Command_Fourier(Command[CommandArguments_Fourier, None]):
                 case Number(value=spacing), Number(value=maxR):
                     r_axis = np.arange(0.0, maxR + spacing, spacing)
 
-            ramp_width = self.args.width if self.args.width is not None else 0.5 * (range[1] - range[0])
+            ramp_width = self.args.width.value if self.args.width is not None else 0.5 * (range[1] - range[0])
             w = flattop_window(k_axis, (range[0], range[0]+ramp_width, range[1]-ramp_width, range[1]), self.args.apodizer)
             chi = df['chi'][idx].to_numpy() * w * k_axis**self.args.kweight
             f = fourier(k_axis, chi, r_axis)
@@ -129,3 +149,5 @@ class Command_Fourier(Command[CommandArguments_Fourier, None]):
             )
             log.debug(f'Computed Fourier transform for page "{name}" with {len(r_axis)} points.')
         log.info(f'Computed Fourier transform for {len(context.datastore.pages)} pages.')
+        
+        return CommandResult_Fourier()

@@ -7,26 +7,35 @@ from numpy import typing as npt
 from functools import partial
 from typing import Self
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
 
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 
 
 @dataclass(slots=True)
 class CommandArguments_Noise(CommandArguments):
-    x: str
-    y: str
+    x: str = field_arg(
+        flags=['--xaxiscol'],
+        type=str,
+        required=False,
+        default='E'
+    )
+
+    y: str = field_arg(
+        flags=['--yaxiscol'],
+        type=str,
+        required=False,
+        default='a'
+    )
 
 @dataclass(slots=True)
 class CommandResult_Noise(CommandResult):
     ...
 
 
-parse_noise_command = CommandArgumentParser(CommandArguments_Noise)
-parse_noise_command.add_argument('x', '--xaxiscol', type=str, default='E')
-parse_noise_command.add_argument('y', '--yaxiscol', type=str, default='a')
+parse_noise_command = CommandArgumentParser(CommandArguments_Noise, 'noise')
 
 
 @dataclass(slots=True)
@@ -35,7 +44,8 @@ class Command_Noise(Command[CommandArguments_Noise, CommandResult_Noise]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_noise_command(commandtoken, tokens, parsecontext)
+        arguments = parse_noise_command.parse(commandtoken, tokens)
+
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,

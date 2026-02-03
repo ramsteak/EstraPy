@@ -14,14 +14,11 @@ from lark import Token, Tree
 from .timers import TimerCollection
 from .datastore import DataStore
 from .grammar.axisindexpos import AxisIndexPosition
+from .commandparser2 import CommandArguments
 
 
 @dataclass(slots=True)
 class Directive: ...
-
-@dataclass(slots=True)
-class CommandArguments:
-    _token_map: dict[str, Token | Tree[Token]] = field(default_factory=dict[str, Token | Tree[Token]], init=False)
 
 @dataclass(slots=True)
 class CommandResult: ...

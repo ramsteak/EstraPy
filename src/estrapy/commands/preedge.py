@@ -5,9 +5,9 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from ..core.context import CommandArguments, Command
-from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.context import Command, Context, ParseContext, CommandResult
+from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core._validators import validate_int_non_negative, validate_range_unit
 from ..core.number import Number, parse_range, Unit
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 from ..core.misc import fmt
@@ -15,32 +15,47 @@ from ..core.misc import fmt
 
 @dataclass(slots=True)
 class CommandArguments_Preedge(CommandArguments):
-    range: tuple[Number, Number]
-    degree: int
+    range: tuple[Number, Number] = field_arg(
+        position=0,
+        types=parse_range,
+        nargs=2,
+        required=True,
+        validate=validate_range_unit(Unit.EV)
+    )
 
-parse_preedge_command = CommandArgumentParser(CommandArguments_Preedge)
-parse_preedge_command.add_argument('range', types=parse_range, nargs=2, required=True)
-parse_preedge_command.add_argument('degree', '--degree', '-d', type=int, default=1)
-parse_preedge_command.add_argument(None, '--constant', '-C', action='store_const', dest='degree', const=0, nargs=0)
-parse_preedge_command.add_argument(None, '--linear', '-l', action='store_const', dest='degree', const=1, nargs=0)
-parse_preedge_command.add_argument(None, '--quadratic', '-q', action='store_const', dest='degree', const=2, nargs=0)
-parse_preedge_command.add_argument(None, '--cubic', '-c', action='store_const', dest='degree', const=3, nargs=0)
+    degree: int = field_arg(
+        flags=['--degree', '-d'],
+        type=int,
+        default=1,
+        const_flags={
+            '--constant': 0, '-C': 0,
+            '--linear': 1, '-l': 1,
+            '--quadratic': 2, '-q': 2,
+            '--cubic': 3, '-c': 3
+        },
+        validate=validate_int_non_negative
+    )
 
+parse_preedge_command = CommandArgumentParser(CommandArguments_Preedge, 'preedge')
+
+class CommandResult_Preedge(CommandResult):
+    ...
 
 @dataclass(slots=True)
-class Command_Preedge(Command[CommandArguments_Preedge, None]):
+class Command_Preedge(Command[CommandArguments_Preedge, CommandResult_Preedge]):
     @classmethod
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_preedge_command(commandtoken, tokens, parsecontext)
+        arguments = parse_preedge_command.parse(commandtoken, tokens)
+
         return cls(
             line=commandtoken.line or -1,
             name=commandtoken.value,
             args=arguments,
         )
 
-    def execute(self, context: Context) -> None:
+    def execute(self, context: Context) -> CommandResult_Preedge:
         log = context.logger.getChild('command.preedge')
 
         for name, page in context.datastore.pages.items():
@@ -92,3 +107,5 @@ class Command_Preedge(Command[CommandArguments_Preedge, None]):
             )
             log.debug(f'Applied pre-edge polynomial subtraction of polynomial {fmt.sup.poly([*poly], floatfmt='0.2g')} to page {name}.')
 
+        return CommandResult_Preedge()
+    

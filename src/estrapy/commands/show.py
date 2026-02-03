@@ -3,10 +3,11 @@ from lark import Token, Tree
 from dataclasses import dataclass, field
 from typing import Self
 
-from ..core.context import CommandArguments, Command, CommandResult
+from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
-from ..core.misc import fuzzy_match, Bag
+from ..core.commandparser2 import CommandArgumentParser, field_arg, CommandArguments
+from ..core._validators import type_fuzzy
+from ..core.misc import Bag
 from ..core.datastore import Domain
 
 # Define which show modes require a page to be specified, as a tuple of
@@ -23,16 +24,39 @@ SHOW_MODES = {
 
 @dataclass(slots=True)
 class CommandArguments_Show(CommandArguments):
-    mode: str
-    page: str | None
+    mode: str = field_arg(
+        position=0,
+        type=type_fuzzy(list(SHOW_MODES.keys())),
+        required=True
+    )
+
+    page: str | None = field_arg(
+        flags=['--page'],
+        type=str,
+        required=False,
+        default=None
+    )
+
+    def validate(self) -> bool:
+        """
+        Validates the interaction between the show mode and the presence of a page.
+        """
+        # SHOW_MODES mapping: (works_without_page, works_with_page)
+        can_work_without_page, can_work_with_page = SHOW_MODES[self.mode]
+
+        if self.page is not None and not can_work_with_page:
+            raise ValueError(f"Mode '{self.mode}' does not accept a page argument.")
+        
+        if self.page is None and not can_work_without_page:
+            raise ValueError(f"Mode '{self.mode}' requires a page argument.")
+
+        return True
 
 @dataclass(slots=True)
 class CommandResult_Show(CommandResult):
     message: list[str] = field(default_factory=list[str])
 
-parse_show_command = CommandArgumentParser(CommandArguments_Show)
-parse_show_command.add_argument('mode', type=str, required=False)
-parse_show_command.add_argument('page', '--page', type=str, required=False, default=None)
+parse_show_command = CommandArgumentParser(CommandArguments_Show, 'show')
 
 @dataclass(slots=True)
 class Command_Show(Command[CommandArguments_Show, CommandResult_Show]):
@@ -40,17 +64,7 @@ class Command_Show(Command[CommandArguments_Show, CommandResult_Show]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_show_command(commandtoken, tokens, parsecontext)
-
-        mode = fuzzy_match(arguments.mode, SHOW_MODES)
-        if mode is None:
-            raise ValueError(f"Invalid mode '{arguments.mode}' for show command. Valid modes are: {', '.join(SHOW_MODES)}")
-        arguments.mode = mode
-
-        if arguments.page is not None and not SHOW_MODES[mode][1]:
-            raise ValueError(f"Mode '{mode}' does not accept a page argument.")
-        elif arguments.page is None and not SHOW_MODES[mode][0]:
-            raise ValueError(f"Mode '{mode}' requires a page argument.")
+        arguments = parse_show_command.parse(commandtoken, tokens)
 
         return cls(
             line=commandtoken.line or -1,
