@@ -8,7 +8,7 @@ from typing import Self
 
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core._validators import validate_number_positive, validate_int_positive, type_enum, validate_non_null
 from ..core.number import Number, parse_number, Unit, parse_range
 from ..core.datastore import Domain, ColumnKind

@@ -9,7 +9,7 @@ from typing import Self, Any
 from ...core.context import Command, CommandResult
 from ...core.context import Context, ParseContext, PlotContext, FigureSpecification, AxisSpecification
 from ...core.datastore import DataPage
-from ...core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ...core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ...core._validators import validate_float_positive, validate_float_non_negative
 from ...core.grammar.mathexpressions import Expression
 from ...core.grammar.axisindexpos import AxisIndexPosition

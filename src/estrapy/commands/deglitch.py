@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ..core.context import Context, ParseContext, Command, CommandResult
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core.number import Number, parse_number
 from ..operations.derivative import nderivative
 

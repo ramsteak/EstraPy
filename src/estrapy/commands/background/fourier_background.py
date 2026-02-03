@@ -8,7 +8,7 @@ from functools import partial
 from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
-from ...core.commandparser2 import CommandArguments, field_arg
+from ...core.commandparser import CommandArguments, field_arg
 from ...core._validators import validate_float_non_negative, validate_number_unit, validate_number_positive, validate_non_negative
 from ...core.number import Number, parse_number, Unit
 from ...operations.fourier import flattop_window, fourier

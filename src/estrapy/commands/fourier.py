@@ -7,7 +7,7 @@ from typing import Self
 
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core._validators import validate_number_positive, validate_number_unit, validate_range_unit, validate_float_non_negative, type_fuzzy, validate_option_in
 from ..core.number import Number, parse_range, parse_number, Unit
 from ..operations.fourier import fourier, apodizer_functions, flattop_window

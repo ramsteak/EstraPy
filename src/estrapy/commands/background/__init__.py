@@ -11,7 +11,7 @@ from .spline_background import execute_background_spline, SubCommand_SplineBackg
 from .polynomial_background import execute_background_polynomial, SubCommand_PolynomialBackgroundArguments
 
 from ...core.context import Command, Context, ParseContext
-from ...core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ...core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ...core._validators import validate_range_unit
 from ...core.number import Number, parse_range, Unit
 from ...core.datastore import Domain, ColumnDescription, ColumnKind

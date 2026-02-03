@@ -5,7 +5,7 @@ from typing import Self
 
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser2 import CommandArgumentParser, field_arg, CommandArguments
+from ..core.commandparser import CommandArgumentParser, field_arg, CommandArguments
 from ..core.number import Number, try_parse_number
 from ..core.datastore import Domain, ColumnDescription, ColumnKind
 

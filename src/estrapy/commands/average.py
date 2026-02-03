@@ -11,7 +11,7 @@ from ..core._validators import validate_int_positive, type_enum
 
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core.misc import Bag
 from ..core.datastore import DataPage, FileMetadata, Domain, DataDomain
 from ..core.misc import guess_type

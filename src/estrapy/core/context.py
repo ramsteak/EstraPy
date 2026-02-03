@@ -14,7 +14,7 @@ from lark import Token, Tree
 from .timers import TimerCollection
 from .datastore import DataStore
 from .grammar.axisindexpos import AxisIndexPosition
-from .commandparser2 import CommandArguments
+from .commandparser import CommandArguments
 
 
 @dataclass(slots=True)

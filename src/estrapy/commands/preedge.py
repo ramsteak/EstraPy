@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ..core.context import Command, Context, ParseContext, CommandResult
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core._validators import validate_int_non_negative, validate_range_unit
 from ..core.number import Number, parse_range, Unit
 from ..core.datastore import Domain, ColumnDescription, ColumnKind

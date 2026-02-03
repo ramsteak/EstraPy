@@ -9,7 +9,7 @@ from typing import Self, Any
 from .. import __version__
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser2 import CommandArgumentParser, CommandArguments, field_arg
+from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
 from ..core.grammar.mathexpressions import Expression
 from ..core.datastore import Domain
 from ..core.misc import template_replace
