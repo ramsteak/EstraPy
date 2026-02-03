@@ -1,13 +1,13 @@
 from dataclasses import dataclass, field
 from logging import Logger
 from pathlib import Path
-from typing import Any, Callable, Self, Generic, TypeVar
+from typing import Any, Callable, Self, Generic, TypeVar, TYPE_CHECKING
 from datetime import datetime
 from lark import Lark
 
-# TODO: avoid importing matplotlib in core if possible
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 from lark import Token, Tree
 
@@ -85,7 +85,7 @@ class AxisSpecification:
     """An intermediate structure to hold axis specifications before plotting.
     It holds both the position and all callbacks that generate the plot."""
     pos:  AxisIndexPosition
-    callbacks: list[Callable[[Axes, Figure], Any]] = field(default_factory=list[Any])
+    callbacks: list[Callable[['Axes', 'Figure'], Any]] = field(default_factory=list[Any])
 
 @dataclass(slots=True)
 class FigureSpecification:
