@@ -99,9 +99,9 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
             from .fourier import Command_Fourier
             return Command_Fourier.parse(t, args, parsecontext)
         # Command fit ------------------------------------------------------------------------------
-        case [Token('COMMANDNAME', 'fit') as t, *args]:
-            from .fit import Command_Fit
-            return Command_Fit.parse(t, args, parsecontext)
+        # case [Token('COMMANDNAME', 'fit') as t, *args]:
+        #     from .fit import Command_Fit
+        #     return Command_Fit.parse(t, args, parsecontext)
         # Command save -----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'save') as t, *args]:
             from .save import Command_Save
@@ -126,9 +126,10 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         case [Token('COMMANDNAME', 'plot') as t, *args]:
             from .plot import Command_Plot
             return Command_Plot.parse(t, args, parsecontext)
-        case [Token('COMMANDNAME', 'deglitch') as t, *args]:
-            from .deglitch import Command_Deglitch
-            return Command_Deglitch.parse(t, args, parsecontext)
+        # Command deglitch -------------------------------------------------------------------------
+        # case [Token('COMMANDNAME', 'deglitch') as t, *args]:
+        #     from .deglitch import Command_Deglitch
+        #     return Command_Deglitch.parse(t, args, parsecontext)
         # Command exit -----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'exit' | 'quit') as t, *args]:
             pass # Exit is a statement that has no arguments. Everything after exit is ignored.
