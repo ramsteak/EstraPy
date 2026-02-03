@@ -369,6 +369,7 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
             raise ValueError(
                 f"The input file version {'.'.join(map(str, file_version))} is higher than the program version {__version__}. Please update the program."
             )
+        
         parsed_tree = file_parser.parse(input_file_data) # pyright: ignore[reportUnknownMemberType]
 
         # Transform the parse tree into a more manageable structure
@@ -401,7 +402,8 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
                 message_lines.append(' ' * (col - 1) + '^' * (endcol - col) + f'\n\n{ve.orig_exc}')
 
                 raise CommandParseError('\n'.join(message_lines), token) from ve
-            raise ve from ve
+            raise ve
+        
     log.debug(f"Time to parse the input file: {(timers["parsing"]) / 1e6:.2f} ms")
 
     with timers.time('execution'):
@@ -470,8 +472,7 @@ def entry_point() -> None:
         main()
     except Exception as e:
         if global_LOGGING_LEVEL == logging.DEBUG:
-            import traceback
-            traceback.print_exc()
+            raise
         else:
             import sys
 
