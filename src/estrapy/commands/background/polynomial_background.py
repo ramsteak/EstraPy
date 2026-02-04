@@ -94,7 +94,6 @@ def execute_background_polynomial(
         for name,page in context.datastore.pages.items()
     }
 
-    log.debug('Computing background for all pages.')
     compute = partial(_compute_background_polynomial, range=k_range, sargs=sargs, log=log)
 
     threaded = len(context.datastore.pages) >= 12 and context.options.debug is False

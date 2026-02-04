@@ -132,8 +132,6 @@ def execute_background_spline(
         for name,page in context.datastore.pages.items()
     }
 
-    log.debug('Computing background for all pages.')
-
     compute = partial(_compute_background_spline, range=k_range, sargs=sargs, spline_fitter=spline_fitter, log=log)
 
     threaded = len(context.datastore.pages) >= 12 and context.options.debug is False

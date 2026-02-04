@@ -9,7 +9,7 @@ from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
 from ...core.commandparser import CommandArguments, field_arg
-from ...core._validators import validate_float_non_negative, validate_number_unit, validate_number_positive, validate_non_negative
+from ...core._validators import validate_float_non_negative, validate_number_unit, validate_number_positive
 from ...core.number import Number, parse_number, Unit
 from ...operations.fourier import flattop_window, fourier
 from ...core.context import Context
@@ -156,7 +156,6 @@ def execute_background_fourier(
         for name,page in context.datastore.pages.items()
     }
 
-    log.debug('Computing background for all pages.')
     compute = partial(_compute_background_fourier, range=k_range, sargs=sargs, log=log)
 
     threaded = len(context.datastore.pages) >= 12 and context.options.debug is False
