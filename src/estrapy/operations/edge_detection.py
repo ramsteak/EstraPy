@@ -35,8 +35,8 @@ def correlation_edge_detection(dat: npt.ArrayLike, ref: npt.ArrayLike, derivativ
     _ref = np.asarray(ref)
 
     # Calculate nth derivative
-    d_data = nderivative(_dat, d=derivative)
-    d_ref = nderivative(_ref, d=derivative)
+    d_data = nderivative(_dat, order=derivative)
+    d_ref = nderivative(_ref, order=derivative)
 
     assert not isinstance(d_data, tuple), "nderivative should return a single array for 1 input"
     assert not isinstance(d_ref, tuple), "nderivative should return a single array for 1 input"
