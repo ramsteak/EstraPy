@@ -127,9 +127,17 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
             from .plot import Command_Plot
             return Command_Plot.parse(t, args, parsecontext)
         # Command deglitch -------------------------------------------------------------------------
-        # case [Token('COMMANDNAME', 'deglitch') as t, *args]:
-        #     from .deglitch import Command_Deglitch
-        #     return Command_Deglitch.parse(t, args, parsecontext)
+        case [Token('COMMANDNAME', 'deglitch') as t, *args]:
+            from .deglitch import Command_Deglitch
+            return Command_Deglitch.parse(t, args, parsecontext)
+        # Command multiedge ------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'multiedge') as t, *args]:
+            from .multiedge import Command_MultiEdge
+            return Command_MultiEdge.parse(t, args, parsecontext)
+        # Command rebin ----------------------------------------------------------------------------
+        # case [Token('COMMANDNAME', 'rebin') as t, *args]:
+        #     from .rebin import Command_Rebin
+        #     return Command_Rebin.parse(t, args, parsecontext)
         # Command exit -----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'exit' | 'quit') as t, *args]:
             pass # Exit is a statement that has no arguments. Everything after exit is ignored.
