@@ -1,6 +1,6 @@
 import numpy as np
 
-from typing import Callable, TypeVar, Collection, Any
+from typing import Callable, TypeVar, Collection, Any, Iterable, Union
 from enum import Enum
 
 from .number import Number, Unit
@@ -160,12 +160,19 @@ def type_enum(enum_class: type[_E]) -> Callable[[str], _E]:
     
     return converter
 
-def type_fuzzy(options: list[str]) -> Callable[[str], str]:
+def type_fuzzy(options: Iterable[Union[str, tuple[str, ...]]], *, min_length: int = 1) -> Callable[[str], str]:
     """Validator factory to create a validator that checks if a string matches one of the specified options."""
     def converter(value: str) -> str:
-        r = fuzzy_match(value, options)
-        if r is None:
-            raise ValueError(f"Expected one of {', '.join(options)}, got '{value}'.")
-        return r
+        return fuzzy_match(value, options, min_length=min_length, strict=True)
     
     return converter
+
+def type_bool(value: str) -> bool:
+    """Converter to convert a string to a boolean."""
+    value_lower = value.lower()
+    if value_lower in ('true', '1', 'yes', 'on', 't', 'y'):
+        return True
+    elif value_lower in ('false', '0', 'no', 'off', 'f', 'n'):
+        return False
+    else:
+        raise ValueError(f"Expected a boolean value (true/false), got '{value}'.")

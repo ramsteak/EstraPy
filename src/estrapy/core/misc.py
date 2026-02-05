@@ -7,7 +7,7 @@ from typing import TypeVar, Generic, Iterable, Collection, Iterator, Any, Litera
 from collections import deque
 from enum import Enum
 
-from .number import Number, parse_number
+from .number import Number, parse_number, Unit
 
 _K = TypeVar('_K')
 _V = TypeVar('_V')
@@ -426,54 +426,168 @@ class peekable(Iterator[_T], Generic[_T]):
             self._iterator.close()  # type: ignore
 
 
-@overload
-def fuzzy_match(string: str, options: Iterable[str], *, strict: Literal[True]) -> str: ...
-@overload
-def fuzzy_match(string: str, options: Iterable[str], *, strict: Literal[False] = False) -> str | None: ...
+from typing import Iterable, Literal, overload, Union
 
-def fuzzy_match(string: str, options: Iterable[str], *, strict: bool = False) -> str | None:
-    """Perform a fuzzy match of a string against a list of options. Returns the best matching option.
+@overload
+def fuzzy_match(
+    string: str,
+    options: Iterable[Union[str, tuple[str, ...]]],
+    *,
+    strict: Literal[True],
+    min_length: int = 1,
+) -> str: ...
+
+@overload
+def fuzzy_match(
+    string: str,
+    options: Iterable[Union[str, tuple[str, ...]]],
+    *,
+    strict: Literal[False] = False,
+    min_length: int = 1,
+) -> str | None: ...
+
+def fuzzy_match(
+    string: str,
+    options: Iterable[Union[str, tuple[str, ...]]],
+    *,
+    strict: bool = False,
+    min_length: int = 1,
+) -> str | None:
+    """Perform a fuzzy match of a string against a list of options.
+    
+    Returns the best matching option (or the first element if option is a tuple).
     The matching is case-insensitive, ignores underscores, hyphens and spaces.
     
     In order to match, a string must not contain any character that is not in the option,
     and the characters must appear in the same order.
-
-    >>> options = ['fouriertransform', 'background', 'postedge']
-    >>> target = 'fou-tran'
-    >>> fuzzy_match(target, options)
-    'fouriertransform'
-
+    
+    Args:
+        string: The string to match against options
+        options: Iterable of strings or tuples of strings (aliases for the same option)
+        strict: If True, raises ValueError when no match is found
+        min_length: Minimum length required for the input string (default: 1)
+    
+    Returns:
+        The matched option string (first element if tuple), or None if no match
+    
+    Raises:
+        ValueError: If strict=True and no match is found
+        ValueError: If min_length < 1
+        ValueError: If string length < min_length
+        ValueError: If options is empty
+        ValueError: If any option or tuple element is empty
+    
+    Examples:
+        >>> options = ['fouriertransform', 'background', 'postedge']
+        >>> fuzzy_match('fou-tran', options)
+        'fouriertransform'
+        
+        >>> # Using aliases
+        >>> options = [('color', 'colour'), 'background']
+        >>> fuzzy_match('colour', options)
+        'color'
+        
+        >>> # Minimum length requirement
+        >>> fuzzy_match('f', options, min_length=3)
+        Traceback (most recent call last):
+        ...
+        ValueError: Input string "f" is too short (minimum length: 3)
     """
+    # Validation
+    if min_length < 1:
+        raise ValueError(f"min_length must be at least 1, got {min_length}")
     
-    _options = {o.casefold(): o for o in list(options)}
-    target = string.casefold()
-
-    if target in _options:
-        return _options[target]
+    if len(string) < min_length:
+        raise ValueError(
+            f'Input string "{string}" is too short (minimum length: {min_length})'
+        )
     
+    # Normalize options: convert to list and handle tuples
+    options_list = list(options)
+    if not options_list:
+        raise ValueError("Options cannot be empty")
+    
+    # Build mapping: normalized_option -> (canonical_return_value, all_aliases)
+    # canonical_return_value is what we return (first element if tuple)
+    option_map: dict[str, tuple[str, list[str]]] = {}
+    
+    for option in options_list:
+        if isinstance(option, tuple):
+            if not option:
+                raise ValueError("Option tuple cannot be empty")
+            if any(not alias or not isinstance(alias, str) for alias in option): # pyright: ignore[reportUnnecessaryIsInstance]
+                raise ValueError("All tuple elements must be non-empty strings")
+            
+            canonical = option[0]
+            aliases = list(option)
+        else:
+            if not option or not isinstance(option, str): # pyright: ignore[reportUnnecessaryIsInstance]
+                raise ValueError("Options must be non-empty strings or tuples of strings")
+            canonical = option
+            aliases = [option]
+        
+        # Map all normalized aliases to the canonical form
+        for alias in aliases:
+            normalized = _normalize_string(alias)
+            if normalized in option_map:
+                raise ValueError(
+                    f'Duplicate option detected: "{alias}" conflicts with existing option'
+                )
+            option_map[normalized] = (canonical, aliases)
+    
+    # Normalize target string
+    target = _normalize_string(string)
+    
+    # Check for exact match first
+    if target in option_map:
+        return option_map[target][0]
+    
+    # Fuzzy matching
     scores: dict[str, float] = {}
-    for option in _options:
+    
+    for normalized_option, (canonical, _) in option_map.items():
         idxs: list[int] = []
         for char in target:
-            pos = option.find(char, idxs[-1] + 1 if idxs else 0)
+            pos = normalized_option.find(char, idxs[-1] + 1 if idxs else 0)
             if pos == -1:
                 idxs.clear()
                 break
             idxs.append(pos)
-
+        
         if not idxs:
             continue
-        scores[option] = sum([
-            idxs[0],
-            sum(a-b-1 for a,b in zip(idxs[1:], idxs[:-1])),
-            1-1/(len(option))
+        
+        # Scoring: prefer matches that:
+        # 1. Start earlier (idxs[0])
+        # 2. Have characters closer together (sum of gaps)
+        # 3. Are shorter overall (1 - 1/len penalty)
+        # Lower score is better
+        scores[normalized_option] = sum([
+            idxs[0],  # Penalty for not starting at beginning
+            sum(a - b - 1 for a, b in zip(idxs[1:], idxs[:-1])),  # Sum of gaps
+            1 - 1 / len(normalized_option)  # Length penalty (shorter is better)
         ])
     
-    if not scores and strict:
-        raise ValueError(f'No match found for "{string}" in options: {list(options)}')
     if not scores:
+        if strict:
+            alias_strs: list[str] = []
+            for canonical, aliases in option_map.values():
+                if len(aliases) > 1:
+                    alias_strs.append(f"{aliases[0]} (aliases: {', '.join(aliases[1:])})")
+                else:
+                    alias_strs.append(aliases[0])
+            raise ValueError(
+                f'No match found for "{string}" in options: {alias_strs}'
+            )
         return None
-    return _options[min(scores, key=scores.get)] # type: ignore
+    
+    best_match = min(scores, key=scores.__getitem__)
+    return option_map[best_match][0]
+
+
+def _normalize_string(s: str) -> str:
+    """Normalize a string for matching: lowercase and remove separators."""
+    return s.casefold().replace('_', '').replace('-', '').replace(' ', '')
 
 _E = TypeVar('_E', bound=Enum)
 
@@ -483,7 +597,7 @@ def fuzzy_match_enum(string: str, enum: type[_E], *, strict: Literal[True]) -> _
 def fuzzy_match_enum(string: str, enum: type[_E], *, strict: Literal[False] = False) -> _E | None: ...
 
 def fuzzy_match_enum(string: str, enum: type[_E], *, strict: bool = False) -> _E | None:
-    match = fuzzy_match(string, [e.name for e in enum])
+    match = fuzzy_match(string, [e.name for e in enum], strict=strict)
     if match is None:
         return None
     return enum[match]
@@ -530,3 +644,101 @@ def template_replace(template: str, vars: SupportsGetItem[str, str]) -> str:
         return str(value)
 
     return RE_VARNAME.sub(replacer, template)
+
+
+from ..core.datastore import Domain
+def infer_axis_domain(
+        *,
+        axis: str | None = None,
+        range: tuple[Number, Number] | None = None,
+        numbers: list[Number] | None = None,
+        domain: Domain | None = None,
+        
+        ) -> tuple[str, Domain]:
+        """Infer the axis and domain from the range, domain and other numbers. Returns a tuple of (axis, domain)."""
+        domains: dict[str, Domain] = {
+            'E': Domain.RECIPROCAL, 'e': Domain.RECIPROCAL, 'k': Domain.RECIPROCAL, 'q': Domain.RECIPROCAL,
+            'r': Domain.FOURIER}
+        units: dict[str, Unit] = {'E': Unit.EV, 'e': Unit.EV, 'k': Unit.K, 'q': Unit.K, 'r': Unit.A}
+        sign: dict[str, bool] = {'E': False, 'e': True} # All others are None (no sign restriction). E requires no sign, e requires sign.
+        # If axis is provided, it should match the domain and the unit of range and numbers
+        # If the value of the ranges are -np.inf or np.inf the unit could be None
+
+        if axis is not None:
+            expected_domain = domains.get(axis)
+            expected_unit = units.get(axis)
+            expected_sign = sign.get(axis)
+
+            if expected_domain is None:
+                raise ValueError(f"Cannot infer domain from axis '{axis}'.")
+            if domain is not None and domain != expected_domain:
+                raise ValueError(f"Axis '{axis}' is incompatible with domain '{domain.name}'.")
+            if range is not None:
+                range_low, range_high = range
+                if range_low.unit is not None and range_low.unit != expected_unit:
+                    raise ValueError(f"Axis '{axis}' is incompatible with lower range unit '{range_low.unit.name}'.")
+                if range_low.sign is None and expected_sign is True:
+                    raise ValueError(f"Axis '{axis}' requires sign for lower range, but none was provided.")
+                
+                if range_high.unit is not None and range_high.unit != expected_unit:
+                    raise ValueError(f"Axis '{axis}' is incompatible with upper range unit '{range_high.unit.name}'.")
+                if range_high.sign is None and expected_sign is True:
+                    raise ValueError(f"Axis '{axis}' requires sign for upper range, but none was provided.")
+                
+            if numbers is not None:
+                for number in numbers:
+                    if number.unit is not None and number.unit != expected_unit:
+                        raise ValueError(f"Axis '{axis}' is incompatible with number unit '{number.unit.name}'.")
+                    # Do not check sign for numbers, as they may represent intervals or other constructs.
+            return axis, expected_domain
+        
+        # If axis is not provided, try to infer it from the domain and the unit of range and numbers.
+        # Inferred axis is a list of possible options. We join them at the end to get the best match,
+        # if there are multiple options left, we choose based on the order.
+        inferred_axis: list[set[str]] = []
+
+        if domain is not None:
+            possible_axes = {ax for ax, dom in domains.items() if dom == domain}
+            if not possible_axes:
+                raise ValueError(f"Cannot infer axis from domain '{domain.name}'.")
+            inferred_axis.append(possible_axes)
+        
+        if range is not None:
+            range_low, range_high = range
+            possible_axes = set(domains.keys())
+            if range_low.unit is not None:
+                possible_axes &= {ax for ax, unit in units.items() if unit == range_low.unit}
+            if range_low.sign is not None:
+                possible_axes &= {ax for ax in sign.items()}
+            
+            if range_high.unit is not None:
+                possible_axes &= {ax for ax, unit in units.items() if unit == range_high.unit}
+            if range_high.sign is not None:
+                possible_axes &= {ax for ax in sign.items()}
+            
+            if not possible_axes:
+                raise ValueError(f"Cannot infer axis from range '{range_low}' to '{range_high}'.")
+            inferred_axis.append(possible_axes)
+        
+        if numbers is not None:
+            possible_axes = set(domains.keys())
+            for number in numbers:
+                if number.unit is not None:
+                    possible_axes &= {ax for ax, unit in units.items() if unit == number.unit}
+            if not possible_axes:
+                raise ValueError(f"Cannot infer axis from numbers with units {[n.unit for n in numbers]}.")
+            inferred_axis.append(possible_axes)
+        
+        if not inferred_axis:
+            raise ValueError("Cannot infer axis without any information.")
+        
+        common_axes = set[str].intersection(*inferred_axis)
+        if not common_axes:
+            raise ValueError("Inconsistent information provided, cannot infer axis.")
+        
+        # Choose the best match based on the order of domains
+        for ax in domains.keys():
+            if ax in common_axes:
+                return ax, domains[ax]
+        
+        raise ValueError("Cannot infer axis.")
