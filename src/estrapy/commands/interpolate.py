@@ -39,7 +39,7 @@ class CommandArguments_Interpolate(CommandArguments):
         validate=validate_int_positive
     )
 
-    axis: str | None = field_arg(
+    axis: str = field_arg(
         flags=['--axis'],
         type=str,
         required=False,
