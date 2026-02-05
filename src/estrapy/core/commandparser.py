@@ -1,11 +1,14 @@
 from lark import Token, Tree
 from dataclasses import dataclass, field, fields, MISSING, Field
-from typing import TypeVar, Callable, Any, Union, Protocol, Generic, Mapping, ItemsView, KeysView, ValuesView, Type, Self, Iterator, Sequence, TypeAlias, runtime_checkable
+from typing import TypeVar, Callable, Any, Union, Protocol, Generic, Mapping, ItemsView, KeysView, ValuesView, Type, Self, Iterator, Sequence, TypeAlias, runtime_checkable, Literal, TYPE_CHECKING
 from enum import Enum
 from itertools import chain, count
 
 from ..core.errors import CommandError
 from ..core.misc import peekable
+
+if TYPE_CHECKING:
+    from dataclasses import _MISSING_TYPE # pyright: ignore[reportPrivateUsage]
 
 class Callback_anystr(Protocol):
     def __call__(self, *args: str) -> Any: ...
@@ -207,6 +210,8 @@ class NargsSpecification:
 
 @dataclass(slots=True, frozen=True)
 class ArgumentSpecification(Mapping[str, Any]):
+    default: Any | None
+    default_factory: Callable[[], Any] | None | 'Literal[_MISSING_TYPE.MISSING]'
     type: Callable[[str], Any] | None
     types: Callback_str | None
     nargs: NargsSpecification
@@ -357,9 +362,11 @@ def field_arg(*,
             # If position is none, the definition order will be used.
             # Nargs must allow at least one value.
             return field(
-                default = default,
-                default_factory = default_factory,
+                # default = default,
+                # default_factory = default_factory,
                 metadata = {'arg':PositionSpecification(
+                    default = default,
+                    default_factory = default_factory,
                     type = type,
                     types = types,
                     nargs = nargs_spec,
@@ -381,9 +388,9 @@ def field_arg(*,
                     raise ValueError(f'Invalid flag format: {flag}')
             
             return field(
-                default = default,
-                default_factory = default_factory,
                 metadata = {'arg': OptionSpecification(
+                    default = default,
+                    default_factory = default_factory,
                     type = type,
                     types = types,
                     nargs = nargs_spec,
@@ -411,9 +418,9 @@ def field_arg(*,
                     raise ValueError(f'Subparser value must be a subclass of CommandArguments, got {parser}')
 
             return field(
-                default = default,
-                default_factory = default_factory,
                 metadata = {'arg':SubparserSpecification(
+                    default = default,
+                    default_factory = default_factory,
                     type = type,
                     types = types,
                     nargs = nargs_spec,
@@ -429,10 +436,6 @@ def field_arg(*,
         case _:
             raise ValueError('Invalid combination of position, flags, and subparsers. Only one of these can be specified.')
         
-
-
-    return field(default=default, default_factory=default_factory)
-
 _CA = TypeVar('_CA', bound='CommandArguments')
 
 class CommandArgumentParser(Generic[_CA]):
@@ -529,6 +532,10 @@ class CommandArgumentParser(Generic[_CA]):
         tokens = peekable(subtree)
         r = self._parse(command_token, tokens)
         
+        token = next(tokens, None)
+        if token is not None:
+            raise CommandParseError(f'Unexpected token while parsing command arguments: {token}', token)
+
         if isinstance(r, Validatable):
             r.validate()
         return r
@@ -544,10 +551,14 @@ class CommandArgumentParser(Generic[_CA]):
 
         # Update the kwargs with default values from the dataclass fields.
         for fname, field_info in self._fields.items():
-            if field_info.default is not MISSING:
-                kwargs[fname] = field_info.default
-            elif field_info.default_factory is not MISSING:
-                kwargs[fname] = field_info.default_factory()
+            arg_spec = field_info.metadata.get('arg', None)
+            if not isinstance(arg_spec, ArgumentSpecification):
+                raise TypeError(f'Field {fname} does not have valid ArgumentSpecification metadata.')
+            
+            if arg_spec.default is not MISSING:
+                kwargs[fname] = arg_spec.default
+            elif arg_spec.default_factory is not MISSING and arg_spec.default_factory is not None:
+                kwargs[fname] = arg_spec.default_factory()
         
         # Set of all field names.
         _all_fields = set(self._fields.keys())
@@ -596,12 +607,9 @@ class CommandArgumentParser(Generic[_CA]):
                         pass
             
             # If we reach here, no parsing method succeeded.
-            # This indicates an unexpected token.
-            token = next(tokens, None)
-            if token is None:
-                break
-
-            raise CommandParseError(f'Unexpected token while parsing command arguments: {token}', token)
+            # This indicates an unexpected token. We should leave it unparsed for
+            # the super-parser and close this parser.
+            break
         
         
         # ----------------------------------------------------------------------
