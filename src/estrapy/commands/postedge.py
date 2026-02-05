@@ -161,7 +161,7 @@ class Command_Postedge(Command[CommandArguments_Postedge, CommandResult_Postedge
                 case 'subtraction':
                     new = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA, deps=['a', 'post'], calc=lambda d,j0=J0: (d['a'] - d['post']) + j0)
                 case 'division':
-                    new = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA, deps=['a', 'post'], calc=lambda d,j0=J0: d['a'] / d['post'] * J0)
+                    new = ColumnDescription(name='a', unit=None, type=ColumnKind.DATA, deps=['a', 'post'], calc=lambda d,j0=J0: d['a'] / d['post'] * j0)
                 case _:
                     raise ValueError(f'Invalid mode "{self.args.mode}" for postedge correction.')
             
