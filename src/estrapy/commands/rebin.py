@@ -1,6 +1,5 @@
 import numpy as np
 
-from numpy import typing as npt
 from lark import Token, Tree
 
 from dataclasses import dataclass
@@ -9,8 +8,8 @@ from typing import Self
 from ..core.datastore import Domain
 from ..core.context import Context, ParseContext, Command, CommandResult
 from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
-from ..core._validators import type_fuzzy, validate_option_in, type_enum, validate_number_positive, validate_noninfinite_range
-from ..core.number import Number, parse_range, parse_number, Unit
+from ..core._validators import validate_option_in, type_enum, validate_number_positive, validate_noninfinite_range
+from ..core.number import Number, parse_range, parse_number
 from ..core.misc import infer_axis_domain
 
 @dataclass(slots=True)
@@ -111,4 +110,5 @@ class Command_Rebin(Command[CommandArguments_Rebin, CommandResult_Rebin]):
             page.domains[Domain.RECIPROCAL].data = rebinned.reset_index(drop=True)
             log.debug(f"Rebinned page '{page.meta.name}' in domain '{self.args.domain.value}' on axis '{self.args.axis}' to new axis with {len(boundaries) - 1} points.")
         log.info(f"Rebinned all pages in domain '{self.args.domain.value}' on axis '{self.args.axis}'. Note that this operation is destructive.")
-        
+    
+        return CommandResult_Rebin()
