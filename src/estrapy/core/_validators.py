@@ -149,6 +149,27 @@ def validate_range_unit(*u: Unit) -> Callable[[tuple[Number, Number] | None], bo
         return True
     return validator
 
+def validate_noninfinite_range(r: tuple[Number, Number] | object | None) -> bool:
+    """Validator to check if a range (tuple of two Numbers) does not contain infinite values."""
+    if r is None:
+        return True
+    
+    if not isinstance(r, tuple) or len(r) != 2:
+        raise ValueError(f"Expected a tuple of two Numbers, got {r}.")
+    
+    lower, upper = r
+    if not isinstance(lower, Number):
+        raise ValueError(f"Expected a tuple of two Numbers, got {r}.")
+    if not isinstance(upper, Number):
+        raise ValueError(f"Expected a tuple of two Numbers, got {r}.")
+
+    if lower.value == -np.inf or lower.value == np.inf:
+        raise ValueError(f"Expected lower bound not equal to -inf or inf, got {lower.value}.")
+    if upper.value == -np.inf or upper.value == np.inf:
+        raise ValueError(f"Expected upper bound not equal to -inf or inf, got {upper.value}.")
+
+    return True
+
 _E = TypeVar('_E', bound=Enum)
 def type_enum(enum_class: type[_E]) -> Callable[[str], _E]:
     """Validator factory to create a validator that checks if a string is a valid member of the specified enum class."""
