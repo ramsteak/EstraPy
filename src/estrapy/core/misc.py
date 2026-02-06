@@ -252,6 +252,21 @@ class fmt(StaticUtility):
             return str(n).translate(str.maketrans('0123456789-+', '₀₁₂₃₄₅₆₇₈₉₋₊'))
 
     @staticmethod
+    def plu(n: int, singular: str, plural: str | None = None) -> str:
+        """Formats a noun as singular or plural based on the given number.
+        If plural form is not provided, it defaults to singular form with 's' appended."""
+        if n == 1:
+            return singular
+        if plural is not None:
+            return plural
+        return singular + 's'
+
+    @staticmethod
+    def are(n: int) -> str:
+        """Formats a verb as singular or plural based on the given number."""
+        return 'is' if n == 1 else 'are'
+
+    @staticmethod
     def th(n: int) -> str:
         """Formats an integer with its ordinal suffix (1st, 2nd, 3rd, etc.)."""
         if 10 <= n <= 20:
@@ -651,7 +666,7 @@ def infer_axis_domain(
         *,
         axis: str | None = None,
         range: tuple[Number, Number] | None = None,
-        numbers: list[Number] | None = None,
+        numbers: list[Number | None] | None = None,
         domain: Domain | None = None,
         
         ) -> tuple[str, Domain]:
@@ -687,6 +702,9 @@ def infer_axis_domain(
                 
             if numbers is not None:
                 for number in numbers:
+                    if number is None:
+                        continue
+                    
                     if number.unit is not None and number.unit != expected_unit:
                         raise ValueError(f"Axis '{axis}' is incompatible with number unit '{number.unit.name}'.")
                     # Do not check sign for numbers, as they may represent intervals or other constructs.
