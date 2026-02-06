@@ -24,14 +24,12 @@ def parse_x_tuple_floats(value: str) -> tuple[float, float]:
 @dataclass(slots=True)
 class CommandArguments_Plot(CommandArguments):
     kind: str | None = field_arg(
-        position=0,
         type=str,
         required=False,
         default=None
     )
 
     subkind: str | None = field_arg(
-        position=1,
         type=str,
         required=False,
         default=None

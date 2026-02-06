@@ -25,7 +25,6 @@ SHOW_MODES = {
 @dataclass(slots=True)
 class CommandArguments_Show(CommandArguments):
     mode: str = field_arg(
-        position=0,
         type=type_fuzzy(list(SHOW_MODES.keys())),
         required=True
     )

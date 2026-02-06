@@ -16,7 +16,6 @@ from ..core.misc import fmt
 @dataclass(slots=True)
 class CommandArguments_Postedge(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=True,

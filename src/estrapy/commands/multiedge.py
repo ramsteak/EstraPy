@@ -71,24 +71,20 @@ EDGE_FUNCTION_ALIASES: list[tuple[str, ...]] = [
 @dataclass(slots=True)
 class CommandArguments_MultiEdge(CommandArguments):
     kind: str = field_arg(
-        position=0,
         type=type_fuzzy(EDGE_FUNCTION_ALIASES, min_length=3),
         required=True,
         validate=validate_option_in(EDGE_FUNCTIONS.keys()),
     )
     a: float = field_arg(
-        position=1,
         type=float,
         required=True,
     )
     b: Number = field_arg(
-        position=2,
         type=parse_number,
         required=True,
         validate=validate_number_unit(Unit.EV, Unit.K)
     )
     c: Number = field_arg(
-        position=3,
         type=parse_number,
         required=True,
         validate=validate_number_unit(Unit.EV, Unit.K)

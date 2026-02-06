@@ -18,7 +18,6 @@ from ..core.misc import fmt
 @dataclass(slots=True)
 class CommandArguments_Fourier(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=True,
@@ -26,7 +25,6 @@ class CommandArguments_Fourier(CommandArguments):
     )
 
     maxR: Number | None = field_arg(
-        position=1,
         type=parse_number,
         required=False,
         default=None,

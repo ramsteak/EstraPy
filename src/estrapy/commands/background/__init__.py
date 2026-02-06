@@ -33,7 +33,6 @@ class CommandArguments_Background(CommandArguments):
 
     
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=False,

@@ -246,7 +246,7 @@ class SubparserSpecification(ArgumentSpecification):
 
 @dataclass(slots=True, frozen=True)
 class PositionSpecification(ArgumentSpecification):
-    position: int | None
+    ...
 
 @dataclass(slots=True, frozen=True)
 class OptionSpecification(ArgumentSpecification):
@@ -281,7 +281,6 @@ def field_arg(*,
               required: bool = False,
               help: str | None = None,
               subparsers: dict[str, type[CommandArguments]] | None = None,
-              position: int | None = None,
               validate: Callback | list[Callback] | None = None
 ) -> Any:
     # Check that only one of default or default_factory is provided
@@ -356,8 +355,8 @@ def field_arg(*,
             raise ValueError('If types is specified, nargs cannot be single value.')
 
     # Check wether the argument is a subparser, positional or option argument.
-    match position, flags, const_flags, subparsers:
-        case int() | None, None, None, None:
+    match flags, const_flags, subparsers:
+        case None, None, None:
             # Positional argument, with or without a specified order.
             # If position is none, the definition order will be used.
             # Nargs must allow at least one value.
@@ -374,11 +373,10 @@ def field_arg(*,
                     required = required,
                     help = help,
                     destination = None,
-                    position = position,
                     validate = validate
                 )}
             )
-        case [None, list(), None, None] | [None, list(), dict(), None] | [None, None, dict(), None]:
+        case [list(), None, None] | [list(), dict(), None] | [None, dict(), None]:
             # Check that flags is a non-empty list of strings, starting with '-' or '--'.
             # If they start with a single '-', they are short flags and should only be one character.
             if not flags and not const_flags:
@@ -404,7 +402,7 @@ def field_arg(*,
                 )}
             )
 
-        case None, None, None, dict():
+        case None, None, dict():
             # Check that the dict is of type dict[str, type[CommandArguments]]. Only valid CommandArguments subclasses
             # can be used as subparsers, the key type must be str and it cannot be empty.
 
@@ -504,7 +502,6 @@ class CommandArgumentParser(Generic[_CA]):
                         self._subparser_names[sub_name] = fname
 
                 case PositionSpecification():
-                    # TODO: respect and validate position order
                     self._positional_args[fname] = field_info
                     self._positional_order.append(fname)
 

@@ -23,7 +23,6 @@ from ..operations.axis_conversions import E_to_k
 @dataclass(slots=True)
 class SubCommandArguments_Edge_Set(CommandArguments):
     energy: Number = field_arg(
-        position=0,
         type=parse_edge,
         required=True,
         validate = [validate_number_unit(Unit.EV), validate_number_positive]
@@ -67,7 +66,6 @@ class SubCommandArguments_Edge_Calc(CommandArguments):
 @dataclass(slots=True)
 class SubCommandArguments_Edge_Shift(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=False,

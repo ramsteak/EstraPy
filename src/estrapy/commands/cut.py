@@ -12,7 +12,6 @@ from ..core.datastore import Domain
 @dataclass(slots=True)
 class CommandArguments_Cut(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=True,

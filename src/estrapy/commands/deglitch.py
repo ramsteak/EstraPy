@@ -41,7 +41,6 @@ class SubCommandResult_Finder_Force(SubCommandResult_Finder):
 @dataclass(slots=True)
 class SubCommandArguments_Finder_Point(SubCommandArguments_Finder):
     position: Number = field_arg(
-        position=0,
         type=parse_number,
         required=True,
         validate=validate_number_unit(Unit.K, Unit.EV),
@@ -161,7 +160,6 @@ class SubCommandResult_Method_Interpolate(SubCommandResult_Method):
 @dataclass(slots=True)
 class CommandArguments_Deglitch(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=False,

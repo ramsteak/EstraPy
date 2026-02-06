@@ -22,7 +22,6 @@ from ..operations.edge_detection import correlation_edge_detection, SlidingL2Res
 @dataclass(slots=True)
 class SubCommandArguments_Align_Shift(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position = 0,
         types = parse_range,
         nargs = 2,
         required = False,

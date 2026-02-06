@@ -15,7 +15,6 @@ from ..core.misc import infer_axis_domain
 @dataclass(slots=True)
 class CommandArguments_Rebin(CommandArguments):
     range: tuple[Number, Number] = field_arg(
-        position=0,
         types=parse_range,
         nargs=2,
         required=True,
