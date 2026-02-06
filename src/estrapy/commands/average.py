@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Self, Any
 from itertools import batched
 
-from ..core._validators import validate_int_positive, type_enum
+from ..core._validators import validate_int_positive, type_enum, validate_option_in
 
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
@@ -50,7 +50,8 @@ class CommandArguments_Average(CommandArguments):
         type=type_enum(Domain),
         required=False,
         help='The data domain (e.g., real or reciprocal) in which to perform averaging.',
-        default=Domain.RECIPROCAL
+        default=Domain.RECIPROCAL,
+        validate=validate_option_in(Domain)
     )
 
     axis: str | None = field_arg(
