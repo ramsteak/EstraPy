@@ -251,3 +251,7 @@ class PiecewiseSplineFitter:
     @property
     def num_coefficients(self) -> int:
         return self.total_coeffs
+
+    @property
+    def num_degrees_of_freedom(self) -> int:
+        return self.total_coeffs - self.constraints_matrix.shape[0]
