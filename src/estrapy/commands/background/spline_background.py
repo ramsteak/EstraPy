@@ -10,9 +10,10 @@ from .result import BackgroundResult
 from ...core.threaded import execute_threaded
 from ...core.commandparser import CommandArguments, field_arg
 from ...core._validators import validate_float_non_negative, validate_int_non_negative
-from ...core.number import Number, parse_number
+from ...core.number import Number, parse_number, Unit
 from ...core.context import Context
 from ...core.datastore import Domain
+from ...core.misc import fmt
 
 from ...operations.spline import PiecewiseSplineFitter
 
@@ -131,6 +132,28 @@ def execute_background_spline(
         name:page.domains[Domain.RECIPROCAL].get_columns_data(['k', 'chi']).to_numpy()
         for name,page in context.datastore.pages.items()
     }
+
+    # Check that the nodes are within the data range of all pages, and log a warning if not.
+    # It is acceptable if only one node per side is outside the data range
+    # (i.e. data was cut to 12.0k, last actual point is at 11.9k and we fit to 12.0k),
+    # but if more nodes are outside the data range, it is likely that the fit will be poor or that the matrix will be singular.
+    # We set a threshold of 1e-1k for the distance between last point and node
+    for name, xy in page_fulldata.items():
+        x = xy[:,0]
+        minX, maxX = Number(None, float(np.min(x)), Unit.K), Number(None, float(np.max(x)), Unit.K)
+        out_nodes = [
+            node for node in sargs.nodes
+            if (node.value < minX.value - 0.1 or node.value > maxX.value + 0.1)
+        ]
+        if out_nodes:
+            log.warning(
+                f'{fmt.plu(len(out_nodes), 'Node', 'Nodes')} '
+                f'{', '.join(str(node) for node in out_nodes)} '
+                f'{fmt.are(len(out_nodes))} '
+                f'outside the data range [{format(minX, '0.2f')}, {format(maxX, '0.2f')}] of page {name}. '
+                'This may lead to poor background fitting or singular matrices.'
+        )
+
 
     compute = partial(_compute_background_spline, range=k_range, sargs=sargs, spline_fitter=spline_fitter, log=log)
 
