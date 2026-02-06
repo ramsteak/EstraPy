@@ -360,7 +360,7 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
         # Lark command parsing gives an error if all commands do not end in \n,
         # so we append \n to the input file so the last command has at least one.
         assert context.paths.inputfile is not None, "Input file must be set in file mode."
-        input_file_data = context.paths.inputfile.read_text() + '\n'
+        input_file_data = context.paths.inputfile.read_text(encoding='utf-8') + '\n'
 
         # Check that the input file version is lower or equal to the program version
         first_line = input_file_data.partition('\n')[0]
