@@ -5,7 +5,7 @@ from lark import Token, Tree
 from scipy.stats import norm # pyright: ignore[reportMissingTypeStubs]
 
 from dataclasses import dataclass
-from typing import Self, Mapping
+from typing import Self, Mapping, override
 
 from ..core.datastore import Domain, ColumnKind
 from ..core.context import Context, ParseContext, Command, CommandResult
@@ -21,7 +21,9 @@ from ..operations.evenodd import diff_even
 
 @dataclass(slots=True)
 class SubCommandArguments_Finder(CommandArguments):
-    ...
+    def _get_numbers(self) -> list[Number | None] | None:
+        """Internal helper to get all Number arguments for axis inference."""
+        return None
 
 @dataclass(slots=True)
 class SubCommandResult_Finder(CommandResult):
@@ -31,6 +33,7 @@ class SubCommandResult_Finder(CommandResult):
 @dataclass(slots=True)
 class SubCommandArguments_Finder_Force(SubCommandArguments_Finder):
     ...
+
 @dataclass
 class SubCommandResult_Finder_Force(SubCommandResult_Finder):
     ...
@@ -43,6 +46,9 @@ class SubCommandArguments_Finder_Point(SubCommandArguments_Finder):
         required=True,
         validate=validate_number_unit(Unit.K, Unit.EV),
     )
+    @override
+    def _get_numbers(self) -> list[Number | None] | None:
+        return [self.position]
 
 @dataclass(slots=True)
 class SubCommandResult_Finder_Point(SubCommandResult_Finder):
@@ -191,17 +197,15 @@ class CommandArguments_Deglitch(CommandArguments):
 
     def __post_init__(self) -> None:
         # Infer axis from range unit if the subcommand requires it
-        match self.finder:
-            case SubCommandArguments_Finder_Polynomial() as sargs:
-                axis, _ = infer_axis_domain(
-                    domain = Domain.RECIPROCAL,
-                    axis = sargs.axis,
-                    range = self.range,
-                    numbers = None
-                )
-                sargs.axis = axis
-            case _:
-                pass
+        # Define a protocol for subcommands that have an axis argument
+        if hasattr(self.finder, 'axis'):
+            axis, _ = infer_axis_domain(
+                domain = Domain.RECIPROCAL,
+                axis = getattr(self.finder, 'axis', None),
+                range = self.range,
+                numbers = self.finder._get_numbers() # pyright: ignore[reportPrivateUsage]
+            )
+            setattr(self.finder, 'axis', axis)
 
 
 parse_deglitch_command = CommandArgumentParser(CommandArguments_Deglitch, 'deglitch')
