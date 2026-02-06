@@ -137,7 +137,10 @@ def execute_background_spline(
     # It is acceptable if only one node per side is outside the data range
     # (i.e. data was cut to 12.0k, last actual point is at 11.9k and we fit to 12.0k),
     # but if more nodes are outside the data range, it is likely that the fit will be poor or that the matrix will be singular.
-    # We set a threshold of 1e-1k for the distance between last point and node
+    # We set a threshold of 1e-1k for the distance between last point and node.
+
+    # Also check if there are enough data points within the range to fit the spline, and log a warning if not.
+    # Require at least as many data points as the number of degrees of freedom of the spline.
     for name, xy in page_fulldata.items():
         x = xy[:,0]
         minX, maxX = Number(None, float(np.min(x)), Unit.K), Number(None, float(np.max(x)), Unit.K)
@@ -153,6 +156,17 @@ def execute_background_spline(
                 f'outside the data range [{format(minX, '0.2f')}, {format(maxX, '0.2f')}] of page {name}. '
                 'This may lead to poor background fitting or singular matrices.'
         )
+            
+        if xy.shape[0] - spline_fitter.num_degrees_of_freedom <= 0:
+            log.warning(
+                f'Page {name} has only {xy.shape[0]} data points within the range, which is not enough to fit a spline with {spline_fitter.num_degrees_of_freedom} degrees of freedom. '
+                'The fit may be poor or fail.'
+            )
+        elif xy.shape[0] - spline_fitter.num_degrees_of_freedom <= spline_fitter.num_degrees_of_freedom * 0.1:
+            log.warning(
+                f'Page {name} has only {xy.shape[0]} data points within the range, which is close to the number of degrees of freedom ({spline_fitter.num_degrees_of_freedom}) of the spline. '
+                'The fit may be poor or unstable.'
+            )
 
 
     compute = partial(_compute_background_spline, range=k_range, sargs=sargs, spline_fitter=spline_fitter, log=log)
