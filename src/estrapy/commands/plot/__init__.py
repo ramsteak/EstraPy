@@ -509,11 +509,11 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
                         {
                             'unit': name,
                             'x': np.atleast_1d(xexpr(**fpage)),
-                            'y': np.atleast_1d(yexpr(**fpage)),
+                            'y': np.atleast_1d(yexpr(**fpage) + (self.args.voffset or 0) + (self.args.vshift or 0) * i),
                             'color': color
                         }
                     )
-                for (name, fpage), color in zip(frozenpages.items(), colorby_var)
+                for i, ((name, fpage), color) in enumerate(zip(frozenpages.items(), colorby_var))
             ]
 
             style: dict[str, Any] = {}
