@@ -239,3 +239,15 @@ class PiecewiseSplineFitter:
             return y_out
         
         return spline_func
+
+    @property
+    def num_segments(self) -> int:
+        return len(self.segments)
+    
+    @property
+    def num_constraints(self) -> int:
+        return self.constraints_matrix.shape[0]
+
+    @property
+    def num_coefficients(self) -> int:
+        return self.total_coeffs
