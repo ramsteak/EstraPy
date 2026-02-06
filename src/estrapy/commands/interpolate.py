@@ -9,9 +9,10 @@ from typing import Self
 from ..core.context import Command, CommandResult
 from ..core.context import Context, ParseContext
 from ..core.commandparser import CommandArgumentParser, CommandArguments, field_arg
-from ..core._validators import validate_number_positive, validate_int_positive, type_enum, validate_non_null
-from ..core.number import Number, parse_number, Unit, parse_range
+from ..core._validators import validate_number_positive, validate_int_positive, type_enum, validate_option_in
+from ..core.number import Number, parse_number, parse_range
 from ..core.datastore import Domain, ColumnKind
+from ..core.misc import infer_axis_domain
 
 @dataclass(slots=True)
 class CommandArguments_Interpolate(CommandArguments):
@@ -51,7 +52,7 @@ class CommandArguments_Interpolate(CommandArguments):
         type=type_enum(Domain),
         required=False,
         default=None,
-        validate=validate_non_null
+        validate=validate_option_in(Domain)
     )
 
     def validate(self) -> None:
@@ -62,27 +63,9 @@ class CommandArguments_Interpolate(CommandArguments):
     
     def __post_init__(self) -> None:
         # Try to infer axis from range unit and sign
-        if self.axis is None: # pyright: ignore[reportUnnecessaryComparison]
-            # Try to infer axis from range unit and sign
-
-            match self.range, self.interval, self.domain:
-                case (Number(unit=None), Number(unit=None)), Number(unit=None), None | Domain.RECIPROCAL:
-                    self.axis = 'E'
-                    self.domain = Domain.RECIPROCAL
-                case (Number(unit=Unit.EV | None, sign=None), Number(unit=Unit.EV | None, sign=None)), Number(unit=Unit.EV | None), None | Domain.RECIPROCAL:
-                    self.axis = 'E'
-                    self.domain = Domain.RECIPROCAL
-                case (Number(unit=Unit.EV | None, sign='+'|'-'), Number(unit=Unit.EV | None, sign='+'|'-')), Number(unit=Unit.EV | None), None | Domain.RECIPROCAL:
-                    self.axis = 'e'
-                    self.domain = Domain.RECIPROCAL
-                case (Number(unit=Unit.K | None), Number(unit=Unit.K | None)), Number(unit=Unit.K | None), None | Domain.RECIPROCAL:
-                    self.axis = 'k'
-                    self.domain = Domain.RECIPROCAL
-                case (Number(unit=Unit.A | None), Number(unit=Unit.A | None)), Number(unit=Unit.A | None), None | Domain.FOURIER:
-                    self.axis = 'R'
-                    self.domain = Domain.FOURIER
-                case _:
-                    raise ValueError("Cannot infer axis from range units. Specify the --axis argument.")
+        axis, domain = infer_axis_domain(axis=self.axis, range=self.range, numbers=[self.interval], domain=self.domain)
+        self.axis = axis
+        self.domain = domain
         
 
 @dataclass(slots=True)
@@ -119,12 +102,12 @@ class Command_Interpolate(Command[CommandArguments_Interpolate, CommandResult_In
         
         axisname = self.args.axis
 
-        for page in context.datastore.pages.values():
+        for name, page in context.datastore.pages.items():
             domain = page.domains[self.args.domain]
             if axisname not in domain.columns:
-                raise ValueError(f"Axis '{axisname}' not found in domain '{self.args.domain.value}' for page '{page.meta.name}'.")
+                raise ValueError(f"Axis '{axisname}' not found in domain '{self.args.domain.value}' for page '{name}'.")
             if domain.columns[axisname][-1].desc.type != ColumnKind.AXIS:
-                raise ValueError(f"Column '{axisname}' in domain '{self.args.domain.value}' for page '{page.meta.name}' is not an axis column.")
+                raise ValueError(f"Column '{axisname}' in domain '{self.args.domain.value}' for page '{name}' is not an axis column.")
             
             old_axis = domain.get_column_data(axisname).to_numpy()
             # TODO: handle this transformation in a non destructive way
@@ -134,7 +117,7 @@ class Command_Interpolate(Command[CommandArguments_Interpolate, CommandResult_In
                 columns=domain.data.columns,
             )
             domain.data = new_data
-            log.debug(f"Interpolated page '{page.meta.name}' in domain '{self.args.domain.value}' on axis '{axisname}' to new axis with {len(new_axis)} points.")
+            log.debug(f"Interpolated page '{name}' in domain '{self.args.domain.value}' on axis '{axisname}' to new axis with {len(new_axis)} points.")
         log.info(f"Interpolated all pages in domain '{self.args.domain.value}' on axis '{axisname}'.")
 
         return CommandResult_Interpolate()
