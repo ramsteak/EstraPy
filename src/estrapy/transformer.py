@@ -1,3 +1,5 @@
+import re
+
 from lark import Transformer, Token
 from typing import Any
 
@@ -5,6 +7,23 @@ from typing import Any
 from .core.context import Command, Script, Directive, CommandArguments, CommandResult
 from .core.context import ParseContext
 from .commands import parse_command, parse_directive
+
+def safe_unescape(s: str) -> str:
+    escape_map = {
+        'n': '\n',
+        't': '\t',
+        'r': '\r',
+        '\\': '\\',
+        '"': '"',
+        "'": "'",
+    }
+
+    pattern = r'\\([ntr\\\'"])'
+    def _replace(match: re.Match[str]) -> str:
+        char_code = match.group(1)
+        return escape_map[char_code]
+        
+    return re.sub(pattern, _replace, s)
 
 
 class EstraTransformer(Transformer[Any, Script]):
@@ -27,6 +46,6 @@ class EstraTransformer(Transformer[Any, Script]):
     def ESCAPED_STRING(self, item: Token) -> Token:
         # Convert escaped string to normal string by removing quotes and unescaping
         # Escaped strings are always quoted with either " or '
-        s = str(item.value)[1:-1]
-        s = s.encode('utf-8').decode('unicode_escape')
+        s = safe_unescape(str(item.value)[1:-1])
+        # s = s.encode('latin-1', 'backslashreplace').decode('unicode_escape')
         return Token('STRING', s, item.start_pos, item.line, item.column, item.end_line, item.end_column, item.end_pos)
