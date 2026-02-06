@@ -112,6 +112,10 @@ class CommandArguments_MultiEdge(CommandArguments):
         required=False,
         default='a',
     )
+    def __post_init__(self) -> None:
+        # Try to infer axis from b and c unit and sign
+        axis, _ = infer_axis_domain(axis=self.axis, numbers=[self.b, self.c])
+        self.axis = axis
 
 @dataclass(slots=True)
 class CommandResult_MultiEdge(CommandResult):
@@ -135,7 +139,6 @@ class Command_MultiEdge(Command[CommandArguments_MultiEdge, CommandResult_MultiE
         )
 
     def execute(self, context: Context) -> CommandResult_MultiEdge:
-        axis, _ = infer_axis_domain(axis = self.args.axis, numbers=[self.args.b, self.args.c], domain=Domain.RECIPROCAL)
         edge_func = EDGE_FUNCTIONS[self.args.kind]
 
         for _, page in context.datastore.pages.items():
