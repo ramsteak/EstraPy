@@ -9,7 +9,7 @@ from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
 from ...core.commandparser import CommandArguments, field_arg
-from ...core._validators import validate_float_non_negative, validate_int_non_negative
+from ...core._validators import validate_float_non_negative
 from ...core.number import Number, parse_number, Unit
 from ...core.context import Context
 from ...core.datastore import Domain
