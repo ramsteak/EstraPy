@@ -433,7 +433,19 @@ def field_arg(*,
 
         case _:
             raise ValueError('Invalid combination of position, flags, and subparsers. Only one of these can be specified.')
-        
+
+class TokenFlowControl(Enum):
+    FAILED_BAD = -10
+    FAILED_TYPE = -5
+    FAILED_PARSE = -2
+    FAILED = -1
+    EXHAUSTED = 0
+    REATTEMPT = 1
+    SUCCESS = 10
+
+    def is_failure(self) -> bool:
+        return self.value < 0
+
 _CA = TypeVar('_CA', bound='CommandArguments')
 
 class CommandArgumentParser(Generic[_CA]):
@@ -576,32 +588,36 @@ class CommandArgumentParser(Generic[_CA]):
             # Attempt parsing as an option argument first.
             # Then, attempt parsing as a subparser.
             # Then, attempt parsing as a positional argument.
-            # The _parse_option, _parse_subparser, and _parse_positional
-            # methods will return:
-            #  - (None, None) on failure to parse
-            #  - (False, None) if they modify the token stream and need to reattempt parsing
-            #  - (True, _) on successful parsing
+            # The _parse_option, _parse_subparser, and _parse_positional methods
+            # return a TokenFlowControl value indicating the success of the parsing
+            # attempt and the influence on the token stream and parsing flow.
             match self._parse_option(tokens, kwargs, _defined_fields, _token_map):
-                case True | False:
+                case TokenFlowControl.SUCCESS | TokenFlowControl.REATTEMPT:
                     _could_be_positional = False
                     continue
-                case None:
+                case TokenFlowControl.EXHAUSTED:
+                    break
+                case _:
                     pass
             
             match self._parse_subparser(tokens, kwargs, _defined_fields, _token_map):
-                case True | False:
+                case TokenFlowControl.SUCCESS | TokenFlowControl.REATTEMPT:
                     _could_be_positional = False
                     continue
-                case None:
+                case TokenFlowControl.EXHAUSTED:
+                    break
+                case _:
                     pass
-            
+
             if _could_be_positional:
                 match self._parse_positional(tokens, kwargs, _defined_fields, _token_map, _positional_names_iter):
-                    case True | False:
-                        continue
-                    case None:
+                    case TokenFlowControl.FAILED_BAD:
                         _could_be_positional = False
-                        pass
+                        continue
+                    case TokenFlowControl.EXHAUSTED:
+                        break
+                    case _:
+                        continue
             
             # If we reach here, no parsing method succeeded.
             # This indicates an unexpected token. We should leave it unparsed for
@@ -656,7 +672,7 @@ class CommandArgumentParser(Generic[_CA]):
         return result
 
 
-    def _parse_option(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike]) -> bool | None:
+    def _parse_option(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike]) -> TokenFlowControl:
         """Attempts to parse an option argument from the token stream.
 
         Returns a tuple of (success: bool | None, value: Any).
@@ -674,7 +690,7 @@ class CommandArgumentParser(Generic[_CA]):
         match token:
             # Exhausted token stream
             case None:
-                return None
+                return TokenFlowControl.EXHAUSTED
             case Tree(Token('RULE', 'option'), [Token('OPTION', str(flag)) as _option_token, *arg_tokens]):
                 # Check if the flag is registered and valid
                 if flag not in self._option_flags:
@@ -683,11 +699,11 @@ class CommandArgumentParser(Generic[_CA]):
                         # It is a multioption short flag. Split and push back the individual flags.
                         for ch in reversed(flag[1:]):
                             tokens.pushback(Tree(Token('RULE', 'option'), [Token('OPTION', f'-{ch}')]))
-                        return False  # Indicate to reattempt parsing
+                        return TokenFlowControl.REATTEMPT  # Indicate to reattempt parsing
                     else:
                         # Not a valid option flag, and we don't know how to parse it.
                         tokens.pushback(token)
-                        return None
+                        return TokenFlowControl.FAILED
                     
                 # Valid option flag
                 arg_name = self._option_flags[flag]
@@ -822,13 +838,13 @@ class CommandArgumentParser(Generic[_CA]):
                         
                 # Mark the field as defined
                 defined_fields.add(arg_name)
-                return True
+                return TokenFlowControl.SUCCESS
 
             case _:
                 tokens.pushback(token)
-                return None
+                return TokenFlowControl.FAILED
 
-    def _parse_subparser(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike]) -> bool | None:
+    def _parse_subparser(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike]) -> TokenFlowControl:
         """Attempts to parse a subparser argument from the token stream.
 
         Returns True if a subparser argument was successfully parsed,
@@ -844,11 +860,11 @@ class CommandArgumentParser(Generic[_CA]):
         match token:
             # Exhausted token stream
             case None:
-                return None
+                return TokenFlowControl.EXHAUSTED
             case Token(_, str(sub_name)) as sub_token:
                 if sub_name not in self._subparsers:
                     tokens.pushback(token)
-                    return None
+                    return TokenFlowControl.FAILED
                 
                 # Valid subparser name
                 subparser = self._subparsers[sub_name]
@@ -867,12 +883,37 @@ class CommandArgumentParser(Generic[_CA]):
 
                 # Mark the field as defined
                 defined_fields.add(field_name)
-                return True
+                return TokenFlowControl.SUCCESS
             case _:
                 tokens.pushback(token)
-                return None
+                return TokenFlowControl.FAILED
             
-    def _parse_positional(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike], positional_names_iter: Iterator[str]) -> bool | None:
+    def _parse_positional(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike], positional_names_iter: Iterator[str]) -> TokenFlowControl:
+        """Wrapper for _parse_positional_once to handle the flow control values."""
+        try:
+            arg_name = next(positional_names_iter)
+        except StopIteration:
+            return TokenFlowControl.FAILED_BAD  # No more positional arguments to parse
+        
+        arg_spec = self._positional_args[arg_name].metadata['arg']
+        if not isinstance(arg_spec, PositionSpecification):
+            raise TypeError(f'Field {arg_name} is not a PositionSpecification. CommandArgumentParser was badly initialized.')
+
+        result = self._parse_positional_once(tokens, kwargs, defined_fields, token_map, arg_name, arg_spec)
+        
+        if arg_spec.required:
+            match result:
+                case TokenFlowControl.FAILED_PARSE:
+                    raise CommandParseError(f'Could not parse value as {arg_name}', tokens.peek_n(1))
+                case TokenFlowControl.FAILED | TokenFlowControl.FAILED_BAD | TokenFlowControl.FAILED_TYPE:
+                    raise CommandParseError(f'Missing required positional argument {arg_name}', tokens.peek_n(1))
+                case TokenFlowControl.SUCCESS | TokenFlowControl.REATTEMPT | TokenFlowControl.EXHAUSTED:
+                    return result
+        else:
+            return result
+
+            
+    def _parse_positional_once(self, tokens: peekable[Token | Tree[Token]], kwargs: dict[str, Any], defined_fields: set[str], token_map: dict[str, TokenLike], arg_name: str, arg_spec: PositionSpecification) -> TokenFlowControl:
         """Attempts to parse a positional argument from the token stream.
 
         Returns True if a positional argument was successfully parsed,
@@ -882,18 +923,6 @@ class CommandArgumentParser(Generic[_CA]):
         A positional argument is identified by its position in the token stream.
         """
 
-        try:
-            arg_name = next(positional_names_iter)
-        except StopIteration:
-            return None  # No more positional arguments to parse
-        
-        field_info = self._positional_args[arg_name]
-        arg_spec = field_info.metadata['arg']
-
-        # Should be a PositionSpecification. If this fails, there was an issue in the initialization.
-        if not isinstance(arg_spec, PositionSpecification):
-            raise TypeError(f'Field {arg_name} is not a PositionSpecification. CommandArgumentParser was badly initialized.')
-        
         # Check for duplicate definition
         if arg_name in defined_fields:
             raise CommandParseError(f'Positional argument {arg_name} is defined multiple times.', None)
@@ -922,7 +951,7 @@ class CommandArgumentParser(Generic[_CA]):
                 tokens.pushback(collected_tokens.pop())
                 if not collected_tokens:
                     # This argument failed to parse. We have pushed back all tokens, so we return None.
-                    return None
+                    return TokenFlowControl.FAILED
         
             # Nargs is satisfied. We now check if types is satisfied (if applicable).
             match arg_spec.type, arg_spec.types, arg_spec.nargs.single:
@@ -950,7 +979,7 @@ class CommandArgumentParser(Generic[_CA]):
                         # Type conversion failed. Push back all tokens and return None.
                         for t in reversed(collected_tokens):
                             tokens.pushback(t)
-                        return None
+                        return TokenFlowControl.FAILED_PARSE
                 case arg_type, None, False if callable(arg_type):
                     # Single type, multiple values. If any type conversion fails:
                     # if soft, push back one token and reattempt parsing
@@ -963,11 +992,11 @@ class CommandArgumentParser(Generic[_CA]):
                         if arg_spec.nargs.soft:
                             tokens.pushback(collected_tokens.pop())
                             if not collected_tokens:
-                                return None
+                                return TokenFlowControl.FAILED_PARSE
                         else:
                             for t in reversed(collected_tokens):
                                 tokens.pushback(t)
-                            return None
+                            return TokenFlowControl.FAILED_PARSE
                 case None, arg_types, False if callable(arg_types):
                     # Types callback, multiple values. If types conversion fails:
                     # if soft, push back one token and reattempt parsing
@@ -980,11 +1009,11 @@ class CommandArgumentParser(Generic[_CA]):
                         if arg_spec.nargs.soft:
                             tokens.pushback(collected_tokens.pop())
                             if not collected_tokens:
-                                return None
+                                return TokenFlowControl.FAILED_PARSE
                         else:
                             for t in reversed(collected_tokens):
                                 tokens.pushback(t)
-                            return None
+                            return TokenFlowControl.FAILED_PARSE
                 case _:
                     # All other combinations are invalid
                     raise TypeError(f'Invalid combination of type/types and nargs for positional argument {arg_name}.')
@@ -1003,4 +1032,4 @@ class CommandArgumentParser(Generic[_CA]):
                 raise TypeError(f'Unsupported action {arg_spec.action.action} for positional argument {arg_name}.')
         
         defined_fields.add(arg_name)
-        return True
+        return TokenFlowControl.SUCCESS

@@ -17,7 +17,7 @@ from .dispatcher import execute_script  # noqa: E402
 from .core.grammar.estrapyparser import file_parser  # noqa: E402
 from .transformer import EstraTransformer
 from .core.context import Context, Paths, Options, ParseContext  # noqa: E402
-from .core.errors import CommandParseError  # noqa: E402
+from .core.errors import CommandError, EstraCommandErrorContextManager  # noqa: E402
 from .core.timers import TimerCollection  # noqa: E402
 
 global_LOGGING_LEVEL = logging.INFO
@@ -373,36 +373,12 @@ def estrapy_file_mode(context: Context, timers: TimerCollection) -> None:
         parsed_tree = file_parser.parse(input_file_data) # pyright: ignore[reportUnknownMemberType]
 
         # Transform the parse tree into a more manageable structure
-        try:
-            parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'), context.parser)
+
+        parsecontext = ParseContext(context.paths, timers, context.logger.getChild('parser'), context.parser)
+
+        with EstraCommandErrorContextManager(input_file_data):
             transformer = EstraTransformer(parsecontext)
             script = transformer.transform(parsed_tree)
-        except VisitError as ve:
-            # On transformation error, check if it's a CommandSyntaxError and re-raise it with input file context
-            if isinstance(ve.orig_exc, CommandParseError):
-                token = ve.orig_exc.token
-                # If the token is None, raise the original exception
-                if token is None:
-                    raise ve.orig_exc from ve
-
-                # Otherwise, log the error with some context from the input file
-                line = token.line
-                col, endcol = token.column, token.end_column
-                if line is None:
-                    raise ve.orig_exc from ve
-                if col is None:
-                    raise ve.orig_exc from ve
-                if endcol is None:
-                    endcol = col + 1
-
-                all_lines = input_file_data.splitlines()
-                message_lines: list[str] = []
-                message_lines.append(f'Error in line {line}, column {col}:')
-                message_lines.extend(all_lines[max(0, line - 5) : line])
-                message_lines.append(' ' * (col - 1) + '^' * (endcol - col) + f'\n\n{ve.orig_exc}')
-
-                raise CommandParseError('\n'.join(message_lines), token) from ve
-            raise ve
         
     log.debug(f"Time to parse the input file: {(timers["parsing"]) / 1e6:.2f} ms")
 
@@ -477,6 +453,8 @@ def entry_point() -> None:
             import sys
 
             print(f'Fatal error [{e.__class__.__name__}]: {e}', file=sys.stderr)
+            for note in e.__notes__:
+                print(note, file=sys.stderr)
             exit(1)
     except KeyboardInterrupt:
         import sys
