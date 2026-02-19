@@ -1,0 +1,20 @@
+title: EstraPy
+description: Documentation for the XANESE/EXAFS analysis tool EstraPy
+theme: just-the-docs
+
+url: https://ramsteak.github.io/EstraPy/
+
+aux_links:
+  GitHub: https://github.com/ramsteak/EstraPy
+
+color_scheme: dark
+
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default
+
+markdown: kramdown
+mathjax: true

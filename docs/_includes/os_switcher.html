@@ -1,0 +1,68 @@
+<style>
+.os-selector {
+  position: relative;
+}
+
+.os-selector input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.os-switcher {
+  margin: 20px 0;
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border-color, #eeebee);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.os-switcher label {
+  padding: 8px 16px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-color, #eeebee);
+  transition: background-color 0.2s, color 0.2s;
+  user-select: none;
+}
+
+.os-switcher label:last-child {
+  border-right: none;
+}
+
+.os-switcher label:hover {
+  background: var(--btn-primary-color, #5c5962);
+  color: white;
+}
+
+#os-windows:checked ~ .os-switcher label[for="os-windows"],
+#os-linux:checked ~ .os-switcher label[for="os-linux"] {
+  background: var(--btn-primary-color, #5c5962);
+  color: white;
+}
+
+.windows-only, .linux-only {
+  display: none;
+}
+
+#os-windows:checked ~ .content .windows-only {
+  display: block;
+}
+
+#os-linux:checked ~ .content .linux-only {
+  display: block;
+}
+</style>
+
+<div class="os-selector">
+  <input type="radio" id="os-windows" name="os" checked>
+  <input type="radio" id="os-linux" name="os">
+  
+  <div class="os-switcher">
+    <label for="os-windows">Windows</label>
+    <label for="os-linux">Linux/macOS</label>
+  </div>
+
+  <div class="content" markdown="1">
