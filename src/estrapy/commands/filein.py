@@ -89,6 +89,7 @@ class FileInOptions:
     reciprocal_axis_flag__: bool = False
     # --energy <column> | -E <column>
     energy: Token | EllipsisType = ...
+    energy_unit: float | EllipsisType = ...
     # --wavevector <column> | -k <column>
     wavevector: Token | EllipsisType = ...
     # --rspace <column> | -r <column>
@@ -167,7 +168,7 @@ class FileInOptions:
     vars: dict[str, str | Number | int] = field(default_factory=dict[str, str | Number | int])
 
     # ---------------------- Importer options ----------------------
-    importeroptions = ImporterOptions()
+    importeroptions: ImporterOptions = field(default_factory=ImporterOptions)
 
     sortby: list[str] | EllipsisType = ...  # Default sort by filename (.fn)
 
@@ -226,13 +227,16 @@ def expand_column_descriptor(desc: ColumnSelector, columns: list[str]) -> list[s
             case int(index):
                 res.append(columns[index])
             case [str(start), str(stop)]:
-                res.extend((start, stop))
+                start_id, stop_id = columns.index(start), columns.index(stop)
+                res.extend(columns[start_id:stop_id+1])
             case [str(start), int(stop)]:
-                res.extend((start, columns[stop]))
+                start_id = columns.index(start)
+                res.extend(columns[start_id:stop+1])
             case [int(start), str(stop)]:
-                res.extend((columns[start], stop))
+                stop_id = columns.index(stop)
+                res.extend(columns[start:stop_id+1])
             case [int(start), int(stop)]:
-                res.extend((columns[start], columns[stop]))
+                res.extend(columns[start:stop+1])
     return res
 
 
@@ -251,6 +255,12 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
         columnselector = parse_column_descriptor(options.energy)
         column = ColumnDescription(name='E', unit=Unit.EV, type=ColumnKind.AXIS, labl='Energy [eV]')
         cmd.columns.append((column, Domain.RECIPROCAL, columnselector))
+        # If unit is specified, modify the column and multiply the values by the factor.
+        if options.energy_unit is not ...:
+            importer: Expr = lambda df, f=options.energy_unit: (df['E'] * f) # noqa: E731
+            column = ColumnDescription(name='E', unit=Unit.EV, type=ColumnKind.AXIS, deps=['E'], calc=importer)
+            cmd.signals.append((column, Domain.RECIPROCAL, importer))
+
     elif options.wavevector is not ...:
         columnselector = parse_column_descriptor(options.wavevector)
         column = ColumnDescription(name='k', unit=Unit.K, type=ColumnKind.AXIS, labl='Wavevector [1/Å]')
@@ -455,6 +465,11 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                 _assert_flag_not_assigned_set(options, 'reciprocal_axis_flag__', t)
                 _assert_option_not_assigned_set(options, 'energy', t, o)
             case Tree(
+                'option', [Token('OPTION', '--energy-unit') as t, Token('STRING', str()) as o]
+            ):
+                mul = parse_number('1' + str(o)).value
+                _assert_option_not_assigned_set(options, 'energy_unit', t, mul)
+            case Tree(
                 'option', [Token('OPTION', '--wavevector' | '-k') as t, Token('STRING' | 'INTEGER', str() | int()) as o]
             ):
                 _assert_flag_not_assigned_set(options, 'reciprocal_axis_flag__', t)
@@ -519,10 +534,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
             case Tree('option', [Token('OPTION', '--transmission' | '-t') as t]):
                 # No columns specified -> use as flag to import as transmission
                 _assert_flag_not_assigned_set(options, 'reciprocal_sample_signal_mode__', t, 'calc_transmission')
-            case Tree(
-                'option',
-                [Token('OPTION', '--transmission' | '-t') as t, Token('STRING' | 'INTEGER', str() | int()) as o],
-            ):
+            case Tree('option', [Token('OPTION', '--transmission' | '-t') as t, Token('STRING' | 'INTEGER', str() | int()) as o],) | Tree('option', [Token('OPTION', '--absorbance' | '-a') as t, Token('STRING' | 'INTEGER', str() | int()) as o]):
                 # One column -> import as transmission signal (not intensity)
                 _assert_flag_not_assigned_set(options, 'reciprocal_sample_signal_mode__', t, 'raw_transmission')
                 _assert_option_not_assigned_set(options, 'transmission', t, o)
@@ -767,7 +779,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                         raise CommandSyntaxError('The decimal option requires a single character as argument.', v)
                     case 'separator' | 'sep', Token('STRING', str(sep)):
                         options.importeroptions.separator = sep
-                    case 'comment', Token('STRING', str(cmt)) if len(cmt) == 1:
+                    case 'comment' | 'com', Token('STRING', str(cmt)) if len(cmt) == 1:
                         options.importeroptions.comment_prefix = cmt
                     case 'comment' | 'com', _:
                         raise CommandSyntaxError(
@@ -842,11 +854,16 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
         if not directory.is_absolute():
             directory = (context.paths.workingdir / directory).resolve()
 
-        files = [f for fs in command.filenames for f in directory.glob(fs)]
+        files: list[Path] = []
+        for fs in command.filenames:
+            files_found = list(directory.glob(fs))
+            if not files_found:
+                log.warning(f"No files found in directory '{directory}' matching the pattern '{fs}'.")
+            files.extend(files_found)
 
         # If no files found, raise an error
         if not files:
-            raise ExecutionError(f"No files found in directory '{directory}' matching the specified filenames.")
+            raise ExecutionError(f"No files found in directory '{directory}' matching any of the specified filenames.")
 
         imported_files: list[DataPage] = []
         if context.options.debug or len(files) <= 8:
@@ -894,6 +911,22 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
             df.meta['.n'] = n
             df.meta['.N'] = previous_file_count + n
 
+    # Check for duplicate file names both in the previously imported files and the currently imported files.
+    # If duplicates are found, rename the files by appending a suffix _1, _2, etc. to the file name
+    # (before the extension). Give a warning about the duplicate file names and the renaming.
+    existing_names = set(context.datastore.pages.keys())
+    for df in imported_files:
+        name = df.meta.name
+        if name in existing_names:
+            suffix = 1
+            new_name = f"{name}_{suffix}"
+            while new_name in existing_names:
+                suffix += 1
+                new_name = f"{name}_{suffix}"
+            log.warning(f"Duplicate file name '{name}' found. Renaming to '{new_name}'.")
+            df.meta.name = new_name
+        existing_names.add(df.meta.name)
+
     # Store imported files in the context
     context.datastore.pages.update({df.meta.name: df for df in imported_files})  # to check the error
     _total_size = sum(f.meta['.fs'] for f in imported_files)
@@ -917,7 +950,10 @@ def parse_filename_vars(file: Path) -> dict[str, Any]:
     vars: dict[str, Any] = {}
 
     # Add parts of the filename separated by underscores as .f1, .f2, ...
-    vars.update({f'.f{i}': guess_type(part) for i, part in enumerate(file.stem.split('_'), start=1)})
+    _split = file.stem.split('_')
+    vars.update({f'.f{i}': guess_type(part) for i, part in enumerate(_split, start=1)})
+    # Add parts of the filename separated by underscores from the end as .fn1, .fn2, ...
+    vars.update({f'.fn{i}': guess_type(part) for i, part in enumerate(reversed(_split), start=1)})
 
     # Add parent directory parts as .fd1, .fd2, ... where .fd is the immediate parent
     # Technically both .fd and .fd0 are the immediate parent
@@ -1021,7 +1057,7 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
     extractedcolumns = Bag[Domain, tuple[ColumnDescription, pd.Series]].from_iter(
         (
             domain,
-            (column, dat[expand_column_descriptor(descriptor, dat.columns.to_list())].mean(axis=1).rename(column.name)),
+            (column, dat[expand_column_descriptor(descriptor, dat.columns.to_list())].sum(axis=1).rename(column.name)),
         )
         for column, domain, descriptor in command.columns
     )
