@@ -10,7 +10,7 @@ from ...core.context import Command, CommandResult
 from ...core.context import Context, ParseContext, PlotContext, FigureSpecification, AxisSpecification
 from ...core.datastore import DataPage
 from ...core.commandparser import CommandArgumentParser, CommandArguments, field_arg
-from ...core._validators import validate_float_positive, validate_float_non_negative
+from ...core._validators import validate_float_positive, validate_float_non_negative, type_bool
 from ...core.grammar.mathexpressions import Expression
 from ...core.grammar.axisindexpos import AxisIndexPosition
 from ...core.misc import template_replace
@@ -198,10 +198,11 @@ class CommandArguments_Plot(CommandArguments):
 
     legend: bool | None = field_arg(
         flags=['--legend'],
-        action='store_true',
+        type=type_bool,
+        const=True,
         required=False,
         default=None,
-        nargs=0
+        nargs='?'
     )
 
     xlim: tuple[float, float] | None = field_arg(
@@ -544,7 +545,11 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
                              hue='color',
                              units='unit' if multiple_lines else None,
                              palette=palette,
-                             ax=ax)
+                             ax=ax, **style)
+                if self.args.legend is True:
+                    ax.legend(title=self.args.colorby)
+                else:
+                    ax.get_legend().remove()
             
             iaxis.callbacks.append(cb)
         
