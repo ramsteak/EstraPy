@@ -453,8 +453,11 @@ def entry_point() -> None:
             import sys
 
             print(f'Fatal error [{e.__class__.__name__}]: {e}', file=sys.stderr)
-            for note in e.__notes__:
-                print(note, file=sys.stderr)
+
+            if hasattr(e, '__notes__'):
+                for note in e.__notes__:
+                    print(note, file=sys.stderr)
+            
             exit(1)
     except KeyboardInterrupt:
         import sys
