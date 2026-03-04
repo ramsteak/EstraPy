@@ -9,7 +9,7 @@ from .result import BackgroundResult
 
 from ...core.threaded import execute_threaded
 from ...core.commandparser import CommandArguments, field_arg
-from ...core._validators import validate_float_non_negative
+from ...core._validators import validate_float_non_negative, validate_int_non_negative
 from ...core.number import Number, parse_number, Unit
 from ...core.context import Context
 from ...core.datastore import Domain
@@ -54,14 +54,35 @@ class SubCommand_SplineBackgroundArguments(CommandArguments):
         default=None
     )
 
+    continuity: int | None = field_arg(
+        flags=['--continuity'],
+        type=int,
+        required=False,
+        default=1,
+        validate=validate_int_non_negative
+    )
+
+    def __post_init__(self) -> None:
+        if self.continuity == -1:
+            self.continuity = None
+
     def validate(self) -> bool:
         """
         Validates the consistency between nodes and degrees.
         """
-        if len(self.nodes) != len(self.degrees)-1:
-            raise ValueError(
-                f"Number of nodes ({len(self.nodes)}) must match number of degrees ({len(self.degrees)})."
-            )
+        if len(self.nodes) > 1:
+            if len(self.nodes) != len(self.degrees)-1:
+                raise ValueError(
+                    f"Number of nodes ({len(self.nodes)}) must match number of degrees ({len(self.degrees)})."
+                )
+        else:
+            # If there is only one node, we can interpret it as a number of knots
+            # and generate equidistant knots within the range. Only one degree is allowed in this case.
+            if len(self.degrees) != 1:
+                raise ValueError(
+                    f"If only one node is specified, there must be exactly one degree specified. "
+                    f"Got {len(self.nodes)} node(s) and {len(self.degrees)} degree(s)."
+                )
         return True
 
 
@@ -120,11 +141,19 @@ def execute_background_spline(
 
     log.debug('Preparing spline fitter')
 
-    # TODO: if nodes is one element without unit, interpret as nknots and generate equidistant knots within range
+    if len(sargs.nodes) == 1 and sargs.nodes[0].unit is None:
+        nknots = int(sargs.nodes[0].value)
+        knots = np.linspace(k_range[0], k_range[1], nknots)
+        degrees = np.array(sargs.degrees * (nknots - 1))
+        log.debug(f'Interpreted single node argument as number of knots: generated {nknots} equidistant knots in range: {knots}')
+    else:
+        knots = np.array([n.value for n in sargs.nodes])
+        degrees = np.array(sargs.degrees)
 
     spline_fitter = PiecewiseSplineFitter(
-        knots = np.array([n.value for n in sargs.nodes]),
-        degrees = np.array(sargs.degrees),
+        knots = knots,
+        degrees = degrees,
+        continuity = sargs.continuity,
         fixed_points = [(fp[0].value, fp[1]) for fp in sargs.fixedpoints] if sargs.fixedpoints is not None else None
     )
 
