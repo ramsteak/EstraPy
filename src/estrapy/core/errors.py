@@ -23,7 +23,7 @@ class CommandSyntaxError(CommandParseError):
     """Exception raised for syntax errors in commands."""
 
 
-class ExecutionError(Exception):
+class ExecutionError(CommandError):
     """Exception raised for errors during command execution."""
 
     pass
