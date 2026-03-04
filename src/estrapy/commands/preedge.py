@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from lark import Token, Tree
 
@@ -63,7 +64,7 @@ class Command_Preedge(Command[CommandArguments_Preedge, CommandResult_Preedge]):
             df = domain.get_columns_data(['E', 'e', 'a'])
             match self.args.range[0]:
                 case Number(sign=None, value=val, unit=_) if val == -np.inf:
-                    idx_l = np.full(len(df), True, dtype=bool)
+                    idx_l = pd.Series(np.ones(len(df), dtype=bool), index=df.index, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_l = df['E'] >= val
                 case Number(sign=_, value=val, unit=Unit.EV):
@@ -74,7 +75,7 @@ class Command_Preedge(Command[CommandArguments_Preedge, CommandResult_Preedge]):
                     raise ValueError(f'Invalid range start "{self.args.range[0]}" for preedge correction.')
             match self.args.range[1]:
                 case Number(sign=None, value=val, unit=_) if val == np.inf:
-                    idx_u = np.full(len(df), True, dtype=bool)
+                    idx_u = pd.Series(np.ones(len(df), dtype=bool), index=df.index, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_u = df['E'] <= val
                 case Number(sign=_, value=val, unit=Unit.EV):

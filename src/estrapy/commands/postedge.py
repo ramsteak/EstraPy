@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from lark import Token, Tree
 
@@ -19,7 +20,7 @@ class CommandArguments_Postedge(CommandArguments):
         types=parse_range,
         nargs=2,
         required=True,
-        validate=validate_range_unit(Unit.EV)
+        validate=validate_range_unit(Unit.EV, Unit.K)
     )
 
     degree: int = field_arg(
@@ -105,7 +106,7 @@ class Command_Postedge(Command[CommandArguments_Postedge, CommandResult_Postedge
 
             match self.args.range[0]:
                 case Number(sign=None, value=value, unit=_) if value == -np.inf:
-                    idx_l = np.full(len(df), True, dtype=bool)
+                    idx_l = pd.Series(np.ones(len(df), dtype=bool), index=df.index, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_l = df['E'] >= val
                 case Number(sign=_, value=val, unit=Unit.EV):
@@ -116,7 +117,7 @@ class Command_Postedge(Command[CommandArguments_Postedge, CommandResult_Postedge
                     raise ValueError(f'Invalid range start "{self.args.range[0]}" for postedge correction.')
             match self.args.range[1]:
                 case Number(sign=None, value=value, unit=_) if value == np.inf:
-                    idx_u = np.full(len(df), True , dtype=bool)
+                    idx_u = pd.Series(np.ones(len(df), dtype=bool), index=df.index, dtype=bool)
                 case Number(sign=None, value=val, unit=Unit.EV):
                     idx_u = df['E'] <= val
                 case Number(sign=_, value=val, unit=Unit.EV):
