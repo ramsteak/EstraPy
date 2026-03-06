@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from numpy import typing as npt
+
 from lark import Token, Tree
 
 from dataclasses import dataclass
@@ -223,26 +225,29 @@ class CommandArguments_Plot(CommandArguments):
 
     grid: bool | None = field_arg(
         flags=['--grid'],
-        action='store_true',
-        nargs=0,
+        type=type_bool,
+        const=True,
         required=False,
-        default=None
+        default=None,
+        nargs='?'
     )
 
     xgrid: bool | None = field_arg(
         flags=['--xgrid'],
-        action='store_true',
-        nargs=0,
+        type=type_bool,
+        const=True,
         required=False,
-        default=None
+        default=None,
+        nargs='?'
     )
 
     ygrid: bool | None = field_arg(
         flags=['--ygrid'],
-        action='store_true',
-        nargs=0,
+        type=type_bool,
+        const=True,
         required=False,
-        default=None
+        default=None,
+        nargs='?'
     )
 
     figsize: tuple[float, float] | None = field_arg(
@@ -304,6 +309,36 @@ def freeze_to_vars(
                 vars.update({vname: vars.get(collist[-1].meta.physicalname) for vname, collist in domain.columns.items()})
 
     return vars # pyright: ignore[reportPrivateUsage]
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from matplotlib.colors import Colormap
+
+def parse_colormap(cmap: str) -> "Colormap":
+    from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+    from matplotlib.cm import get_cmap
+
+    if ',' in cmap and '..' in cmap:
+        raise ValueError("Plot command: 'color' argument cannot contain both ',' and '..' separators.")
+    elif '..' in cmap:
+        # LinearSegmentedColormap
+        colors = [c.strip() for c in cmap.split('..')]
+        return LinearSegmentedColormap.from_list(f'lscm_{"_".join(colors)}', colors)
+    elif ',' in cmap:
+        # ListedColormap
+        colors = [c.strip() for c in cmap.split(',')]
+        return ListedColormap(colors, name=f'lcm_{"_".join(colors)}')
+    else:
+        # Single color or colormap name
+        colorstr = cmap.strip()
+        try:
+            return get_cmap(colorstr)
+        except ValueError:
+            try:
+                # Test if it is a valid color by trying to create a colormap with it
+                return LinearSegmentedColormap.from_list(f'{colorstr}', [colorstr, colorstr])
+            except ValueError:
+                raise ValueError(f"Plot command: 'color' argument '{cmap}' is not a valid colormap name, color specification, or list of colors.") from None
 
 @dataclass(slots=True)
 class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
@@ -386,12 +421,13 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
         from matplotlib.axes import Axes
         from matplotlib.figure import Figure
         from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+        from matplotlib import colors
         from matplotlib.cm import get_cmap
 
         import seaborn as sns
 
 
-        # Apply axis settings if specified
+        # Apply axis test annotations if specified
         if self.args.xlabel is not None:
             iaxis.callbacks.append(lambda ax, fig: ax.set_xlabel(self.args.xlabel)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
         if self.args.ylabel is not None:
@@ -404,10 +440,16 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
         # Grid specifications
         if self.args.xgrid is True:
             iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='x', which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        elif self.args.xgrid is False:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='x', which='both', visible=False)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
         if self.args.ygrid is True:
             iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='y', which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        elif self.args.ygrid is False:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(axis='y', which='both', visible=False)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
         if self.args.grid is True:
             iaxis.callbacks.append(lambda ax, fig: ax.grid(which='both', visible=True)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
+        elif self.args.grid is False:
+            iaxis.callbacks.append(lambda ax, fig: ax.grid(which='both', visible=False)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
         
         # Limits specifications
         if self.args.xlim is not None:
@@ -415,91 +457,62 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
         if self.args.ylim is not None:
             iaxis.callbacks.append(lambda ax, fig: ax.set_ylim(self.args.ylim)) # pyright: ignore[reportUnknownMemberType, reportArgumentType]
         
-        # Color logic
-        # Determine the colorby variable values
-        # Colorby can be either a single variable name, a composite file name or an expression.
-        # We need to differentiate and get the single values for each data page.
 
-        # We assume that if "{}" is in the string, it is a composite filename.
-        # If not, we try to parse it as an expression. A single variable should parse as an expression too.
+        # Determine the color variable
         if self.args.colorby is not None:
             if '{' in self.args.colorby:
-                # Composite filename
-                colorby_var = [
-                    template_replace(self.args.colorby, page.meta)
-                    for page in context.datastore.pages.values()
-                ]
+                colorby_var = [template_replace(self.args.colorby, page.meta) for page in context.datastore.pages.values()]
             else:
                 exp = Expression[Any].compile(self.args.colorby)
-                colorby_var = [
-                    exp(**freeze_to_vars(page, include_columns=False, include_hist_columns=False))
-                    for page in context.datastore.pages.values()
-                ]
+                colorby_var = [exp(**freeze_to_vars(page, include_columns=False, include_hist_columns=False)) for page in context.datastore.pages.values()]
         else:
-            # Colorby is not specified, use the index of the data pages
             colorby_var = list(range(len(context.datastore.pages)))
 
-        # Convert Number instances to float
         colorby_var = [float(v) if isinstance(v, Number) else v for v in colorby_var]
 
-        # Determine wether the colorby variable is categorical or continuous
-        is_categorical = any(isinstance(v, (str, int)) for v in colorby_var)
-        
-        pass
-
-
+        # Determine the color palette
+        color_categorical = any(isinstance(v, (str, int)) for v in colorby_var)
         if self.args.color is not None:
-            # Color can either be:
-            #  - a sequence of colors (either named or #rrggbb) separated by , -> ListedColormap
-            #  - a sequence of colors (either named or #rrggbb) separated by .. -> LinearSegmentedColormap
-            #  - a named color (or #rrggbb) -> LinearSegmentedColormap with two identical colors
-            #  - a matplotlib colormap name -> colormap
-            #  - a matplotlib reversed colormap name (e.g. 'viridis_r') -> colormap
-            
-            # self.args.color is a single string with either "," or ".." or neither.
-            if ',' in self.args.color and '..' in self.args.color:
-                raise ValueError("Plot command: 'color' argument cannot contain both ',' and '..' separators.")
-            elif '..' in self.args.color:
-                # LinearSegmentedColormap
-                colors = [c.strip() for c in self.args.color.split('..')]
-                colormap = LinearSegmentedColormap.from_list(f'lscm_{"_".join(colors)}', colors)
-            elif ',' in self.args.color:
-                # ListedColormap
-                colors = [c.strip() for c in self.args.color.split(',')]
-                colormap = ListedColormap(colors, name=f'lcm_{"_".join(colors)}')
-            else:
-                # Single color or colormap name
-                colorstr = self.args.color.strip()
-                try:
-                    colormap = get_cmap(colorstr)
-                    
-                except ValueError:
-                    # Not a colormap name, use two identical colors
-                    colormap = LinearSegmentedColormap.from_list(f'{colorstr}', [colorstr, colorstr])
+            colormap = parse_colormap(self.args.color)
         else:
-            # Default colormap
-            colormap = get_cmap('tab10') if is_categorical else get_cmap('viridis')
+            colormap = get_cmap('tab10') if color_categorical else get_cmap('viridis')
 
-        
+        # Determine the color values for each page based on the colorby variable and the colormap
+        if color_categorical:
+            unique_cats, unique_cat_index = np.unique(colorby_var, return_inverse=True)
+
+            # For categorical variables, we use the colormap as a list of colors and map each unique value to a color
+            if isinstance(colormap, ListedColormap) and len(colormap.colors) <= 25: # Arbitrary limit for "enough colors in the colormap" to become a sequential mapping instead of a categorical mapping
+                palette = {unique_cats[i]: colormap.colors[i % len(colormap.colors)] for i in range(len(unique_cats))}
+            else:
+                palette = {unique_cats[i]: colormap(i / (unique_cats.shape[0]-1)) for i in range(len(unique_cats))}
+        else:
+            # For continuous variables, we normalize the values to the range 0,1 and give a sampleable colormap that supports getitem
+            norm = colors.Normalize(min(colorby_var), max(colorby_var))
+
+            class SampleableColormap:
+                def __init__(self, cmap: colors.Colormap, norm: colors.Normalize):
+                    self.cmap = cmap
+                    self.norm = norm
+                
+                def __getitem__(self, value: float) -> Any:
+                    return colors.to_hex(self.cmap(self.norm(value)))
+            palette = SampleableColormap(colormap, norm)
+
+            
         # Plotting logic
+
         # Freeze the pages into variable dictionaries for expression evaluation (both kind and color)
         frozenpages = {name: freeze_to_vars(page) for name, page in context.datastore.pages.items()}
+
         # An expression requires xaxis:yaxis, separated by a colon, so we can assume that if there
         # is a colon and both parts parse as expressions, it is an expression plot (either variable or spectra).
         if isinstance(self.args.kind, str) and ':' in self.args.kind:
             xpart, ypart = self.args.kind.split(':', 1)
             # Try to parse both parts as expressions
-            xexpr = Expression.compile(xpart)
-            yexpr = Expression.compile(ypart)
+            xexpr = Expression[float | npt.NDArray[np.floating]].compile(xpart)
+            yexpr = Expression[float | npt.NDArray[np.floating]].compile(ypart)
 
-            # xaxis: list[npt.NDArray[np.floating] | float] = []
-            # yaxis: list[npt.NDArray[np.floating] | float] = []
-
-            # Collect dataframes for each page, with columns:
-            #  - 'unit' -> the name of the page, to be used with sns.unit
-            #  - 'x', 'y' -> the x and y values
-            #  - 'color' -> the colorby variable value
-            # The dataframe is then concatenated and plotted with seaborn
 
             pass
 
@@ -536,19 +549,16 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
             data_flat = pd.concat(datas, ignore_index=True)
 
             def cb(ax: Axes, fig: Figure) -> Any:
-                if is_categorical:
-                    palette = colormap.colors if isinstance(colormap, ListedColormap) else None
-                else:
-                    palette = colormap
                 sns.lineplot(data_flat,
                              x='x', y='y',
                              hue='color',
                              units='unit' if multiple_lines else None,
                              palette=palette,
+                             estimator=None,
                              ax=ax, **style)
                 if self.args.legend is True:
-                    ax.legend(title=self.args.colorby)
-                else:
+                    ax.legend(title=self.args.legendname)
+                elif self.args.legend is False:
                     ax.get_legend().remove()
             
             iaxis.callbacks.append(cb)
