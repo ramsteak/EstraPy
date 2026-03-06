@@ -45,7 +45,7 @@ class ImporterOptions:
     skip_rows: int = 0
     decimal: str | None = None
     leadingheader: int | None = None
-    re_sep: re.Pattern[str] | None = None
+    # re_sep: re.Pattern[str] | None = None
 
 
 Expr: TypeAlias = Callable[[pd.DataFrame], pd.Series]
@@ -440,11 +440,15 @@ def get_filein_command(options: FileInOptions, parsecontext: ParseContext) -> Co
     # Compile importer options
     if cmd.importeroptions.separator is None:
         cmd.importeroptions.separator = r'\s+'
+    elif cmd.importeroptions.separator == 'tab':
+        cmd.importeroptions.separator = r'\t'
+    elif cmd.importeroptions.separator == 'comma':
+        cmd.importeroptions.separator = r','
+    elif cmd.importeroptions.separator == 'semicolon':
+        cmd.importeroptions.separator = r';'
     else:
-        cmd.importeroptions.re_sep = re.compile(cmd.importeroptions.separator)
-        cmd.importeroptions.separator = (
-            ' '  # If a custom separator is given, the regex will be used to edit the separator to a single space
-        )
+        # cmd.importeroptions.re_sep = re.compile(cmd.importeroptions.separator)
+        cmd.importeroptions.separator = (cmd.importeroptions.separator)
 
     if cmd.importeroptions.decimal is None:
         cmd.importeroptions.decimal = '.'
@@ -566,7 +570,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                 _assert_flag_not_assigned_set(
                     options, 'reciprocal_reference_signal_mode__', t, 'raw_referencetransmission'
                 )
-                _assert_option_not_assigned_set(options, 'referencetransmission', t, [o])
+                _assert_option_not_assigned_set(options, 'referencetransmission', t, o)
             case Tree(
                 'option',
                 [
@@ -769,7 +773,7 @@ def get_filein_options(args: Sequence[Token | Tree[Token]], parsecontext: ParseC
                         raise CommandSyntaxError('The sortby option requires string arguments.')
                     if token.type != 'STRING':
                         raise CommandSyntaxError('The sortby option requires string arguments.', token)
-                    
+
                 _assert_option_not_assigned_set(options, 'sortby', t, n)
             case Tree('option', [Token('OPTION', '--format'), Token('STRING', str(kind)) as k, Token() as v]):
                 match kind.lower(), v:
@@ -853,6 +857,9 @@ def execute_filein_command(command: CommandArguments_filein, context: Context) -
         directory = command.directory or context.paths.workingdir
         if not directory.is_absolute():
             directory = (context.paths.workingdir / directory).resolve()
+
+        if not directory.is_dir():
+            raise ExecutionError(f"The specified directory '{directory}' does not exist or is not a directory.")
 
         files: list[Path] = []
         for fs in command.filenames:
@@ -959,7 +966,7 @@ def parse_filename_vars(file: Path) -> dict[str, Any]:
     # Technically both .fd and .fd0 are the immediate parent
     vars['.fd'] = file.parent.name
     vars.update({f'.fd{i}': part for i, part in enumerate(reversed(file.parent.parts))})
-    
+
     # Add other filename variables
     vars['.fn'] = file.name                     # Full filename with extension
     vars['.f'] = file.stem                      # Filename without extension
@@ -1007,13 +1014,14 @@ def read_file(file: Path, command: CommandArguments_filein, context: Context) ->
             headerline = ''
 
         # Now we replace separator characters with spaces, and read the data using pandas.
-        normfiledata = normalize_csv(f.read(), command.importeroptions.re_sep)
+        # normfiledata = normalize_csv(f.read(), command.importeroptions.re_sep)
         dat = pd.read_csv(  # type: ignore
-            StringIO(normfiledata),
+            StringIO(f.read()),
             sep=command.importeroptions.separator,
             header=None,
             decimal=command.importeroptions.decimal or '.',
             engine='c',
+            skipinitialspace=True,
             dtype=float,
         )
         # Now that we know how many columns there are in the data, we can parse the header line if present
