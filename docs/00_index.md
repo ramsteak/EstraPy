@@ -59,10 +59,6 @@ Get up and running in minutes
 
 Learn the .estra file format and commands
 
-### [API Reference]({{ '/api' | relative_url }})
-
-Complete command and function documentation
-
 ### [Tutorials]({{ '/tutorials' | relative_url }})
 
 Step-by-step guides for common workflows

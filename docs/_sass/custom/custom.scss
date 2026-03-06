@@ -2,6 +2,6 @@ code {
     font-size: 0.9em;
 }
 
-.nowrap {
-    white-space: nowrap;
+:not(pre) > code {
+  white-space: nowrap;
 }

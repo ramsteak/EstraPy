@@ -1,7 +1,7 @@
 ---
 title: General Syntax
 parent: Syntax
-nav_order: 1
+nav_order: 10
 permalink: /commands/general-syntax/
 math: katex
 ---
@@ -78,7 +78,7 @@ Creates a compressed `.zip` archive of all output files at the end of the analys
 
 as well as a copy of the input file and any other accessed files, such as fitting models.
 
-The archive name is determined the input filename, the project [`title`](#title) and the current time.
+The archive name is generated with the input filename, the project [`title`](#title) and the current time.
 
 **Example:**
 
@@ -259,7 +259,10 @@ To do so, all values must be of the same type (e.g. all in eV or all in k). Mixi
 
 ```sh
 # This will cause an error due to mixed units:
-rebin 0k 15eV --interval 0.05k
+rebin 0k 1500eV --interval 0.05k
+
+# ✅ Correct - explicitly specify axis
+rebin 0k 1500eV --interval 0.05k --axis k  
 ```
 
 ---
@@ -298,9 +301,3 @@ plot r:real(f)
 Complete Example
 ---
 -->
-
-## Next Steps
-
-- [Command Reference]({{ "/api" | relative_url }}) - Complete list of available commands
-- [Tutorials]({{ "/tutorials" | relative_url }}) - Step-by-step analysis examples
-- [Troubleshooting]({{ "/troubleshooting" | relative_url }}) - Common syntax errors and solutions

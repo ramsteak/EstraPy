@@ -183,8 +183,6 @@ Here are some essential commands you'll use in your `.estra` files:
 | `baseline_correction` | Remove baseline signal |
 | `normalize` | Normalize data values |
 
-For a complete list, see the [API Reference]({{ '/api' | relative_url }}).
-
 ## Getting Help
 
 - **Syntax questions** - See [Input File Syntax]({{ '/syntax' | relative_url }})

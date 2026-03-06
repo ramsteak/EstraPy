@@ -1,7 +1,7 @@
 ---
 title: File Input
 parent: Syntax
-nav_order: 2
+nav_order: 20
 permalink: /commands/file-input/
 math: katex
 ---
@@ -13,7 +13,7 @@ EstraPy uses the `filein` command to import data files. The command reads specif
 ## Basic Usage
 
 ```sh
-filein <files> [options]
+filein <file(s)> [options]
 ```
 
 Import a single file or multiple files, optionally using glob patterns.
@@ -34,7 +34,7 @@ filein data/*.dat -E energy -t I0 I1
 
 | Option | Description |
 |--------|-------------|
-| `<file>` | Path to the file(s). Supports glob patterns (e.g., `*.dat`) |
+| `<file(s)>` | Path to the file(s). Supports glob patterns (e.g., `*.dat`) |
 | `--dir <directory>` | Base directory for relative paths |
 
 ### Axis Import Options

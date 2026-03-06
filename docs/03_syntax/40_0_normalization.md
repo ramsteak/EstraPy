@@ -1,7 +1,7 @@
 ---
 title: Normalization
-parent: Commands
-nav_order: 3
+parent: Syntax
+nav_order: 40
 permalink: /commands/normalization/
 has_children: true
 math: katex
@@ -9,7 +9,7 @@ math: katex
 
 # Normalization
 
-Normalization is a critical step in XAS data analysis that removes systematic variations and isolates the oscillatory EXAFS signal. EstraPy provides three commands that work together to perform complete XAS normalization:
+Normalization is a critical step in XAS data analysis that removes systematic variations and isolates a normalized XANES edge and oscillatory EXAFS signal. EstraPy provides three commands that work together to perform complete XAS normalization:
 
 1. **[`preedge`]({{ "/commands/normalization/preedge" | relative_url }})** - Removes the pre-edge background
 2. **[`postedge`]({{ "/commands/normalization/postedge" | relative_url }})** - Removes the post-edge background (atomic absorption)
@@ -27,7 +27,7 @@ preedge .. -50eV
 postedge 150eV ..
 
 # 3. Normalize to edge jump
-normalize
+normalize --factor J0
 ```
 
 After normalization, you'll have:
@@ -56,7 +56,7 @@ The `postedge` command fits a polynomial to the absorption well above the edge a
 
 where $$J_0$$ is the edge jump height (stored as metadata variable `J0`).
 
-**Result:** Isolated EXAFS oscillations on top of a constant baseline.
+**Result:** Spectrum corrected for atomic absorption, with an edge jump standardized to $$J_0$$.
 
 ### Jump Normalization
 
@@ -67,47 +67,7 @@ The `normalize` command divides the signal by the edge jump $$J_0$$ to create st
 
 **Result:** Dimensionless absorption coefficient and EXAFS signal ready for Fourier analysis.
 
-## Common Patterns
-
-### Standard XAS Normalization
-
-```sh
-# Complete normalization workflow
-preedge .. -50eV           # Fit pre-edge up to 50 eV below edge
-postedge 150eV .. --div    # Fit post-edge from 150 eV above, divide
-normalize                  # Create mu and chi
-```
-
-### K-weighted Normalization
-
-For fitting the post-edge in k-space (useful for distant post-edge regions):
-
-```sh
-preedge .. -50eV
-postedge 3k 12k --k-axis --kweight 2
-normalize
-```
-
-### Alternative Post-edge Range
-
-Using relative energy ($$e = E - E_0$$):
-
-```sh
-preedge .. -50eV
-postedge +150eV +1000eV -e
-normalize
-```
-
-## Metadata Variables
-
-The normalization commands set important metadata variables:
-
-| Variable | Set by | Description |
-|----------|--------|-------------|
-| `E0` | `preedge` | Absorption edge energy (eV) |
-| `J0` | `postedge` | Edge jump height |
-
-These variables are stored per-page and can be used in subsequent commands, plots, and exports.
+Note that the `a` column is not modified by `normalize` and retains the original absorption signal. The normalized `mu` and `chi` columns are created as new columns in the dataset.
 
 ## Domain and Column Requirements
 
@@ -123,8 +83,7 @@ The edge energy `E0` must be set by the `edge` command for normalization to work
 
 - **[Pre-edge Correction]({{ "/commands/normalization/preedge" | relative_url }})** - Detailed `preedge` documentation
 - **[Post-edge Correction]({{ "/commands/normalization/postedge" | relative_url }})** - Detailed `postedge` documentation
-- **[Normalize]({{ "/commands/normalization/normalize" | relative_url }})** - Detailed `normalize` documentation
-- **[Fourier Transform]({{ "/commands/fourier" | relative_url }})** - Next step after normalization
+- **[Normalize]({{ "/commands/normalization/normalization" | relative_url }})** - Detailed `normalize` documentation
 
 ---
 

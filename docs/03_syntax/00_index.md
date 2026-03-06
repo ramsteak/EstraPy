@@ -22,6 +22,14 @@ command-name [arguments] [options] [subcommands]
 
 Commands can span multiple lines for readability - continuation lines must start with at least one space.
 
+For example:
+
+```sh
+preedge -150eV -25eV --linear
+
+edge set Cu.K
+```
+
 ## Data Structure
 
 EstraPy organizes data into **pages** and **domains**:
@@ -53,7 +61,7 @@ EstraPy currently supports two domains:
 | **reciprocal** | Original signal space | Energy (`E`, eV), wavevector (`k`, Å⁻¹), absorption (`mu`), fine structure (`chi`), ... |
 | **fourier** | Distance space after Fourier transform | Distance (`R`, Å), Fourier transform magnitude (`f`), ... |
 
-Most commands operate in the reciprocal domain by default. Commands like [`fourier`]({{ "/commands/fourier-transform" | relative_url }}) explicitly transform data between domains.
+Most commands operate in the reciprocal domain by default. Commands like [`fourier`]({{ "/commands/fourier-transform" | relative_url }}) explicitly transform data between the reciprocal and fourier domains.
 
 ### Column Types
 
@@ -65,20 +73,7 @@ Each column is classified as either:
 
 Some commands require you to specify which domain, axis, and columns to use. Others (like `preedge`) have sensible defaults and work with the only logical choices (`reciprocal` domain, `E` axis, `a` column).
 
-## Command Categories
-
-Commands are organized into several categories:
-
-- **[Input/Output]({{ "/commands/io" | relative_url }})** - Load and export data
-- **[Data Processing]({{ "/commands/processing" | relative_url }})** - Transform and analyze data
-- **[Visualization]({{ "/commands/plotting" | relative_url }})** - Create plots and figures
-- **[Fourier Analysis]({{ "/commands/fourier" | relative_url }})** - Fourier transforms and related operations
-
 ## Getting Started
-
-1. Review the [General Syntax]({{ "/commands/general-syntax" | relative_url }}) to understand file structure
-2. Browse command categories to find operations you need
-3. Check the [API Reference]({{ "/api" | relative_url }}) for detailed command documentation
 
 For practical examples, see the [Tutorials]({{ "/tutorials" | relative_url }}) section.
 
