@@ -1,5 +1,5 @@
 [project]
-name = "estrapy2"
+name = "estrapy"
 version = "2.0.0"
 description = "Add your description here"
 readme = "README.md"
@@ -39,4 +39,4 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 
 [project.scripts]
-estrapy2 = "estrapy:estrapy.main"
+estrapy = "estrapy:estrapy.main"
