@@ -12,6 +12,8 @@
 ## Miglioramenti generali
 
 - ri aggiungere plot intermedi per ciascun comando, se richiesti
+- modificare da np.polyfit a np.polynomial.x.fit per evitare warning di rank degenerate
+- sort dei dati in x in importazione file
 
 ## Cose da controllare
 
@@ -34,6 +36,8 @@
   - Implementare la costruzione e validazione di argomenti attraverso dataclasses fields, in modo da ridurre la quantità di codice boilerplate e migliorare la leggibilità.
 
 - Implementare una sezione di help, accessibile anche dall'esterno (`estrapy help <comando>`)
+
+- Sistemare TokenFlow usando eccezioni invede di Enum
 
 ## Background
 
