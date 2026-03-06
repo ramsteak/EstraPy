@@ -668,6 +668,7 @@ def infer_axis_domain(
         range: tuple[Number, Number] | None = None,
         numbers: list[Number | None] | None = None,
         domain: Domain | None = None,
+        columns: list[str] | None = None,
         
         ) -> tuple[str, Domain]:
         """Infer the axis and domain from the range, domain and other numbers. Returns a tuple of (axis, domain)."""
@@ -709,6 +710,25 @@ def infer_axis_domain(
                         raise ValueError(f"Axis '{axis}' is incompatible with number unit '{number.unit.name}'.")
                     # Do not check sign for numbers, as they may represent intervals or other constructs.
             return axis, expected_domain
+        
+        if columns is not None:
+            # If columns are provided but axis is not, columns must contain at most one axis, and it must be compatible with the domain and the unit of range and numbers.
+            possible_axes = set[str]()
+            for col in columns:
+                if col in domains:
+                    possible_axes.add(col)
+            if not possible_axes:
+                raise ValueError(f"Cannot infer axis from columns {columns}. No valid axis found.")
+            if len(possible_axes) > 1:
+                raise ValueError(f"Cannot infer axis from columns {columns}. Multiple possible axes found: {possible_axes}.")
+            columnaxis = possible_axes.pop()
+
+            return infer_axis_domain(
+                axis=columnaxis,
+                range=range,
+                numbers=numbers,
+                domain=domain,
+            )
         
         # If axis is not provided, try to infer it from the domain and the unit of range and numbers.
         # Inferred axis is a list of possible options. We join them at the end to get the best match,
