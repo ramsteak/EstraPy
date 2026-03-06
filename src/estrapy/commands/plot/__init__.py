@@ -485,7 +485,8 @@ class Command_Plot(Command[CommandArguments_Plot, CommandResult_Plot]):
             if isinstance(colormap, ListedColormap) and len(colormap.colors) <= 25: # Arbitrary limit for "enough colors in the colormap" to become a sequential mapping instead of a categorical mapping
                 palette = {unique_cats[i]: colormap.colors[i % len(colormap.colors)] for i in range(len(unique_cats))}
             else:
-                palette = {unique_cats[i]: colormap(i / (unique_cats.shape[0]-1)) for i in range(len(unique_cats))}
+                _norm = unique_cats.shape[0]-1 if unique_cats.shape[0] > 1 else 1
+                palette = {unique_cats[i]: colormap(i / _norm) for i in range(len(unique_cats))}
         else:
             # For continuous variables, we normalize the values to the range 0,1 and give a sampleable colormap that supports getitem
             norm = colors.Normalize(min(colorby_var), max(colorby_var))
