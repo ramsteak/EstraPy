@@ -26,7 +26,7 @@ An input file consists of four sections, in order:
 **Every input file must start with a version declaration:**
 
 ```sh
-# version: 2.0.0
+# version: {{ site.version }}
 ```
 
 This ensures compatibility between your input file and the installed EstraPy version:
@@ -56,7 +56,7 @@ Clears the output folder before execution, removing all files and directories fr
 **Example:**
 
 ```sh
-# version: 2.0.0
+# version: {{ site.version }}
 % clear
 
 filein data/scan_001.dat
@@ -85,7 +85,7 @@ The archive name is generated with the input filename, the project [`title`](#ti
 `analysis.estra`
 
 ```sh
-# version: 2.0.0
+# version: {{ site.version }}
 % clear
 % archive
 % title "Cu foil experiment"
@@ -125,7 +125,7 @@ Creates a variable that will be substituted throughout the file wherever `${vari
 
 **Example (future):**
 ```
-# version: 2.0.0
+# version: {{ site.version }}
 % define kweight 2
 % define sample "Cu foil"
 

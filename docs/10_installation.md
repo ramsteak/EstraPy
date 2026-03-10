@@ -36,12 +36,26 @@ estrapy --version
 You should see:
 
 ```sh
-EstraPy 2.0.0
+EstraPy {{ site.version }}
+```
+
+## System package
+
+The easiest way to install EstraPy is using pip as a system package. This way, you can use EstraPy from any terminal without activating a virtual environment.
+
+```sh
+pip install estrapy
+```
+
+or with uv:
+
+```sh
+uv pip install estrapy --system
 ```
 
 ## Virtual Environment (Recommended)
 
-It's recommended to install EstraPy in a virtual environment to avoid dependency conflicts:
+For better dependency management and to avoid conflicts with other Python packages, it's recommended to install EstraPy in a virtual environment. This allows you to create an isolated environment for EstraPy and its dependencies, ensuring that it doesn't interfere with other projects or system packages.
 
 ### Using venv
 
@@ -80,7 +94,7 @@ If you are using a virtual environment, remember to activate it each time before
 Download the latest `.whl` file from the [releases page](https://github.com/ramsteak/EstraPy/releases) and install it:
 
 ```sh
-pip install estrapy-2.0.0-py3-none-any.whl
+pip install estrapy-{{ site.version }}-py3-none-any.whl
 ```
 
 ### Building from Source
@@ -93,7 +107,7 @@ If you want to build from source or contribute to development:
 gh repo clone ramsteak/EstraPy
 cd EstraPy
 python -m build
-pip install dist/estrapy-2.0.0-py3-none-any.whl
+pip install dist/estrapy-{{ site.version }}-py3-none-any.whl
 ```
 
 **Using git:**
@@ -102,7 +116,7 @@ pip install dist/estrapy-2.0.0-py3-none-any.whl
 git clone https://github.com/ramsteak/EstraPy
 cd EstraPy
 python -m build
-pip install dist/estrapy-2.0.0-py3-none-any.whl
+pip install dist/estrapy-{{ site.version }}-py3-none-any.whl
 ```
 
 **Note:** Building from source requires the `build` package:

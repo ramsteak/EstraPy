@@ -62,7 +62,7 @@ cat example.estra
 Input files use a simple, readable syntax. Here's what a typical file looks like:
 
 ```sh
-# version: 2.0.0
+# version: {{ site.version }}
 # Each file starts with the version of the EstraPy syntax being used
 % title "Basic XANES Analysis"
 
@@ -108,7 +108,7 @@ You should see output similar to:
 ```log
 [INF] EstraPy - XAS data analysis tool
 [INF] (c) 2024 Marco Stecca
-[INF] Version 2.0.0
+[INF] Version {{ site.version }}
 [INF] Imported 1 file in 99.37 ms (122.6kB).
 [INF] Set E0 to 6539.0eV for all pages.
 [INF] Completed spline background calculation for all pages.
