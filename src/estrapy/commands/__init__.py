@@ -138,6 +138,10 @@ def parse_command(command: list[Token | Tree[Token]], parsecontext: ParseContext
         case [Token('COMMANDNAME', 'rebin') as t, *args]:
             from .rebin import Command_Rebin
             return Command_Rebin.parse(t, args, parsecontext)
+        # Command filter ---------------------------------------------------------------------------
+        case [Token('COMMANDNAME', 'filter') as t, *args]:
+            from .filter import Command_Filter
+            return Command_Filter.parse(t, args, parsecontext)
         # Command exit -----------------------------------------------------------------------------
         case [Token('COMMANDNAME', 'exit' | 'quit') as t, *args]:
             pass # Exit is a statement that has no arguments. Everything after exit is ignored.
