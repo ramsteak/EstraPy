@@ -8,7 +8,7 @@ permalink: /installation/
 
 ## Requirements
 
-- Python 3.11 or higher
+- Python 3.13 or higher
 - pip or uv package manager
 
 ## Quick Install

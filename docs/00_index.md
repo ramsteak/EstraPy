@@ -32,7 +32,7 @@ Synchrotron facilities produce X-ray diffraction and spectroscopy data used in m
 
 ## Quick Start
 
-**Requirements:** Python 3.11+
+**Requirements:** Python 3.13+
 
 Install EstraPy and run your first analysis:
 
