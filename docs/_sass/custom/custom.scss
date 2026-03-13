@@ -5,3 +5,34 @@ code {
 :not(pre) > code {
   white-space: nowrap;
 }
+
+/* Base tree block */
+pre > code.language-tree {
+  line-height: 1.2;
+  margin: 0.5rem 0;
+  font-size: 0.93rem;
+  background: #1e1e1e;   /* dark background to highlight colors */
+  color: #ffffff;        /* default user files in white */
+  display: block;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+/* Folders in blue */
+pre > code.language-tree .folder {
+  color: #0366d6;  /* nice blue */
+  font-weight: bold;
+}
+
+/* Readonly files in grey */
+pre > code.language-tree .file {
+  color: #6a737d;  /* GitHub grey */
+}
+
+/* Comments / notes */
+pre > code.language-tree .comment {
+  color: #8b949e;  /* lighter grey */
+  font-style: italic;
+}
