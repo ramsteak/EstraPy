@@ -1,5 +1,9 @@
-__version__ = '2.0.0'
-__version_tuple__ = (2, 0, 0)
+from importlib.metadata import version
+from packaging.version import Version
+
+
+__version__ = version("estrapy")
+__version_tuple__ = Version(__version__).release
 
 author = 'Marco Stecca'
 copyright = f'(c) 2024-2026 {author}'
