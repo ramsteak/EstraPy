@@ -101,18 +101,14 @@ class Command_Rebin(Command[CommandArguments_Rebin, CommandResult_Rebin]):
     def execute(self, context: Context) -> CommandResult_Rebin:
         log = context.logger.getChild(f'command.rebin')
         
+        range_low, range_high = self.args.range[0].value, self.args.range[1].value
         if self.args.interval is not None:
-            interval = self.args.interval.value
-            # Boundaries define the edges of the bins. There is one more boundary,
-            # and they are shifted by half an interval compared to the bin centers.
-            range_low, range_high = self.args.range[0].value, self.args.range[1].value
             interval = self.args.interval.value
             new_axis = np.arange(range_low, range_high + interval, interval)
             boundaries = np.arange(range_low - 0.5 * interval, range_high + interval, interval)
 
         elif self.args.number is not None:
             number = self.args.number
-            range_low, range_high = self.args.range[0].value, self.args.range[1].value
             new_axis = np.linspace(range_low, range_high, number)
             boundaries = np.array(np.linspace(range_low - 0.5, range_high + 0.5, number + 1), dtype=float)
         else:
