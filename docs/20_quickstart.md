@@ -105,7 +105,7 @@ EstraPy will:
 
 You should see output similar to:
 
-```log
+```text
 [INF] EstraPy - XAS data analysis tool
 [INF] (c) 2024 Marco Stecca
 [INF] Version {{ site.version }}
