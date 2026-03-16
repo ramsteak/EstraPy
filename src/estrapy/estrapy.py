@@ -105,7 +105,7 @@ def parse_args() -> ArgumentConfig:
         type=str,
         nargs='?',
         default=None,
-        help='Path to the input .estra file. If not provided, reads from stdin.',
+        help='Path to the input .estra file. If not provided, starts estrapy in interactive mode.',
     )
     parser.add_argument(
         '-o',
@@ -345,7 +345,7 @@ def estrapy_interactive_mode(context: Context, timers: TimerCollection) -> None:
                 execute_script(script, context)
             except UnexpectedToken as e:
                 print(f'Syntax error: {e}')
-            except CommandParseError as e:
+            except CommandError as e:
                 print(f'Parse error: {e}')
             except VisitError as e:
                 print(f'Error during execution: {e}')
