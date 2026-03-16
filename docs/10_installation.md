@@ -8,7 +8,7 @@ permalink: /installation/
 
 ## Requirements
 
-- Python 3.13 or higher
+- Python 3.13 or higher (see [Python Installation]( {{ '/python-installation' | relative_url }}))
 - pip or uv package manager
 
 ## Quick Install
