@@ -11,7 +11,7 @@ from ...core.threaded import execute_threaded
 from ...core.commandparser import CommandArguments, field_arg
 from ...core._validators import validate_float_non_negative, validate_number_unit, validate_number_positive
 from ...core.number import Number, parse_number, Unit
-from ...operations.fourier import flattop_window, fourier
+from ...operations.fourier import flattop_window, fourier, ifourier
 from ...core.context import Context
 from ...core.datastore import Domain
 
@@ -125,7 +125,7 @@ def _compute_background_fourier(xy: npt.NDArray[np.floating],
     W = flattop_window(r, backward_window_shape, 'hanning')
 
     f = fourier(x, y * x**kweight * w, r)
-    b = fourier(r, f.conj() * W, x)
+    b = ifourier(r, f * W, x)
 
     bkg = b.real / (x**kweight + sargs.epsilon) / w
 

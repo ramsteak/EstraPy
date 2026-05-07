@@ -141,11 +141,23 @@ def fourier(
     
     for j in prange(nr):
         real, imag = 0.0, 0.0
+        FTr = 2 * x[0] * r[j]                       # Initial right edge (i=0)
+        FTrc, FTrs = np.cos(FTr), np.sin(FTr)       # Initial cos/sin for right edge
         for i in range(len(x) - 1):
-            FTl = 2 * x[i] * r[j]
-            FTr = 2 * x[i + 1] * r[j]
-            real += yl[i] * np.cos(FTl) + yr[i] * np.cos(FTr)
-            imag += yl[i] * np.sin(FTl) + yr[i] * np.sin(FTr)
+            FTlc, FTls = FTrc, FTrs                 # Previous right edge becomes current left edge
+            FTr = 2 * x[i + 1] * r[j]               # New right edge
+            FTrc, FTrs = np.cos(FTr), np.sin(FTr)   # New cos/sin for right edge
+            real += yl[i] * FTlc + yr[i] * FTrc
+            imag -= yl[i] * FTls + yr[i] * FTrs
         result[j] = real + 1j * imag
     
     return result / np.sqrt(4 * np.pi)
+
+def ifourier(
+    r: npt.NDArray[np.floating],
+    F: npt.NDArray[np.complexfloating],
+    x: npt.NDArray[np.floating],
+) -> npt.NDArray[np.complexfloating]:
+    y = fourier(r, F.conj(), x).conj()
+
+    return y
