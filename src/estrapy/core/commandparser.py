@@ -1,5 +1,5 @@
 from lark import Token, Tree
-from dataclasses import dataclass, field, fields, MISSING, Field
+from dataclasses import dataclass, field, fields, MISSING, Field, is_dataclass
 from typing import TypeVar, Callable, Any, Union, Protocol, Generic, Mapping, ItemsView, KeysView, ValuesView, Type, Self, Iterator, Sequence, TypeAlias, runtime_checkable, Literal, TYPE_CHECKING
 from enum import Enum
 from itertools import chain, count
@@ -446,6 +446,32 @@ class TokenFlowControl(Enum):
     def is_failure(self) -> bool:
         return self.value < 0
 
+def is_dataclass_well_formed(cls: type[Any]) -> bool:
+    """
+    Check if a dataclass has all its annotated fields properly defined.
+    Excludes fields marked with init=False.
+    
+    Returns True if:
+    - cls is a dataclass
+    - All class annotations (excluding init=False fields) are present in __dataclass_fields__
+    """
+    if not is_dataclass(cls):
+        return False
+    
+    # Collect all annotations from this class only (not inherited)
+    own_annotations = getattr(cls, '__annotations__', {})
+    
+    # Get field names from __dataclass_fields__, excluding init=False
+    dataclass_fields_dict = cls.__dataclass_fields__
+    init_field_names = {
+        name for name, field in dataclass_fields_dict.items() 
+        if field.init
+    }
+    
+    # All own annotations should be in the init fields
+    return own_annotations.keys() <= init_field_names
+
+
 _CA = TypeVar('_CA', bound='CommandArguments')
 
 class CommandArgumentParser(Generic[_CA]):
@@ -461,6 +487,9 @@ class CommandArgumentParser(Generic[_CA]):
         # Check that return_type is a subclass of CommandArguments
         if not issubclass(return_type, CommandArguments): # pyright: ignore[reportUnnecessaryIsInstance]
             raise TypeError(f'return_type must be a subclass of CommandArguments, got {return_type}')
+        # Check that the dataclass is well-formed (i.e. all annotated fields are defined)
+        if not is_dataclass_well_formed(return_type):
+            raise TypeError(f'return_type dataclass is not well-formed. All annotated fields must be defined and have init=True.\nDid you forget @dataclass?')
 
         self.return_type = return_type
         self.name = name
