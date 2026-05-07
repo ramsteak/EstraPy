@@ -78,7 +78,7 @@ def _compute_background_polynomial(xy: npt.NDArray[np.floating],
         background = bkg,
     )
 
-def execute_background_polynomial(
+def calculate_background_polynomial(
     context: Context,
     sargs: SubCommand_PolynomialBackgroundArguments,
     range: tuple[Number, Number],

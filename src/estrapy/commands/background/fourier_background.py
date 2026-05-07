@@ -138,7 +138,7 @@ def _compute_background_fourier(xy: npt.NDArray[np.floating],
         background = Bkg
     )
 
-def execute_background_fourier(
+def calculate_background_fourier(
     context: Context,
     sargs: SubCommand_FourierBackgroundArguments,
     range: tuple[Number, Number],

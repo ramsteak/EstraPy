@@ -128,7 +128,7 @@ def _compute_background_spline(xy: npt.NDArray[np.floating],
         background = Bkg
     )
 
-def execute_background_spline(
+def calculate_background_spline(
     context: Context,
     sargs: SubCommand_SplineBackgroundArguments,
     range: tuple[Number, Number],

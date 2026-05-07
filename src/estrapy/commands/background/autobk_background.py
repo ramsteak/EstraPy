@@ -94,7 +94,7 @@ def _compute_background_autobk(xy: npt.NDArray[np.floating],
     )
 
 
-def execute_background_autobk(
+def calculate_background_autobk(
     context: Context,
     sargs: SubCommand_AutobkBackgroundArguments,
     range: tuple[Number, Number],

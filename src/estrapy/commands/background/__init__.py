@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import Self
 
 from .result import CommandResult_Background
-from .fourier_background import execute_background_fourier, SubCommand_FourierBackgroundArguments
-from .spline_background import execute_background_spline, SubCommand_SplineBackgroundArguments
-from .polynomial_background import execute_background_polynomial, SubCommand_PolynomialBackgroundArguments
-from .autobk_background import execute_background_autobk, SubCommand_AutobkBackgroundArguments
+from .fourier_background import calculate_background_fourier, SubCommand_FourierBackgroundArguments
+from .spline_background import calculate_background_spline, SubCommand_SplineBackgroundArguments
+from .polynomial_background import calculate_background_polynomial, SubCommand_PolynomialBackgroundArguments
+from .autobk_background import calculate_background_autobk, SubCommand_AutobkBackgroundArguments
 
 from ...core.context import Command, Context, ParseContext
 from ...core.commandparser import CommandArgumentParser, CommandArguments, field_arg
@@ -64,13 +64,13 @@ class Command_Background(Command[CommandArguments_Background, CommandResult_Back
     def execute(self, context: Context) -> CommandResult_Background:
         match self.args.mode:
             case SubCommand_FourierBackgroundArguments() as sargs:
-                backgrounds = execute_background_fourier(context, sargs, self.args.range)
+                backgrounds = calculate_background_fourier(context, sargs, self.args.range)
             case SubCommand_SplineBackgroundArguments() as sargs:
-                backgrounds = execute_background_spline(context, sargs, self.args.range)
+                backgrounds = calculate_background_spline(context, sargs, self.args.range)
             case SubCommand_PolynomialBackgroundArguments() as sargs:
-                backgrounds = execute_background_polynomial(context, sargs, self.args.range)
+                backgrounds = calculate_background_polynomial(context, sargs, self.args.range)
             case SubCommand_AutobkBackgroundArguments() as sargs:
-                backgrounds = execute_background_autobk(context, sargs, self.args.range)
+                backgrounds = calculate_background_autobk(context, sargs, self.args.range)
             case _:
                 raise ValueError('Unknown background mode.')
         # Backgrounds is a dict of page name -> BackgroundResult
