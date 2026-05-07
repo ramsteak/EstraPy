@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+title: EstraPy
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Marco
+    family-names: Stecca
+    email: marco.stecca.5@phd.unipd.it
+    affiliation: Università degli Studi di Padova
+    orcid: 'https://orcid.org/0009-0002-1238-1835'
+  - given-names: Paolo
+    family-names: Centomo
+    email: paolo.centomo@unipd.it
+    affiliation: Università degli Studi di Padova
+    orcid: 'https://orcid.org/0000-0002-0124-9284'
+  - given-names: Carlo
+    family-names: Meneghini
+    email: carlo.meneghini@uniroma3.it
+    affiliation: Università di Roma TRE
+    orcid: 'https://orcid.org/0000-0003-4846-8422'
+repository-code: 'https://github.com/ramsteak/EstraPy'
+url: 'https://ramsteak.github.io/EstraPy/'
+abstract: >-
+  EstraPy is a synchrotron data analysis framework, built in
+  Python 3. Synchrotron facilities produce X-ray diffraction
+  and spectroscopy data used in materials science,
+  crystallography, and structural biology research. EstraPy
+  provides a command-line framework for analyzing this data
+  using simple, readable input files.
+keywords:
+  - XAS
+  - Synchrotron
+  - EXAFS
+  - XANES
+  - X-ray
+license: MIT
