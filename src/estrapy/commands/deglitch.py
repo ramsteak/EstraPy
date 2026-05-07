@@ -2,7 +2,7 @@ import numpy as np
 
 from numpy import typing as npt
 from lark import Token, Tree
-from scipy.stats import norm # pyright: ignore[reportMissingTypeStubs]
+from scipy.stats import norm
 
 from dataclasses import dataclass
 from typing import Self, Mapping, override

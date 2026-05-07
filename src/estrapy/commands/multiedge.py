@@ -27,7 +27,7 @@ def edge_tanh(x: npt.NDArray[np.floating], a: float, b: float, c: float, reparam
     return a * (np.tanh(s * (x-b)/abs(c)) + 1) * 0.5
 
 def edge_erf(x: npt.NDArray[np.floating], a: float, b: float, c: float, reparam: bool = True) -> npt.NDArray[np.floating]:
-    from scipy.special import erf, erfinv # pyright: ignore[reportMissingTypeStubs]
+    from scipy.special import erf, erfinv
     s = erfinv(0.8)
     return a * (1 + erf(s * (x-b)/abs(c))) * 0.5
 
@@ -139,7 +139,7 @@ class Command_MultiEdge(Command[CommandArguments_MultiEdge, CommandResult_MultiE
 
         for _, page in context.datastore.pages.items():
             domain = page.domains[Domain.RECIPROCAL]
-            x = domain.get_column_data(axis).to_numpy()
+            x = domain.get_column_data(self.args.axis).to_numpy()
             y = edge_func(x, self.args.a, self.args.b.value, self.args.c.value, self.args.reparam)
 
             col_name = f'edge_{self.args.kind}'

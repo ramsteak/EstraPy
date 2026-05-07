@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass, field
 
-from scipy.interpolate import BSpline, make_interp_spline # type: ignore
+from scipy.interpolate import BSpline, make_interp_spline
 
 @dataclass
 class FeffPath:

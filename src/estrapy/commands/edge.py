@@ -3,7 +3,7 @@ import numpy as np
 from numpy import typing as npt
 from logging import Logger
 from dataclasses import dataclass
-from scipy.interpolate import make_interp_spline, BSpline # type: ignore
+from scipy.interpolate import make_interp_spline, BSpline
 from lark import Token, Tree
 from typing import Self
 from functools import partial

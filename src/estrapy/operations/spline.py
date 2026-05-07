@@ -4,7 +4,7 @@ from numpy import typing as npt
 from itertools import pairwise
 from typing import NamedTuple, TypeVar, Callable
 
-from scipy.linalg import lstsq, svd # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from scipy.linalg import lstsq, svd
 
 class SplineFitFewPointsWarning(RuntimeWarning):
     """Raised when a segment has fewer data points than its polynomial degree,

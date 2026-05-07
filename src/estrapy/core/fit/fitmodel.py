@@ -9,8 +9,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Union, Self, Literal
 from mashumaro import DataClassDictMixin
 from collections import OrderedDict
-from scipy.optimize import least_squares, OptimizeResult #, approx_fprime # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
-from scipy.optimize._numdiff import approx_derivative # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from scipy.optimize import least_squares, OptimizeResult #, approx_fprime
+from scipy.optimize._numdiff import approx_derivative
 
 from .feff8loader import FeffPath, load_path
 from ..misc import Sack

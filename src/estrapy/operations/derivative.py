@@ -1,8 +1,8 @@
 import numpy as np
 from numpy import typing as npt
 from typing import Literal, Any
-from scipy.interpolate import UnivariateSpline # pyright: ignore[reportMissingTypeStubs]
-from scipy.signal import savgol_filter # pyright: ignore[reportUnknownVariableType, reportMissingTypeStubs]
+from scipy.interpolate import UnivariateSpline
+from scipy.signal import savgol_filter
 
 def derivative2(_f: npt.ArrayLike, dx: float | npt.ArrayLike = 1.0) -> npt.NDArray[Any]:
     """

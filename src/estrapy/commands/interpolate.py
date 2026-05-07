@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from scipy.interpolate import make_interp_spline # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from scipy.interpolate import make_interp_spline
 from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self

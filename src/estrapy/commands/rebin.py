@@ -6,7 +6,7 @@ from lark import Token, Tree
 from dataclasses import dataclass
 from typing import Self
 
-from scipy.interpolate import make_interp_spline # pyright: ignore[reportMissingTypeStubs, reportUnknownVariableType]
+from scipy.interpolate import make_interp_spline
 
 from ..core.datastore import Domain
 from ..core.context import Context, ParseContext, Command, CommandResult
