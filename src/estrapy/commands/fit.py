@@ -12,22 +12,62 @@ from matplotlib.colors import SymLogNorm
 
 from ..core.context import CommandArguments, Command, CommandResult
 from ..core.context import Context, ParseContext
-from ..core.commandparser import CommandArgumentParser
+from ..core.commandparser import CommandArgumentParser, field_arg
 from ..core.number import Number, parse_range, Unit
 from ..operations.fourier import apodizer_functions
-from ..core.misc import fuzzy_match
 from ..core.fit.fitmodel import ExafsModel
 from ..core.datastore import Domain
 from ..operations.fourier import flattop_window, fourier
+from ..core._validators import validate_range_unit, validate_float_non_negative, type_fuzzy, validate_option_in
 
 @dataclass(slots=True)
 class CommandArguments_Fit(CommandArguments):
-    modelpath: Path
-    krange: tuple[Number, Number]
-    rrange: tuple[Number, Number]
-    kweight: float
-    apodizer: str
-    apodizerp: float
+    modelpath: Path = field_arg(
+        type=Path,
+        required=True,
+    )
+
+    krange: tuple[Number, Number] = field_arg(
+        flags=['--krange'],
+        nargs=2,
+        types=parse_range,
+        required=False,
+        default=(Number(None, 0.0, Unit.K), Number(None, np.inf, Unit.K)),
+        validate=validate_range_unit(Unit.K)
+    )
+
+    rrange: tuple[Number, Number] = field_arg(
+        flags=['--rrange'],
+        nargs=2,
+        types=parse_range,
+        required=False,
+        default=(Number(None, 0.0, Unit.A), Number(None, np.inf, Unit.A)),
+        validate=validate_range_unit(Unit.A)
+    )
+
+    kweight: float = field_arg(
+        flags=['--kweight', '-k'],
+        type=float,
+        required=False,
+        default=0.0,
+        validate=validate_float_non_negative
+    )
+
+    apodizer: str = field_arg(
+        flags=['--apodizer', '-a'],
+        type=type_fuzzy(list(apodizer_functions)),
+        required=False,
+        default='hanning',
+        validate=validate_option_in(apodizer_functions)
+    )
+
+    apodizerp: float = field_arg(
+        flags=['--parameter', '-p'],
+        type=float,
+        required=False,
+        default=3.0
+    )
+
 
     # to be filled after parsing. If still None after parsing, raise error.
     model: ExafsModel = None  # type: ignore
@@ -36,15 +76,7 @@ class CommandArguments_Fit(CommandArguments):
 class CommandResult_Fit(CommandResult):
     ...
 
-parse_fit_command = CommandArgumentParser(CommandArguments_Fit)
-parse_fit_command.add_argument('modelpath', required=True, type=Path)
-_default_krange = (Number(None, 0.0, Unit.K), Number(None, np.inf, Unit.K))
-_default_rrange = (Number(None, 0.0, Unit.A), Number(None, np.inf, Unit.A))
-parse_fit_command.add_argument('krange', '--krange', nargs=2, types=parse_range, default=_default_krange)
-parse_fit_command.add_argument('rrange', '--rrange', nargs=2, types=parse_range, default=_default_rrange)
-parse_fit_command.add_argument('kweight', '--kweight', '-k', type=float, required=False, default=0.0)
-parse_fit_command.add_argument('apodizer', '--apodizer', '-a', type=str, required=False, default='hanning')
-parse_fit_command.add_argument('apodizerp', '--parameter', '-p', type=float, required=False, default=3)
+parse_fit_command = CommandArgumentParser(CommandArguments_Fit, 'fit')
 
 
 @dataclass(slots=True)
@@ -53,29 +85,7 @@ class Command_Fit(Command[CommandArguments_Fit, CommandResult_Fit]):
     def parse(
         cls: type[Self], commandtoken: Token, tokens: list[Token | Tree[Token]], parsecontext: ParseContext
     ) -> Self:
-        arguments = parse_fit_command(commandtoken, tokens, parsecontext)
-
-        # Validate parameters --------------------------------------------------------------
-        if arguments.krange[0].unit != Unit.K or arguments.krange[1].unit != Unit.K:
-            raise ValueError('Fit krange must be specified in k units.')
-        if arguments.krange[0].value < 0.0:
-            raise ValueError('Fit krange start must be non-negative.')
-        if arguments.krange[1].value <= arguments.krange[0].value:
-            raise ValueError('Fit krange end must be greater than start.')
-        if arguments.rrange[0].unit != Unit.A or arguments.rrange[1].unit != Unit.A:
-            raise ValueError('Fit rrange must be specified in Angstroms.')
-        if arguments.rrange[0].value < 0.0:
-            raise ValueError('Fit rrange start must be non-negative.')
-        if arguments.rrange[1].value <= arguments.rrange[0].value:
-            raise ValueError('Fit rrange end must be greater than start.')
-        if arguments.kweight < 0.0:
-            raise ValueError('Fit kweight must be non-negative.')
-        if arguments.apodizer not in apodizer_functions:
-            apodizer = fuzzy_match(arguments.apodizer, apodizer_functions)
-            if apodizer is not None:
-                arguments.apodizer = apodizer
-            else:
-                raise ValueError(f"Unknown apodizer function '{arguments.apodizer}'. Available options are: {', '.join(apodizer_functions)}.")
+        arguments = parse_fit_command.parse(commandtoken, tokens)
 
         # Resolve and read model ---------------------------------------------------------------
         if not arguments.modelpath.is_absolute():
