@@ -63,22 +63,6 @@ class Options:
     # Whether interactive mode is enabled.
     interactive: bool = False
 
-
-@dataclass(slots=True)
-class ParseContext:
-    # Paths object containing all relevant paths.
-    paths: Paths
-
-    # Timers object containing all relevant timers.
-    timers: TimerCollection
-
-    # Logger object for logging.
-    logger: Logger
-
-    # Grammar parser
-    parser: Lark
-
-
 # Plotting context
 @dataclass(slots=True)
 class AxisSpecification:
@@ -147,6 +131,24 @@ class Context:
 
 _A = TypeVar('_A', bound=CommandArguments, covariant=True)
 _R = TypeVar('_R', bound=CommandResult, covariant=True)
+
+@dataclass(slots=True)
+class ParseContext:
+    # Paths object containing all relevant paths.
+    paths: Paths
+
+    # Timers object containing all relevant timers.
+    timers: TimerCollection
+
+    # Logger object for logging.
+    logger: Logger
+
+    # Grammar parser
+    parser: Lark
+
+    # Commands so far, used by some commands to introspect other commands.
+    commands: 'list[Command[CommandArguments, CommandResult]]' = field(default_factory=list) # pyright: ignore[reportUnknownVariableType]
+
 
 @dataclass(slots=True)
 class Command(Generic[_A, _R]):
