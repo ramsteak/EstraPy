@@ -1,10 +1,23 @@
 import numpy as np
 
-from typing import Callable, TypeVar, Collection, Any, Iterable, Union
+from typing import Callable, TypeVar, Collection, Any, Iterable, Union, Sequence
 from enum import Enum
 
 from .number import Number, Unit
 from .misc import fuzzy_match_enum, fuzzy_match
+
+_T = TypeVar('_T')
+def listof(func: Callable[[_T], bool]) -> Callable[[Sequence[_T]], bool]:
+    def validator(lst: Sequence[_T] | Any) -> bool:
+        if not isinstance(lst, Sequence):
+            raise ValueError(f"Expected a sequence, got {type(lst).__name__}.")
+        for i, item in enumerate(lst): # pyright: ignore[reportUnknownArgumentType]
+            try:
+                func(item)
+            except ValueError as e:
+                raise ValueError(f"Invalid item at index {i}: {e}")
+        return True
+    return validator
 
 def validate_non_null(value: object | None) -> bool:
     """Validator to check if a value is not None."""
