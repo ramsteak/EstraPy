@@ -933,7 +933,7 @@ class CommandArgumentParser(Generic[_CA]):
         if arg_spec.required:
             match result:
                 case TokenFlowControl.FAILED_PARSE:
-                    raise CommandParseError(f'Could not parse value as {arg_name}', tokens.peek_n(1))
+                    raise CommandParseError(f'Could not parse value {str(tokens.peek_n(1))} as argument "{arg_name}"', tokens.peek_n(1))
                 case TokenFlowControl.FAILED | TokenFlowControl.FAILED_BAD | TokenFlowControl.FAILED_TYPE:
                     raise CommandParseError(f'Missing required positional argument {arg_name}', tokens.peek_n(1))
                 case TokenFlowControl.SUCCESS | TokenFlowControl.REATTEMPT | TokenFlowControl.EXHAUSTED:
