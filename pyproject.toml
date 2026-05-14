@@ -20,7 +20,11 @@ dependencies = [
 
 
 [tool.setuptools.package-data]
-estrapy = ["core/grammar/*.lark"]
+estrapy = [
+    "core/grammar/*.lark",
+    "mucal/mucal.c",
+    "mucal/mucal.h",
+    "mucal/mucal.dll",]
 
 [tool.ruff]
 line-length = 120
