@@ -274,7 +274,7 @@ def discover_input_files(directory: Path) -> list[Path]:
 
 
 def select_input_file(files: list[str]) -> str:
-    import inquirer # pyright: ignore[reportMissingTypeStubs] # 
+    import inquirer # pyright: ignore[reportMissingTypeStubs]
 
     questions = [
         inquirer.List(
